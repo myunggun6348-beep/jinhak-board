@@ -152,6 +152,7 @@ function buildTestPage() {
       six: c(mk(six)).map((w) => w.code),
       itv: c(mk([{ kind: "수시", univ: "A", status: "1단계합", itv: "2026-11-28" }, { kind: "수시", univ: "B", status: "1단계합", itv: "2026-11-28" }])).map((w) => w.code),
       jungsi: c(mk([{ kind: "수시", univ: "A", status: "최초합" }, { kind: "정시", univ: "B", status: "지원완료" }])).map((w) => w.code),
+      jungsiGaveUp: c(mk([{ kind: "수시", univ: "A", status: "등록포기" }, { kind: "정시", univ: "B", status: "지원완료" }])).map((w) => w.code),
       dual: c(mk([{ kind: "수시", univ: "A", status: "등록완료" }, { kind: "수시", univ: "B", status: "등록완료" }])).map((w) => w.code),
       due: c(mk([{ kind: "수시", univ: "A", status: "충원대기", due: iso }])).map((w) => w.code),
       minreq: c(mk([{ kind: "수시", univ: "A", status: "지원완료", mmet: "미충족" }])).map((w) => w.code),
@@ -161,10 +162,36 @@ function buildTestPage() {
   check("① 6장 초과", rules.six, ["6장초과"]);
   check("② 면접일 중복", rules.itv, ["면접중복"]);
   check("③ 수시 합격자의 정시 지원", rules.jungsi, ["정시지원불가"]);
+  check("③ 등록을 포기해도 정시 지원 불가", rules.jungsiGaveUp, ["정시지원불가"]);
   check("④ 이중등록", rules.dual, ["이중등록"]);
   check("⑤ 충원 마감 임박", rules.due, ["충원마감"]);
   check("⑥ 수능최저 미충족", rules.minreq, ["최저 미충족"]);
   check("문제 없는 학생은 경고 없음", rules.clean, []);
+
+  console.log("\n[수능최저 자동 판정]");
+  // 국3 수2 영1 탐3·4 한4. 기대값이 null이면 판정하지 않아야 한다(틀린 판정보다 판정 없음이 낫다).
+  const g = { kor: "3", math: "2", eng: "1", inq1: "3", inq2: "4", his: "4" };
+  const minCasesJ = [
+    ["국수영탐 중 2개합 5", g, "충족"],
+    ["2개합 2", g, "미충족"],
+    ["3합7", g, "충족"],
+    ["국,수,영,탐 중 3개 합 7, 한국사 4등급 이내", g, "충족"],
+    ["2개합 5, 한국사 3", g, "미충족"],
+    ["수학 포함 2개합 3", g, "충족"],
+    ["국어 포함 2개합 3", g, "미충족"],
+    ["국수탐(1) 2개합 4", g, "미충족"],
+    ["3개 영역 각 3등급", g, "충족"],
+    ["국수영탐 각 3", g, null],
+    ["탐구 2과목 평균 3, 2개합 5", g, null],
+    ["없음", g, "해당없음"],
+    ["", g, null],
+    ["수학(미적/기하) 포함 2개합 5", g, null],
+    ["2개합 5 또는 영어 1", g, null],
+    ["상위 2개 평균 2.5", g, null],
+    ["2개합 5", { kor: "3" }, null],
+  ];
+  const judged = await p.evaluate((cs) => cs.map((c) => window.__dev.judgeMin(c[0], c[1]).res), minCasesJ);
+  minCasesJ.forEach((c, i) => check("‘" + c[0] + "’", judged[i], c[2]));
 
   check("자바스크립트 오류 없음", errors, []);
   await browser.close();

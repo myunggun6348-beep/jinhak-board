@@ -152,6 +152,8 @@ button{cursor:pointer}
 .apphead{display:flex; align-items:center; gap:8px; margin-bottom:8px}
 .apphead .kind{font-size:11px; font-weight:700; letter-spacing:.05em; color:var(--accent);
   background:var(--accent-soft); padding:2px 8px; border-radius:5px}
+.minnote{margin-top:8px; font-size:12px; color:var(--ink-3)}
+.minnote.off{color:var(--warn); font-weight:700}
 .apphead .warnnote{font-size:11.5px; color:var(--bad); font-weight:700; margin-left:auto}
 .del{border:0; background:transparent; color:var(--ink-3); font-size:12px; padding:3px 6px; border-radius:5px}
 .del:hover{color:var(--bad); background:var(--bad-soft)}
@@ -315,7 +317,7 @@ var KINDS = ["수시","정시"];
 var TYPES = ["학종","교과","논술","실기","정시"];
 var GROUPS = ["가","나","다"];
 var STATUSES = ["지원완료","1단계합","1단계불","면접완료","최초합","충원대기","충원합","불합격","등록완료","등록포기"];
-var PASS = {"최초합":1,"충원합":1,"등록완료":1};
+var PASS = {"최초합":1,"충원합":1,"등록완료":1,"등록포기":1}; /* 등록포기도 합격한 뒤에만 생긴다. 정시 지원 불가 판정에 필요 */
 var MINSTATES = ["미정","충족","미충족","해당없음"];
 var LIVE = {"지원완료":1,"1단계합":1,"면접완료":1,"충원대기":1};
 
@@ -329,7 +331,7 @@ function soon(days,h){var d=new Date(); d.setDate(d.getDate()+days); d.setHours(
   var p=function(n){return n<10?"0"+n:""+n;};
   return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+"T"+p(d.getHours())+":00";}
 var DEMO=[
- {id:"d1",cls:2,no:"30203",name:"강민서",apps:[
+ {id:"d1",cls:2,no:"30203",name:"강민서",csat:{kor:"4",math:"4",eng:"3",inq1:"4",inq2:"5",his:"3"},apps:[
    {id:"a1",kind:"수시",univ:"부산대학교",major:"수학교육과",jh:"학생부교과(학교장추천)",type:"교과",c6:true,itv:"",due:"",status:"지원완료",rank:"",note:"",mreq:"국수영탐 중 2개합 6",mmet:"미충족"},
    {id:"a2",kind:"수시",univ:"경북대학교",major:"통계학과",jh:"학생부종합(일반)",type:"학종",c6:true,itv:"2026-11-28",due:"",status:"1단계합",rank:"",note:""}]},
  {id:"d2",cls:2,no:"30211",name:"윤하늘",apps:[
@@ -393,6 +395,87 @@ function appWarn(st,a){
   if(a.status==="등록완료"&&apps.filter(function(x){return x.status==="등록완료";}).length>1) return "이중등록";
   if(a.status==="충원대기"&&a.due){var d=daysTo(a.due); if(d!==null&&d>=0&&d<=3) return "충원 마감 임박";}
   return "";
+}
+
+/* ── 수능최저 자동 판정 ─────────────────────
+   기준 문장을 읽어 조건 목록으로 바꾼다. 알아보지 못한 부분이 조금이라도 남으면 판정하지 않는다.
+   탐구 반영 방식(상위 1과목 / 2과목 평균 / 평균 절사)이 적혀 있지 않으면 셋 다 계산해
+   결과가 모두 같을 때만 판정한다. 틀린 판정은 판정 없음보다 위험하다. */
+var CSAT=[["kor","국어"],["math","수학"],["eng","영어"],["inq1","탐구1"],["inq2","탐구2"],["his","한국사"]];
+var CSATKEY={"국":"kor","수":"math","영":"eng","한":"his"};
+var CSATNAME={"국":"국어","수":"수학","영":"영어","탐":"탐구","한":"한국사"};
+function parseMin(raw){
+  var s=String(raw||"").replace(/\s+/g,"");
+  if(!s) return {err:"기준이 비어 있습니다"};
+  if(/^(없음|해당없음|미적용|최저없음|무|-|—|x|X)$/.test(s)) return {none:true};
+  if(/(미적|기하|확통|확률|과탐|사탐|직탐|제2외|외국어|한문|또는|혹은)/.test(s))
+    return {err:"선택과목·대체 조건이 있어 직접 확인해야 합니다"};
+  s=s.replace(/(수능최저학력기준|수능최저기준|수능최저|최저학력기준|최저기준|최저|등급|이내|영역|반영|적용|:)/g,"")
+     .replace(/국어/g,"국").replace(/수학/g,"수").replace(/영어/g,"영").replace(/탐구/g,"탐").replace(/한국사/g,"한");
+  var top=/1과목|\(1\)/.test(s), avg=/2과목|\(2\)|평균/.test(s), cut=/절사|버림/.test(s);
+  if(top&&avg) return {err:"탐구 반영 방식이 두 가지로 적혀 있습니다"};
+  var modes=top?["top"]:avg?(cut?["floor"]:["avg","floor"]):["top","avg","floor"];
+  s=s.replace(/\([12]\)|(상위)?[12]과목|평균|소수점?(이하)?(절사|버림)|절사|버림/g,"")
+     .replace(/([국수영탐한])[,·\/]+(?=[국수영탐한])/g,"$1");
+  var must=null;
+  s=s.replace(/\(?([국수영탐])(?:필수)?포함\)?|\(?([국수영탐])필수\)?/g,function(_,a,b){must=a||b; return ",";});
+  var conds=[];
+  s=s.replace(/([국수영탐]+)?중?(\d)개?(합|각)(\d{1,2})/g,function(_,set,n,op,m){
+    conds.push({set:set||"국수영탐",n:+n,op:op,m:+m}); return ",";});
+  s=s.replace(/([국수영탐]{2,})각(\d)/g,function(_,set,m){ conds.push({set:set,n:set.length,op:"각",m:+m}); return ",";});
+  s=s.replace(/([국수영탐한])(\d)(?![\d개합각])/g,function(_,a,m){ conds.push({set:a,n:1,op:"각",m:+m}); return ",";});
+  var rest=s.replace(/[,+\/·&()\[\]、.]|및|중|이고|그리고|탐/g,"");
+  if(rest) return {err:"알아보지 못한 표현이 있습니다. 예: 국수영탐 중 2개합 5, 한국사 4"};
+  if(!conds.length) return {err:"조건을 찾지 못했습니다"};
+  for(var i=0;i<conds.length;i++){
+    var c=conds[i]; c.set=c.set.split("").filter(function(x,j,arr){return arr.indexOf(x)===j;}).join("");
+    if(must&&c.n>1){ if(c.set.indexOf(must)<0) return {err:"포함 과목이 영역 목록에 없습니다"}; c.must=must; }
+    if(c.n>c.set.length) return {err:c.set+" 중 "+c.n+"개는 고를 수 없습니다"};
+  }
+  return {conds:conds, modes:modes};
+}
+function minEval(conds,g,mode){
+  var miss=null;
+  function gv(a){
+    if(a==="탐"){
+      var x=+g.inq1||0, y=+g.inq2||0;
+      if(mode==="top") return (x||y)?Math.min(x||9,y||9):0;
+      if(!x||!y) return 0;
+      return mode==="floor"?Math.floor((x+y)/2):(x+y)/2;
+    }
+    return +g[CSATKEY[a]]||0;
+  }
+  var ok=true, why=[];
+  conds.forEach(function(c){
+    var vals=c.set.split("").map(function(a){ var v=gv(a); if(!v) miss=miss||CSATNAME[a]; return {a:a,v:v}; });
+    if(miss) return;
+    var pick=c.must?vals.filter(function(x){return x.a===c.must;}):[];
+    pick=pick.concat(vals.filter(function(x){return x.a!==c.must;}).sort(function(p,q){return p.v-q.v;}).slice(0,c.n-pick.length));
+    var nums=pick.map(function(x){return x.v;});
+    var got=c.op==="합"?nums.reduce(function(p,q){return p+q;},0):Math.max.apply(null,nums);
+    if(got>c.m) ok=false;
+    why.push((c.n===1?CSATNAME[pick[0].a]:c.n+"개"+c.op)+" "+got+(got>c.m?" > ":" ≤ ")+c.m);
+  });
+  return {ok:ok, why:why.join(", "), miss:miss};
+}
+function judgeMin(raw,g){
+  var p=parseMin(raw);
+  if(p.none) return {res:"해당없음", why:"수능최저 없음"};
+  if(p.err) return {res:null, why:p.err};
+  var outs=p.modes.map(function(m){ return minEval(p.conds,g||{},m); });
+  if(outs[0].miss) return {res:null, why:outs[0].miss+" 등급이 없습니다"};
+  if(outs.some(function(o){return o.ok!==outs[0].ok;}))
+    return {res:null, why:"탐구 반영 방식(1과목·2과목 평균)에 따라 결과가 갈립니다. 요강을 보고 기준에 적어 주세요"};
+  return {res:outs[0].ok?"충족":"미충족", why:outs[0].why};
+}
+function hasCsat(st){ return CSAT.some(function(k){ return st.csat&&st.csat[k[0]]; }); }
+/* 등급이나 기준을 고쳤을 때만 부른다. 그 뒤 담임이 직접 고른 값은 다음 수정 때까지 그대로 둔다. */
+function applyMin(st){
+  (st.apps||[]).forEach(function(a){
+    if(a.kind!=="수시") return;
+    var r=judgeMin(a.mreq, st.csat);
+    if(r.res) a.mmet=r.res;
+  });
 }
 
 /* ── data access ───────────────────────────── */
@@ -552,6 +635,16 @@ function dateInput(type,value,onchange){
 }
 function detail(st){
   var d=el("div","detail");
+  var cs=el("div","app");
+  cs.appendChild(el("div","apphead")).appendChild(el("span","kind","수능 등급"));
+  var cg=el("div","grid csat");
+  CSAT.forEach(function(k){
+    cg.appendChild(field(k[1], sel(["","1","2","3","4","5","6","7","8","9"],(st.csat&&st.csat[k[0]])||"",function(v){
+      st.csat=st.csat||{}; st.csat[k[0]]=v; applyMin(st); save(st); render();
+    })));
+  });
+  cs.appendChild(cg);
+  d.appendChild(cs);
   (st.apps||[]).forEach(function(a){
     var w=appWarn(st,a);
     var box=el("div","app"+(w?" warn":""));
@@ -577,7 +670,7 @@ function detail(st){
     g.appendChild(field("충원 마감", dateInput("datetime-local",a.due,function(v){a.due=v; save(st); render();})));
     g.appendChild(field("상태", sel(STATUSES,a.status,function(v){a.status=v; save(st); render();})));
     if(a.kind==="수시"){
-      g.appendChild(field("수능최저 기준", txt(a.mreq,"예: 2개합 5",function(v){a.mreq=v; save(st);})));
+      g.appendChild(field("수능최저 기준", txt(a.mreq,"예: 2개합 5",function(v){a.mreq=v; applyMin(st); save(st); render();})));
       g.appendChild(field("최저 충족", sel(MINSTATES,a.mmet||"미정",function(v){a.mmet=v; save(st); render();})));
     }
     g.appendChild(field("예비번호", txt(a.rank,"",function(v){a.rank=v; save(st);},"mono")));
@@ -590,6 +683,14 @@ function detail(st){
       g.appendChild(field("6장 제한", cb));
     }
     box.appendChild(g);
+    if(a.kind==="수시"){
+      var r=judgeMin(a.mreq, st.csat);
+      if(a.mreq&&(hasCsat(st)||!r.res&&!/등급이 없습니다$/.test(r.why))){
+        var t=r.res?"자동 판정: "+r.res+" — "+r.why:"자동 판정 안 함 — "+r.why;
+        if(r.res&&r.res!==(a.mmet||"미정")) t+=" (지금은 ‘"+(a.mmet||"미정")+"’으로 직접 골라 두었습니다)";
+        box.appendChild(el("div","minnote"+(r.res&&r.res===a.mmet?"":" off"),t));
+      }
+    }
     d.appendChild(box);
   });
 
@@ -1157,7 +1258,7 @@ function commitApps(byStudent, cls){
         same.c6=a.app.c6; updated++;
       } else { st.apps.push(a.app); added++; }
     });
-    save(st);
+    applyMin(st); save(st);
   });
   pending=null;
   document.getElementById("preview").hidden=true;
@@ -1306,7 +1407,7 @@ try{ if(location.protocol==="file:"){
   window.__dev={mapStatus:mapStatus, mapMin:mapMin, mapType:mapType,
     parseDate:parseDate, parseYN:parseYN, pickStudents:pickStudents,
     parseDelimited:parseDelimited, headerIndex:headerIndex, importApps:importApps,
-    checkStudent:checkStudent};
+    checkStudent:checkStudent, parseMin:parseMin, judgeMin:judgeMin};
 } }catch(e){}
 
 if(window.claude&&window.claude.hot&&window.claude.hot.ready){ window.claude.hot.ready(start); }
