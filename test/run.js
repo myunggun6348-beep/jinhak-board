@@ -153,6 +153,9 @@ function buildTestPage() {
       itv: c(mk([{ kind: "수시", univ: "A", status: "1단계합", itv: "2026-11-28" }, { kind: "수시", univ: "B", status: "1단계합", itv: "2026-11-28" }])).map((w) => w.code),
       jungsi: c(mk([{ kind: "수시", univ: "A", status: "최초합" }, { kind: "정시", univ: "B", status: "지원완료" }])).map((w) => w.code),
       jungsiGaveUp: c(mk([{ kind: "수시", univ: "A", status: "등록포기" }, { kind: "정시", univ: "B", status: "지원완료" }])).map((w) => w.code),
+      jungsiPass: c(mk([{ kind: "정시", univ: "A", group: "가", status: "최초합" }, { kind: "정시", univ: "B", group: "나", status: "지원완료" }])).map((w) => w.code),
+      annPast: c(mk([{ kind: "수시", univ: "A", status: "면접완료", ann: "2020-01-01" }])).map((w) => w.code),
+      annDone: c(mk([{ kind: "수시", univ: "A", status: "불합격", ann: "2020-01-01" }])).map((w) => w.code),
       dual: c(mk([{ kind: "수시", univ: "A", status: "등록완료" }, { kind: "수시", univ: "B", status: "등록완료" }])).map((w) => w.code),
       due: c(mk([{ kind: "수시", univ: "A", status: "충원대기", due: iso }])).map((w) => w.code),
       minreq: c(mk([{ kind: "수시", univ: "A", status: "지원완료", mmet: "미충족" }])).map((w) => w.code),
@@ -163,9 +166,12 @@ function buildTestPage() {
   check("② 면접일 중복", rules.itv, ["면접중복"]);
   check("③ 수시 합격자의 정시 지원", rules.jungsi, ["정시지원불가"]);
   check("③ 등록을 포기해도 정시 지원 불가", rules.jungsiGaveUp, ["정시지원불가"]);
+  check("정시 합격은 수시 합격으로 치지 않음", rules.jungsiPass, []);
   check("④ 이중등록", rules.dual, ["이중등록"]);
   check("⑤ 충원 마감 임박", rules.due, ["충원마감"]);
   check("⑥ 수능최저 미충족", rules.minreq, ["최저 미충족"]);
+  check("⑦ 발표일 지났는데 결과 미입력", rules.annPast, ["결과 미입력"]);
+  check("⑦ 결과가 들어갔으면 경고 없음", rules.annDone, []);
   check("문제 없는 학생은 경고 없음", rules.clean, []);
 
   console.log("\n[수능최저 자동 판정]");

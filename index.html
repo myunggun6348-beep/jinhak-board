@@ -320,6 +320,7 @@ var STATUSES = ["지원완료","1단계합","1단계불","면접완료","최초�
 var PASS = {"최초합":1,"충원합":1,"등록완료":1,"등록포기":1}; /* 등록포기도 합격한 뒤에만 생긴다. 정시 지원 불가 판정에 필요 */
 var MINSTATES = ["미정","충족","미충족","해당없음"];
 var LIVE = {"지원완료":1,"1단계합":1,"면접완료":1,"충원대기":1};
+var AWAIT = {"지원완료":1,"1단계합":1,"면접완료":1};   // 발표일이 지났으면 결과가 들어와 있어야 하는 상태
 
 var db=null, userCap=null, downloadsCap=null, canWrite=null, unsub=null;
 var students=new Map();          // id -> doc body
@@ -365,7 +366,7 @@ function checkStudent(st){
   var six=0, passed=0, reg=0, jungsi=0, itv={};
   apps.forEach(function(a){
     if(a.kind==="수시"&&a.c6) six++;
-    if(PASS[a.status]) passed++;
+    if(a.kind==="수시"&&PASS[a.status]) passed++;
     if(a.status==="등록완료") reg++;
     if(a.kind==="정시") jungsi++;
     if(a.itv){ itv[a.itv]=(itv[a.itv]||0)+1; }
@@ -379,6 +380,8 @@ function checkStudent(st){
     if(a.kind==="수시"&&a.mmet==="미충족"&&LIVE[a.status])
       out.push({lv:"warn",code:"최저 미충족",
         msg:(a.univ||"한 곳")+" 수능최저를 채우지 못했습니다"+(a.mreq?"("+a.mreq+")":"")+". 사실상 탈락이니 정시 준비로 돌려야 합니다."});
+    if(a.ann&&AWAIT[a.status]&&daysTo(a.ann)<0)
+      out.push({lv:"warn",code:"결과 미입력",msg:(a.univ||"한 곳")+" 발표일("+a.ann+")이 지났는데 상태가 ‘"+a.status+"’ 그대로입니다. 학생에게 결과를 확인해 주세요."});
     if(a.status==="충원대기"&&a.due){
       var d=daysTo(a.due);
       if(d!==null&&d>=0&&d<=3)
@@ -390,10 +393,11 @@ function checkStudent(st){
 function appWarn(st,a){
   var apps=st.apps||[];
   if(a.kind==="수시"&&a.mmet==="미충족"&&LIVE[a.status]) return "수능최저 미충족";
-  if(a.kind==="정시"&&apps.some(function(x){return PASS[x.status];})) return "수시 합격자는 정시 지원 불가";
+  if(a.kind==="정시"&&apps.some(function(x){return x.kind==="수시"&&PASS[x.status];})) return "수시 합격자는 정시 지원 불가";
   if(a.itv&&apps.filter(function(x){return x.itv===a.itv;}).length>1) return "면접일 중복";
   if(a.status==="등록완료"&&apps.filter(function(x){return x.status==="등록완료";}).length>1) return "이중등록";
   if(a.status==="충원대기"&&a.due){var d=daysTo(a.due); if(d!==null&&d>=0&&d<=3) return "충원 마감 임박";}
+  if(a.ann&&AWAIT[a.status]&&daysTo(a.ann)<0) return "결과 미입력";
   return "";
 }
 
@@ -537,7 +541,7 @@ function renderStats(host, arr){
   arr.forEach(function(s){
     var apps=s.apps||[];
     if(apps.some(function(a){return a.kind==="수시"&&a.mmet==="미충족";})) minx++;
-    if(apps.some(function(a){return PASS[a.status];})) pass++;
+    if(apps.some(function(a){return a.kind==="수시"&&PASS[a.status];})) pass++;
     else if(apps.some(function(a){return a.status==="충원대기";})) wait++;
     else if(apps.some(function(a){return LIVE[a.status];})) live++;
     if(apps.some(function(a){return a.kind==="정시";})) js++;
@@ -667,6 +671,7 @@ function detail(st){
     g.appendChild(field("전형유형", sel(TYPES,a.type,function(v){a.type=v; save(st);})));
     if(a.kind==="정시") g.appendChild(field("군", sel([""].concat(GROUPS),a.group||"",function(v){a.group=v; save(st);})));
     g.appendChild(field("면접일", dateInput("date",a.itv,function(v){a.itv=v; save(st); render();})));
+    g.appendChild(field("발표일", dateInput("date",a.ann,function(v){a.ann=v; save(st); render();})));
     g.appendChild(field("충원 마감", dateInput("datetime-local",a.due,function(v){a.due=v; save(st); render();})));
     g.appendChild(field("상태", sel(STATUSES,a.status,function(v){a.status=v; save(st); render();})));
     if(a.kind==="수시"){
@@ -717,7 +722,7 @@ function detail(st){
 function addApp(st,kind){
   st.apps=st.apps||[];
   st.apps.push({id:uid(),kind:kind,univ:"",major:"",jh:"",type:kind==="정시"?"정시":"학종",
-    c6:kind==="수시",itv:"",due:"",status:"지원완료",rank:"",note:"",
+    c6:kind==="수시",itv:"",ann:"",due:"",status:"지원완료",rank:"",note:"",
     mreq:"",mmet:kind==="수시"?"미정":"해당없음"});
   save(st); render();
 }
@@ -733,7 +738,7 @@ function renderAll(){
     var c=s.cls||0; byCls[c]=byCls[c]||{n:0,apps:0,pass:0,wait:0,flag:0};
     var o=byCls[c]; o.n++;
     var apps=s.apps||[]; o.apps+=apps.length;
-    if(apps.some(function(a){return PASS[a.status];})) o.pass++;
+    if(apps.some(function(a){return a.kind==="수시"&&PASS[a.status];})) o.pass++;
     if(apps.some(function(a){return a.status==="충원대기";})) o.wait++;
     if(checkStudent(s).length) o.flag++;
   });
@@ -771,7 +776,7 @@ function renderAll(){
 
 /* ── csv ───────────────────────────────────── */
 function csv(arr,name){
-  var head=["반","학번","이름","구분","대학","모집단위","전형명","전형유형","군","6장포함","면접일","충원마감","상태","수능최저기준","최저충족","예비번호","메모","점검"];
+  var head=["반","학번","이름","구분","대학","모집단위","전형명","전형유형","군","6장포함","면접일","발표일","충원마감","상태","수능최저기준","최저충족","예비번호","메모","점검"];
   var lines=[head.join(",")];
   var q=function(v){ v=String(v==null?"":v); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
   arr.forEach(function(s){
@@ -779,7 +784,7 @@ function csv(arr,name){
     var apps=s.apps&&s.apps.length?s.apps:[{}];
     apps.forEach(function(a){
       lines.push([s.cls,s.no,s.name,a.kind||"",a.univ||"",a.major||"",a.jh||"",a.type||"",a.group||"",
-        a.c6?"Y":"N",a.itv||"",a.due||"",a.status||"",a.mreq||"",a.mmet||"",a.rank||"",a.note||"",w].map(q).join(","));
+        a.c6?"Y":"N",a.itv||"",a.ann||"",a.due||"",a.status||"",a.mreq||"",a.mmet||"",a.rank||"",a.note||"",w].map(q).join(","));
     });
   });
   var data="﻿"+lines.join("\r\n");
@@ -1052,6 +1057,7 @@ var COLMAP=[
   ["group",   /^(군|모집군|분할모집군)$/],
   ["c6",      /^(6장포함|6장|제한포함|6장제한)$/],
   ["itv",     /^(면접일|면접일자|면접날짜|면접)$/],
+  ["ann",     /^(발표일|발표일자|발표|합격자발표|합격자발표일|결과발표|결과발표일)$/],
   ["due",     /^(충원마감|충원마감일|충원|예비마감|충원기간)$/],
   ["status",  /^(상태|결과|합불|진행상태|합격여부)$/],
   ["mreq",    /^(수능최저기준|수능최저|최저기준|최저학력기준|최저)$/],
@@ -1163,7 +1169,7 @@ function importApps(rows, cls, hdr){
         type:mapType(get("type"))||(kind==="정시"?"정시":"학종"),
         group:(function(){var g=norm(get("group")); return /^[가나다]$/.test(g)?g:"";})(),
         c6:(yn===null? kind==="수시" : yn),
-        itv:parseDate(get("itv"),false), due:due,
+        itv:parseDate(get("itv"),false), ann:parseDate(get("ann"),false), due:due,
         mreq:String(get("mreq")||"").trim(),
         mmet:(kind==="정시"?"해당없음":(mapMin(get("mmet"))||"미정")),
         status:st||"지원완료", rank:String(get("rank")||"").trim(),
@@ -1252,7 +1258,7 @@ function commitApps(byStudent, cls){
         return x.univ===a.app.univ && (x.jh||"")===(a.app.jh||"") && x.kind===a.app.kind;
       })[0];
       if(same){
-        ["major","type","group","itv","due","status","rank","note"].forEach(function(k){
+        ["major","type","group","itv","ann","due","status","rank","note"].forEach(function(k){
           if(a.app[k]) same[k]=a.app[k];
         });
         same.c6=a.app.c6; updated++;
@@ -1279,10 +1285,10 @@ function tmplRoster(){
 }
 function tmplApps(){
   var rows=[
-    ["학번","이름","구분","대학","모집단위","전형명","전형유형","군","6장포함","면접일","충원마감","상태","수능최저기준","최저충족","예비번호","메모"],
-    ["30201","예시 김민수","수시","부산대학교","수학교육과","학생부교과(학교장추천)","교과","","Y","","","지원완료","국수영탐 중 2개합 5","미정","",""],
-    ["30201","예시 김민수","수시","경북대학교","통계학과","학생부종합(일반)","학종","","Y","2026-11-28","2026-12-26 18:00","1단계합","해당없음","해당없음","",""],
-    ["30202","예시 이서연","정시","동아대학교","기계공학과","수능위주","정시","가","N","","","지원완료","","","",""]
+    ["학번","이름","구분","대학","모집단위","전형명","전형유형","군","6장포함","면접일","발표일","충원마감","상태","수능최저기준","최저충족","예비번호","메모"],
+    ["30201","예시 김민수","수시","부산대학교","수학교육과","학생부교과(학교장추천)","교과","","Y","","2026-12-12","","지원완료","국수영탐 중 2개합 5","미정","",""],
+    ["30201","예시 김민수","수시","경북대학교","통계학과","학생부종합(일반)","학종","","Y","2026-11-28","2026-12-12","2026-12-26 18:00","1단계합","해당없음","해당없음","",""],
+    ["30202","예시 이서연","정시","동아대학교","기계공학과","수능위주","정시","가","N","","","","지원완료","","","",""]
   ];
   saveCsv(rows,"지원현황서식.csv");
 }
