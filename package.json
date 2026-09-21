@@ -1,0 +1,14 @@
+{
+  "name": "jinhak-board",
+  "version": "1.0.0",
+  "private": true,
+  "description": "고3 담임용 대입 지원·결과 현황판",
+  "scripts": {
+    "test": "node test/run.js"
+  },
+  "devDependencies": {
+    "jszip": "3.10.1",
+    "playwright": "^1.47.0",
+    "xlsx": "0.18.5"
+  }
+}

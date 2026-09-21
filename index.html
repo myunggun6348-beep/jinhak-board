@@ -1,0 +1,1315 @@
+<title>3학년 진학 현황판</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --bg:#F5F7FA; --surface:#FFFFFF; --surface-2:#EDF1F6; --surface-3:#E3E9F1;
+  --ink:#151E2B; --ink-2:#4F5D6E; --ink-3:#8593A4;
+  --line:#DCE3EC; --line-2:#C7D2E0;
+  --accent:#2F4B7C; --accent-2:#41639C; --accent-soft:#E6EDF9;
+  --ok:#136B49; --ok-soft:#DFF1E8;
+  --warn:#8F5400; --warn-soft:#FBECD5;
+  --bad:#A02A21; --bad-soft:#FAE5E2;
+  --on-accent:#FFFFFF;
+  --shadow:0 1px 2px rgba(21,30,43,.06), 0 6px 18px rgba(21,30,43,.06);
+  --radius:10px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#10151C; --surface:#161D26; --surface-2:#1D2630; --surface-3:#26313D;
+    --ink:#E8EDF3; --ink-2:#A8B4C2; --ink-3:#77838F;
+    --line:#293341; --line-2:#364354;
+    --accent:#93B2E9; --accent-2:#A9C3F1; --accent-soft:#1C2942;
+    --ok:#62C695; --ok-soft:#12301F;
+    --warn:#E0A24C; --warn-soft:#332614;
+    --bad:#EB8880; --bad-soft:#331A18;
+    --on-accent:#0E1620;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 6px 18px rgba(0,0,0,.28);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#10151C; --surface:#161D26; --surface-2:#1D2630; --surface-3:#26313D;
+  --ink:#E8EDF3; --ink-2:#A8B4C2; --ink-3:#77838F;
+  --line:#293341; --line-2:#364354;
+  --accent:#93B2E9; --accent-2:#A9C3F1; --accent-soft:#1C2942;
+  --ok:#62C695; --ok-soft:#12301F;
+  --warn:#E0A24C; --warn-soft:#332614;
+  --bad:#EB8880; --bad-soft:#331A18;
+  --on-accent:#0E1620;
+  --shadow:0 1px 2px rgba(0,0,0,.3), 0 6px 18px rgba(0,0,0,.28);
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:"Noto Sans KR","Malgun Gothic",system-ui,sans-serif;
+  font-size:14px; line-height:1.55; -webkit-font-smoothing:antialiased;
+}
+.mono{font-family:"IBM Plex Mono",ui-monospace,monospace; font-variant-numeric:tabular-nums}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent-2); outline-offset:2px; border-radius:4px}
+
+/* ── shell ─────────────────────────────────── */
+.topbar{
+  position:sticky; top:env(safe-area-inset-top,0px); z-index:20;
+  background:var(--surface); border-bottom:1px solid var(--line);
+  padding-block:10px; padding-inline:16px;
+  display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+}
+.brand{display:flex; align-items:baseline; gap:9px; margin-right:auto}
+.brand h1{font-size:16px; font-weight:700; margin:0; letter-spacing:-.01em}
+.brand .yr{font-size:11px; color:var(--ink-3); letter-spacing:.06em}
+.tabs{display:flex; gap:3px; background:var(--surface-2); padding:3px; border-radius:8px}
+.tabs button{
+  border:0; background:transparent; color:var(--ink-2);
+  padding:6px 13px; border-radius:6px; font-size:13px; font-weight:500;
+}
+.tabs button[aria-selected="true"]{background:var(--surface); color:var(--ink); box-shadow:var(--shadow); font-weight:700}
+.sync{font-size:11.5px; color:var(--ink-3); display:flex; align-items:center; gap:5px; min-width:0}
+.sync span:last-child{overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--ink-3);flex:none}
+.dot.live{background:var(--ok)}
+.dot.off{background:var(--warn)}
+
+.wrap{max-width:1180px; margin:0 auto; padding-inline:16px; padding-block:18px 64px}
+
+/* ── class picker ──────────────────────────── */
+.classbar{display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:16px}
+.classbar .lab{font-size:12px; color:var(--ink-3); letter-spacing:.04em; margin-right:2px}
+.chip{
+  border:1px solid var(--line-2); background:var(--surface); color:var(--ink-2);
+  padding:6px 14px; border-radius:999px; font-size:13px; font-weight:500;
+}
+.chip[aria-pressed="true"]{background:var(--accent); border-color:var(--accent); color:var(--on-accent); font-weight:700}
+
+/* ── alert strip ───────────────────────────── */
+.alerts{display:flex; flex-direction:column; gap:7px; margin-bottom:18px}
+.alert{
+  display:flex; gap:10px; align-items:flex-start;
+  border:1px solid var(--line); border-left:3px solid var(--warn);
+  background:var(--warn-soft); border-radius:var(--radius);
+  padding:10px 13px; font-size:13px;
+}
+.alert.crit{border-left-color:var(--bad); background:var(--bad-soft)}
+.alert b{font-weight:700}
+.alert .who{font-weight:700; white-space:nowrap}
+.alert .msg{color:var(--ink-2)}
+.alert .msg strong{color:var(--ink); font-weight:700}
+
+/* ── stats ─────────────────────────────────── */
+.stats{display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:1px;
+  background:var(--line); border:1px solid var(--line); border-radius:var(--radius);
+  overflow:hidden; margin-bottom:18px}
+.stat{background:var(--surface); padding:12px 14px}
+.stat .n{font-size:22px; font-weight:700; letter-spacing:-.02em; display:block; line-height:1.2}
+.stat .k{font-size:11.5px; color:var(--ink-3); letter-spacing:.03em}
+.stat.ok .n{color:var(--ok)} .stat.warn .n{color:var(--warn)} .stat.bad .n{color:var(--bad)}
+
+/* ── student list ──────────────────────────── */
+.listhead{display:flex; align-items:baseline; gap:10px; margin:0 0 9px; padding-inline:2px}
+.listhead h2{font-size:14px; font-weight:700; margin:0}
+.listhead .cnt{font-size:12px; color:var(--ink-3)}
+.listhead .sp{margin-left:auto; display:flex; gap:6px}
+.ghost{border:1px solid var(--line-2); background:var(--surface); color:var(--ink-2);
+  padding:5px 11px; border-radius:7px; font-size:12.5px; font-weight:500}
+.ghost:hover{background:var(--surface-2); color:var(--ink)}
+
+.rows{display:flex; flex-direction:column; gap:6px}
+.row{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow)}
+.row.flag{border-color:var(--bad); }
+.rowhead{display:flex; align-items:center; gap:12px; padding:10px 13px; width:100%;
+  background:transparent; border:0; text-align:left}
+.rowhead .no{font-size:12.5px; color:var(--ink-3); width:52px; flex:none}
+.rowhead .nm{font-weight:700; width:78px; flex:none; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.pills{display:flex; gap:5px; flex-wrap:wrap; flex:1; min-width:0}
+.pill{font-size:11.5px; padding:2.5px 8px; border-radius:999px; border:1px solid var(--line-2);
+  background:var(--surface-2); color:var(--ink-2); white-space:nowrap}
+.pill.s-ok{background:var(--ok-soft); border-color:transparent; color:var(--ok); font-weight:700}
+.pill.s-wait{background:var(--warn-soft); border-color:transparent; color:var(--warn); font-weight:700}
+.pill.s-bad{background:var(--bad-soft); border-color:transparent; color:var(--bad)}
+.pill.s-go{background:var(--accent-soft); border-color:transparent; color:var(--accent)}
+.pill.empty{color:var(--ink-3); border-style:dashed; background:transparent}
+.flagmark{font-size:11px; font-weight:700; color:var(--bad); background:var(--bad-soft);
+  padding:2.5px 8px; border-radius:999px; white-space:nowrap}
+.caret{color:var(--ink-3); font-size:11px; flex:none}
+
+/* ── detail ────────────────────────────────── */
+.detail{border-top:1px solid var(--line); padding:13px; display:flex; flex-direction:column; gap:10px}
+.app{border:1px solid var(--line); border-radius:9px; background:var(--surface-2); padding:11px}
+.app.warn{border-color:var(--warn)}
+.grid{display:grid; gap:8px; grid-template-columns:repeat(auto-fit,minmax(132px,1fr))}
+.f{display:flex; flex-direction:column; gap:3px; min-width:0}
+.f label{font-size:11px; color:var(--ink-3); letter-spacing:.03em}
+.f input,.f select{
+  border:1px solid var(--line-2); background:var(--surface); border-radius:6px;
+  padding:6px 8px; font-size:13px; width:100%; min-width:0;
+}
+.f input:disabled,.f select:disabled{background:var(--surface-3); color:var(--ink-3)}
+.apphead{display:flex; align-items:center; gap:8px; margin-bottom:8px}
+.apphead .kind{font-size:11px; font-weight:700; letter-spacing:.05em; color:var(--accent);
+  background:var(--accent-soft); padding:2px 8px; border-radius:5px}
+.apphead .warnnote{font-size:11.5px; color:var(--bad); font-weight:700; margin-left:auto}
+.del{border:0; background:transparent; color:var(--ink-3); font-size:12px; padding:3px 6px; border-radius:5px}
+.del:hover{color:var(--bad); background:var(--bad-soft)}
+.addrow{display:flex; gap:7px; flex-wrap:wrap}
+.btn{border:1px solid var(--accent); background:var(--accent); color:var(--on-accent); padding:7px 14px;
+  border-radius:7px; font-size:13px; font-weight:600}
+.btn.sec{background:transparent; color:var(--accent)}
+.btn:disabled{opacity:.45; cursor:not-allowed}
+
+/* ── add / paste ───────────────────────────── */
+.panel{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
+  padding:13px; box-shadow:var(--shadow); margin-top:14px}
+.panel h3{margin:0 0 9px; font-size:13px; font-weight:700}
+.panel p.hint{margin:0 0 9px; font-size:12px; color:var(--ink-3)}
+textarea{width:100%; border:1px solid var(--line-2); background:var(--surface); border-radius:7px;
+  padding:9px; font-size:13px; min-height:88px; resize:vertical; font-family:inherit}
+.inline{display:flex; gap:7px; flex-wrap:wrap; align-items:flex-end}
+.inline .f{flex:0 1 130px}
+
+.subtabs{display:flex; gap:3px; background:var(--surface-2); padding:3px; border-radius:8px; margin-bottom:12px; width:fit-content; max-width:100%; flex-wrap:wrap}
+.subtabs button{border:0; background:transparent; color:var(--ink-2); padding:6px 13px; border-radius:6px; font-size:12.5px; font-weight:500}
+.subtabs button[aria-selected="true"]{background:var(--surface); color:var(--ink); font-weight:700; box-shadow:var(--shadow)}
+.drop{border:1.5px dashed var(--line-2); border-radius:var(--radius); background:var(--surface-2);
+  padding:24px 16px; text-align:center; display:flex; flex-direction:column; align-items:center; gap:9px}
+.drop.over{border-color:var(--accent); background:var(--accent-soft)}
+.drop b{font-weight:700; color:var(--ink)}
+.drop .hint{font-size:12px; color:var(--ink-3); max-width:44ch}
+.fmts{display:flex; gap:6px; flex-wrap:wrap; justify-content:center; margin-top:2px}
+.fmt{font-size:11px; padding:2px 8px; border-radius:5px; background:var(--surface); border:1px solid var(--line-2); color:var(--ink-2)}
+.fmt.no{color:var(--ink-3); text-decoration:line-through}
+.pv{margin-top:14px; border:1px solid var(--line); border-radius:var(--radius); overflow:hidden}
+.pvhead{display:flex; align-items:center; gap:9px; padding:10px 13px; background:var(--surface-2); flex-wrap:wrap}
+.pvhead .t{font-weight:700; font-size:13px}
+.pvhead .s{font-size:12px; color:var(--ink-3)}
+.pvhead .acts{margin-left:auto; display:flex; gap:6px}
+.pvbody{max-height:260px; overflow:auto}
+.pvbody table{min-width:0}
+.badge{font-size:10.5px; padding:1.5px 6px; border-radius:4px; background:var(--accent-soft); color:var(--accent); font-weight:700}
+.badge.up{background:var(--warn-soft); color:var(--warn)}
+.skip{padding:10px 13px; font-size:12px; color:var(--ink-3); border-top:1px solid var(--line); background:var(--surface)}
+.err{border-left:3px solid var(--bad); background:var(--bad-soft); border-radius:var(--radius);
+  padding:11px 13px; font-size:13px; margin-top:12px}
+.err b{display:block; margin-bottom:3px}
+.tmpl{display:flex; align-items:center; gap:7px; flex-wrap:wrap; margin-top:11px;
+  padding-top:11px; border-top:1px solid var(--line)}
+.tmpl .tl{font-size:12px; color:var(--ink-3)}
+.tmpl .tn{font-size:11.5px; color:var(--ink-3); flex-basis:100%}
+.miss{color:var(--bad); font-weight:700}
+.note{padding:9px 13px; font-size:12px; color:var(--warn); background:var(--warn-soft); border-top:1px solid var(--line)}
+.err .how{color:var(--ink-2); font-size:12.5px}
+
+/* ── overview table ────────────────────────── */
+.tablewrap{overflow-x:auto; border:1px solid var(--line); border-radius:var(--radius); background:var(--surface)}
+table{border-collapse:collapse; width:100%; font-size:13px; min-width:640px}
+th,td{padding:9px 12px; text-align:left; border-bottom:1px solid var(--line); white-space:nowrap}
+th{font-size:11.5px; color:var(--ink-3); font-weight:500; letter-spacing:.04em;
+  background:var(--surface-2); position:sticky; top:0}
+tbody tr:last-child td{border-bottom:0}
+td.num{text-align:right; font-variant-numeric:tabular-nums}
+.banner{border:1px dashed var(--line-2); background:var(--surface-2); border-radius:var(--radius);
+  padding:13px; margin-bottom:16px; font-size:13px; color:var(--ink-2)}
+.banner b{color:var(--ink)}
+.empty-state{text-align:center; padding:40px 16px; color:var(--ink-3)}
+@media (max-width:560px){
+  .rowhead .nm{width:62px}
+  .rowhead .no{width:46px}
+  .wrap{padding-block:14px 56px}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="topbar">
+  <div class="brand">
+    <h1>3학년 진학 현황판</h1>
+    <span class="yr mono" id="yearLabel">2027학년도</span>
+  </div>
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tabClass" aria-selected="true">우리 반</button>
+    <button role="tab" id="tabAll" aria-selected="false">전체 현황</button>
+  </div>
+  <div class="sync"><span class="dot" id="syncDot"></span><span id="syncText">연결 중</span></div>
+</div>
+
+<div class="wrap">
+  <div id="banner" class="banner" hidden></div>
+
+  <div id="viewClass">
+    <div class="classbar" id="classbar"></div>
+    <div class="alerts" id="alerts"></div>
+    <div class="stats" id="stats"></div>
+
+    <div class="listhead">
+      <h2 id="listTitle">학생</h2>
+      <span class="cnt" id="listCount"></span>
+      <span class="sp">
+        <button class="ghost" id="btnCsv">CSV 내려받기</button>
+      </span>
+    </div>
+    <div class="rows" id="rows"></div>
+
+    <div class="panel" id="addPanel">
+      <h3>학생 명단 넣기</h3>
+      <div class="subtabs" role="tablist">
+        <button role="tab" id="stFile" aria-selected="true">파일에서</button>
+        <button role="tab" id="stPaste" aria-selected="false">붙여넣기</button>
+        <button role="tab" id="stOne" aria-selected="false">한 명씩</button>
+      </div>
+
+      <div id="paneFile">
+        <div class="drop" id="drop">
+          <b>학번과 이름이 든 파일을 여기에 끌어다 놓으세요</b>
+          <button class="btn sec" id="btnPick">파일 선택</button>
+          <input type="file" id="file" accept=".csv,.tsv,.txt,.xlsx,.xls,.hwpx,.hwp" hidden>
+          <span class="hint">명단이든 지원 현황이든, 앱이 어느 쪽인지 알아서 가려냅니다. 넣기 전에 읽은 결과를 먼저 보여드립니다.</span>
+          <span class="fmts" id="fmts"></span>
+        </div>
+      </div>
+
+      <div id="panePaste" hidden>
+        <p class="hint">한 줄에 한 명. 학번과 이름 사이는 띄어쓰기, 탭, 쉼표 무엇이든 됩니다. 한글 표를 복사해 붙여넣어도 읽습니다.</p>
+        <textarea id="bulk" placeholder="30201 김민수&#10;30202 이서연&#10;30203 박지훈"></textarea>
+        <div style="margin-top:8px"><button class="btn" id="btnBulk">읽어 보기</button></div>
+      </div>
+
+      <div id="paneOne" hidden>
+        <div class="inline">
+          <div class="f"><label for="newNo">학번</label><input id="newNo" class="mono" inputmode="numeric" placeholder="30215"></div>
+          <div class="f"><label for="newName">이름</label><input id="newName" placeholder="홍길동"></div>
+          <button class="btn" id="btnAdd">추가</button>
+        </div>
+      </div>
+
+      <div class="tmpl">
+        <span class="tl">서식이 필요하시면</span>
+        <button class="ghost" id="btnTmplRoster">명단 서식</button>
+        <button class="ghost" id="btnTmplApps">지원 현황 서식</button>
+        <span class="tn">지원 현황은 상태·전형 값이 정해져 있어 서식을 쓰시는 편이 안전합니다.</span>
+      </div>
+      <div id="importMsg"></div>
+      <div id="preview" class="pv" hidden></div>
+    </div>
+  </div>
+
+  <div id="viewAll" hidden>
+    <div class="alerts" id="allAlerts"></div>
+    <div class="stats" id="allStats"></div>
+    <div class="listhead"><h2>반별 현황</h2><span class="sp"><button class="ghost" id="btnCsvAll">전체 CSV 내려받기</button></span></div>
+    <div class="tablewrap"><table id="classTable"></table></div>
+    <div class="listhead" style="margin-top:22px"><h2>대학별 지원 수</h2></div>
+    <div class="tablewrap"><table id="univTable"></table></div>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+var YEAR = 2027;
+var CLASSES = [1,2,3,4,5,6,7,8,9,10];
+var KINDS = ["수시","정시"];
+var TYPES = ["학종","교과","논술","실기","정시"];
+var GROUPS = ["가","나","다"];
+var STATUSES = ["지원완료","1단계합","1단계불","면접완료","최초합","충원대기","충원합","불합격","등록완료","등록포기"];
+var PASS = {"최초합":1,"충원합":1,"등록완료":1};
+var MINSTATES = ["미정","충족","미충족","해당없음"];
+var LIVE = {"지원완료":1,"1단계합":1,"면접완료":1,"충원대기":1};
+
+var db=null, userCap=null, downloadsCap=null, canWrite=null, unsub=null;
+var students=new Map();          // id -> doc body
+var openId=null, pendingRender=false, demo=false;
+var writeTimers=new Map();
+
+/* ── demo rows: shown only until real data exists ── */
+function soon(days,h){var d=new Date(); d.setDate(d.getDate()+days); d.setHours(h,0,0,0);
+  var p=function(n){return n<10?"0"+n:""+n;};
+  return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+"T"+p(d.getHours())+":00";}
+var DEMO=[
+ {id:"d1",cls:2,no:"30203",name:"강민서",apps:[
+   {id:"a1",kind:"수시",univ:"부산대학교",major:"수학교육과",jh:"학생부교과(학교장추천)",type:"교과",c6:true,itv:"",due:"",status:"지원완료",rank:"",note:"",mreq:"국수영탐 중 2개합 6",mmet:"미충족"},
+   {id:"a2",kind:"수시",univ:"경북대학교",major:"통계학과",jh:"학생부종합(일반)",type:"학종",c6:true,itv:"2026-11-28",due:"",status:"1단계합",rank:"",note:""}]},
+ {id:"d2",cls:2,no:"30211",name:"윤하늘",apps:[
+   {id:"b1",kind:"수시",univ:"동아대학교",major:"기계공학과",jh:"학생부교과",type:"교과",c6:true,itv:"",due:"",status:"최초합",rank:"",note:"",mreq:"",mmet:"충족"}]},
+ {id:"d3",cls:2,no:"30218",name:"임도현",apps:[
+   {id:"c1",kind:"수시",univ:"부경대학교",major:"화학공학과",jh:"학생부종합",type:"학종",c6:true,itv:"2026-11-28",due:soon(2,18),status:"충원대기",rank:"7",note:"",mreq:"",mmet:"해당없음"}]}
+];
+
+/* ── helpers ───────────────────────────────── */
+function el(t,c,txt){var e=document.createElement(t); if(c)e.className=c; if(txt!=null)e.textContent=txt; return e;}
+function uid(){return "x"+Math.random().toString(36).slice(2,9)+Date.now().toString(36).slice(-4);}
+function esc(s){return String(s==null?"":s);}
+function getCls(){try{var v=localStorage.getItem("jh.cls"); return v?parseInt(v,10):null;}catch(e){return null;}}
+function setCls(v){try{localStorage.setItem("jh.cls",String(v));}catch(e){}}
+function daysTo(s){ if(!s) return null; var d=new Date(s); if(isNaN(d)) return null;
+  var t=new Date(); t.setHours(0,0,0,0); var x=new Date(d); x.setHours(0,0,0,0);
+  return Math.round((x-t)/86400000); }
+function fmtDue(s){ if(!s) return ""; var d=new Date(s); if(isNaN(d)) return s;
+  var p=function(n){return n<10?"0"+n:""+n;};
+  return (d.getMonth()+1)+"/"+d.getDate()+" "+p(d.getHours())+":"+p(d.getMinutes()); }
+function statusClass(s){
+  if(PASS[s]) return "s-ok";
+  if(s==="충원대기") return "s-wait";
+  if(s==="불합격"||s==="1단계불"||s==="등록포기") return "s-bad";
+  return "s-go";
+}
+
+/* ── the five checks ───────────────────────── */
+function checkStudent(st){
+  var out=[], apps=st.apps||[];
+  var six=0, passed=0, reg=0, jungsi=0, itv={};
+  apps.forEach(function(a){
+    if(a.kind==="수시"&&a.c6) six++;
+    if(PASS[a.status]) passed++;
+    if(a.status==="등록완료") reg++;
+    if(a.kind==="정시") jungsi++;
+    if(a.itv){ itv[a.itv]=(itv[a.itv]||0)+1; }
+  });
+  if(six>6) out.push({lv:"crit",code:"6장초과",msg:"수시 지원이 "+six+"건입니다. 6장 제한을 넘었습니다."});
+  Object.keys(itv).forEach(function(d){ if(itv[d]>1)
+    out.push({lv:"warn",code:"면접중복",msg:d+" 면접이 "+itv[d]+"건 겹칩니다."}); });
+  if(passed>0&&jungsi>0) out.push({lv:"crit",code:"정시지원불가",msg:"수시에 합격했습니다. 등록을 포기해도 정시 지원이 불가합니다."});
+  if(reg>1) out.push({lv:"crit",code:"이중등록",msg:"등록완료가 "+reg+"건입니다. 이중등록은 입학 취소 사유입니다."});
+  apps.forEach(function(a){
+    if(a.kind==="수시"&&a.mmet==="미충족"&&LIVE[a.status])
+      out.push({lv:"warn",code:"최저 미충족",
+        msg:(a.univ||"한 곳")+" 수능최저를 채우지 못했습니다"+(a.mreq?"("+a.mreq+")":"")+". 사실상 탈락이니 정시 준비로 돌려야 합니다."});
+    if(a.status==="충원대기"&&a.due){
+      var d=daysTo(a.due);
+      if(d!==null&&d>=0&&d<=3)
+        out.push({lv:"crit",code:"충원마감",msg:a.univ+" 충원 마감이 "+(d===0?"오늘":d+"일 뒤")+"입니다("+fmtDue(a.due)+"). 전화를 받을 수 있어야 합니다."});
+    }
+  });
+  return out;
+}
+function appWarn(st,a){
+  var apps=st.apps||[];
+  if(a.kind==="수시"&&a.mmet==="미충족"&&LIVE[a.status]) return "수능최저 미충족";
+  if(a.kind==="정시"&&apps.some(function(x){return PASS[x.status];})) return "수시 합격자는 정시 지원 불가";
+  if(a.itv&&apps.filter(function(x){return x.itv===a.itv;}).length>1) return "면접일 중복";
+  if(a.status==="등록완료"&&apps.filter(function(x){return x.status==="등록완료";}).length>1) return "이중등록";
+  if(a.status==="충원대기"&&a.due){var d=daysTo(a.due); if(d!==null&&d>=0&&d<=3) return "충원 마감 임박";}
+  return "";
+}
+
+/* ── data access ───────────────────────────── */
+function list(){ return demo ? DEMO.slice() : Array.from(students.values()); }
+function sorted(arr){ return arr.sort(function(a,b){ return String(a.no).localeCompare(String(b.no)); }); }
+function byClass(c){ return sorted(list().filter(function(s){return s.cls===c;})); }
+
+function save(st){
+  st.updatedAt=new Date().toISOString();
+  students.set(st.id, st);
+  if(demo||!db||canWrite===false) return;
+  var k=st.id;
+  if(writeTimers.has(k)) clearTimeout(writeTimers.get(k));
+  writeTimers.set(k, setTimeout(function(){
+    writeTimers.delete(k);
+    db.doc("students/"+k).set(JSON.parse(JSON.stringify(st))).catch(function(e){
+      setSync("off","저장 실패 — "+(e&&e.code==="invalid_argument"?"입력 권한이 없습니다":"다시 시도해 주세요"));
+    });
+  },500));
+}
+function setSync(kind,text){
+  var d=document.getElementById("syncDot"), t=document.getElementById("syncText");
+  d.className="dot"+(kind==="live"?" live":kind==="off"?" off":"");
+  t.textContent=text;
+}
+
+/* ── render: class view ────────────────────── */
+function render(){
+  if(pendingRender) return;
+  var cls=getCls();
+  renderClassbar(cls);
+  var mine = cls?byClass(cls):[];
+  document.getElementById("listTitle").textContent = cls? (cls+"반 학생") : "반을 선택하세요";
+  document.getElementById("listCount").textContent = cls? (mine.length+"명") : "";
+  document.getElementById("addPanel").hidden = !cls || canWrite===false;
+  renderAlerts(document.getElementById("alerts"), mine, false);
+  renderStats(document.getElementById("stats"), mine);
+  renderRows(mine, cls);
+  if(!document.getElementById("viewAll").hidden) renderAll();
+}
+function renderClassbar(cls){
+  var bar=document.getElementById("classbar");
+  if(bar.childElementCount) {
+    Array.prototype.forEach.call(bar.querySelectorAll(".chip"),function(b){
+      b.setAttribute("aria-pressed", String(parseInt(b.dataset.c,10)===cls));
+    });
+    return;
+  }
+  bar.appendChild(el("span","lab","담당 반"));
+  CLASSES.forEach(function(c){
+    var b=el("button","chip",c+"반");
+    b.dataset.c=c; b.setAttribute("aria-pressed",String(c===cls));
+    b.onclick=function(){ setCls(c); openId=null; render(); };
+    bar.appendChild(b);
+  });
+}
+function renderStats(host, arr){
+  var n=arr.length, pass=0, wait=0, live=0, flags=0, js=0, minx=0;
+  arr.forEach(function(s){
+    var apps=s.apps||[];
+    if(apps.some(function(a){return a.kind==="수시"&&a.mmet==="미충족";})) minx++;
+    if(apps.some(function(a){return PASS[a.status];})) pass++;
+    else if(apps.some(function(a){return a.status==="충원대기";})) wait++;
+    else if(apps.some(function(a){return LIVE[a.status];})) live++;
+    if(apps.some(function(a){return a.kind==="정시";})) js++;
+    if(checkStudent(s).length) flags++;
+  });
+  host.innerHTML="";
+  [["학생",n,""],["수시 합격",pass,"ok"],["충원 대기",wait,"warn"],["진행 중",live,""],
+   ["최저 미충족",minx,minx?"warn":""],["정시 지원",js,""],["점검 경고",flags,flags?"bad":""]]
+  .forEach(function(t){
+    var d=el("div","stat"+(t[2]?" "+t[2]:""));
+    var n1=el("span","n mono",String(t[1])); var k=el("span","k",t[0]);
+    d.appendChild(n1); d.appendChild(k); host.appendChild(d);
+  });
+}
+function renderAlerts(host, arr, showClass){
+  host.innerHTML="";
+  var items=[];
+  arr.forEach(function(s){
+    checkStudent(s).forEach(function(w){ items.push({s:s,w:w}); });
+  });
+  items.sort(function(a,b){ return (a.w.lv==="crit"?0:1)-(b.w.lv==="crit"?0:1); });
+  items.slice(0,12).forEach(function(it){
+    var a=el("div","alert"+(it.w.lv==="crit"?" crit":""));
+    var who=el("span","who",(showClass?it.s.cls+"반 ":"")+it.s.name);
+    var m=el("span","msg");
+    var b=el("strong",null,it.w.code); m.appendChild(b); m.appendChild(document.createTextNode(" · "+it.w.msg));
+    a.appendChild(who); a.appendChild(m); host.appendChild(a);
+  });
+  if(items.length>12){
+    var more=el("div","alert","그 밖에 "+(items.length-12)+"건의 경고가 더 있습니다.");
+    host.appendChild(more);
+  }
+}
+function renderRows(arr, cls){
+  var host=document.getElementById("rows");
+  host.innerHTML="";
+  if(!cls){ host.appendChild(el("div","empty-state","위에서 담당하시는 반을 먼저 선택해 주세요.")); return; }
+  if(!arr.length){ host.appendChild(el("div","empty-state","아직 등록된 학생이 없습니다. 아래에서 명단을 넣어 주세요.")); return; }
+  arr.forEach(function(st){
+    var warns=checkStudent(st);
+    var row=el("div","row"+(warns.length?" flag":""));
+    var head=el("button","rowhead");
+    head.setAttribute("aria-expanded",String(openId===st.id));
+    head.appendChild(el("span","no mono",esc(st.no)));
+    head.appendChild(el("span","nm",esc(st.name)));
+    var pills=el("div","pills");
+    var apps=st.apps||[];
+    if(!apps.length) pills.appendChild(el("span","pill empty","지원 없음"));
+    apps.slice(0,7).forEach(function(a){
+      var p=el("span","pill "+statusClass(a.status), (a.univ||"미입력")+" · "+a.status);
+      pills.appendChild(p);
+    });
+    if(apps.length>7) pills.appendChild(el("span","pill","+"+(apps.length-7)));
+    head.appendChild(pills);
+    if(warns.length) head.appendChild(el("span","flagmark","경고 "+warns.length));
+    head.appendChild(el("span","caret",openId===st.id?"▲":"▼"));
+    head.onclick=function(){ openId=(openId===st.id?null:st.id); render(); };
+    row.appendChild(head);
+    if(openId===st.id) row.appendChild(detail(st));
+    host.appendChild(row);
+  });
+}
+
+/* ── render: detail ────────────────────────── */
+function field(labelText, node){
+  var f=el("div","f"); var l=el("label",null,labelText);
+  var id="f"+uid(); l.htmlFor=id; node.id=id;
+  f.appendChild(l); f.appendChild(node); return f;
+}
+function sel(options, value, onchange){
+  var s=document.createElement("select");
+  options.forEach(function(o){
+    var op=document.createElement("option"); op.value=o; op.textContent=o||"—";
+    if(o===value) op.selected=true; s.appendChild(op);
+  });
+  s.onchange=function(){ onchange(s.value); };
+  s.disabled=(canWrite===false||demo);
+  return s;
+}
+function txt(value, placeholder, onchange, cls){
+  var i=document.createElement("input");
+  i.value=value||""; if(placeholder) i.placeholder=placeholder;
+  if(cls) i.className=cls;
+  i.onchange=function(){ onchange(i.value.trim()); };
+  i.onfocus=function(){ pendingRender=true; };
+  i.onblur=function(){ pendingRender=false; };
+  i.disabled=(canWrite===false||demo);
+  return i;
+}
+function dateInput(type,value,onchange){
+  var i=document.createElement("input"); i.type=type; i.value=value||"";
+  i.onchange=function(){ onchange(i.value); };
+  i.disabled=(canWrite===false||demo);
+  return i;
+}
+function detail(st){
+  var d=el("div","detail");
+  (st.apps||[]).forEach(function(a){
+    var w=appWarn(st,a);
+    var box=el("div","app"+(w?" warn":""));
+    var hd=el("div","apphead");
+    hd.appendChild(el("span","kind",a.kind));
+    if(w) hd.appendChild(el("span","warnnote",w));
+    var del=el("button","del","삭제");
+    del.disabled=(canWrite===false||demo);
+    del.onclick=function(){
+      st.apps=st.apps.filter(function(x){return x.id!==a.id;}); save(st); render();
+    };
+    hd.appendChild(del);
+    box.appendChild(hd);
+
+    var g=el("div","grid");
+    g.appendChild(field("구분", sel(KINDS,a.kind,function(v){a.kind=v; if(v==="정시")a.type="정시"; save(st); render();})));
+    g.appendChild(field("대학", txt(a.univ,"부산대학교",function(v){a.univ=v; save(st); render();})));
+    g.appendChild(field("모집단위", txt(a.major,"수학교육과",function(v){a.major=v; save(st);})));
+    g.appendChild(field("전형명", txt(a.jh,"학생부종합(일반)",function(v){a.jh=v; save(st);})));
+    g.appendChild(field("전형유형", sel(TYPES,a.type,function(v){a.type=v; save(st);})));
+    if(a.kind==="정시") g.appendChild(field("군", sel([""].concat(GROUPS),a.group||"",function(v){a.group=v; save(st);})));
+    g.appendChild(field("면접일", dateInput("date",a.itv,function(v){a.itv=v; save(st); render();})));
+    g.appendChild(field("충원 마감", dateInput("datetime-local",a.due,function(v){a.due=v; save(st); render();})));
+    g.appendChild(field("상태", sel(STATUSES,a.status,function(v){a.status=v; save(st); render();})));
+    if(a.kind==="수시"){
+      g.appendChild(field("수능최저 기준", txt(a.mreq,"예: 2개합 5",function(v){a.mreq=v; save(st);})));
+      g.appendChild(field("최저 충족", sel(MINSTATES,a.mmet||"미정",function(v){a.mmet=v; save(st); render();})));
+    }
+    g.appendChild(field("예비번호", txt(a.rank,"",function(v){a.rank=v; save(st);},"mono")));
+    g.appendChild(field("메모", txt(a.note,"",function(v){a.note=v; save(st);})));
+    if(a.kind==="수시"){
+      var cb=document.createElement("select");
+      ["Y","N"].forEach(function(o){var op=document.createElement("option");op.value=o;op.textContent=o==="Y"?"포함":"제외";if((a.c6?"Y":"N")===o)op.selected=true;cb.appendChild(op);});
+      cb.onchange=function(){ a.c6=(cb.value==="Y"); save(st); render(); };
+      cb.disabled=(canWrite===false||demo);
+      g.appendChild(field("6장 제한", cb));
+    }
+    box.appendChild(g);
+    d.appendChild(box);
+  });
+
+  var add=el("div","addrow");
+  var b1=el("button","btn sec","+ 수시 지원 추가");
+  b1.disabled=(canWrite===false||demo);
+  b1.onclick=function(){ addApp(st,"수시"); };
+  var b2=el("button","btn sec","+ 정시 지원 추가");
+  b2.disabled=(canWrite===false||demo);
+  b2.onclick=function(){ addApp(st,"정시"); };
+  var b3=el("button","del","학생 삭제");
+  b3.disabled=(canWrite===false||demo);
+  b3.style.marginLeft="auto";
+  b3.onclick=function(){
+    if(!window.confirm(st.name+" 학생을 명단에서 지웁니다. 계속할까요?")) return;
+    students.delete(st.id);
+    if(db) db.doc("students/"+st.id).delete().catch(function(){});
+    openId=null; render();
+  };
+  add.appendChild(b1); add.appendChild(b2); add.appendChild(b3);
+  d.appendChild(add);
+  return d;
+}
+function addApp(st,kind){
+  st.apps=st.apps||[];
+  st.apps.push({id:uid(),kind:kind,univ:"",major:"",jh:"",type:kind==="정시"?"정시":"학종",
+    c6:kind==="수시",itv:"",due:"",status:"지원완료",rank:"",note:"",
+    mreq:"",mmet:kind==="수시"?"미정":"해당없음"});
+  save(st); render();
+}
+
+/* ── render: overview ──────────────────────── */
+function renderAll(){
+  var all=sorted(list());
+  renderAlerts(document.getElementById("allAlerts"), all, true);
+  renderStats(document.getElementById("allStats"), all);
+
+  var byCls={};
+  all.forEach(function(s){
+    var c=s.cls||0; byCls[c]=byCls[c]||{n:0,apps:0,pass:0,wait:0,flag:0};
+    var o=byCls[c]; o.n++;
+    var apps=s.apps||[]; o.apps+=apps.length;
+    if(apps.some(function(a){return PASS[a.status];})) o.pass++;
+    if(apps.some(function(a){return a.status==="충원대기";})) o.wait++;
+    if(checkStudent(s).length) o.flag++;
+  });
+  var t=document.getElementById("classTable"); t.innerHTML="";
+  var hr=t.createTHead().insertRow(); ["반","학생","지원 건수","수시 합격","충원 대기","경고"].forEach(function(h,i){
+    var th=document.createElement("th"); th.textContent=h; if(i>0)th.style.textAlign="right"; hr.appendChild(th);
+  });
+  var tb=t.createTBody();
+  Object.keys(byCls).sort(function(a,b){return a-b;}).forEach(function(c){
+    var o=byCls[c], r=tb.insertRow();
+    r.insertCell().textContent=c+"반";
+    [o.n,o.apps,o.pass,o.wait,o.flag].forEach(function(v,i){
+      var td=r.insertCell(); td.className="num"; td.textContent=v;
+      if(i===4&&v) td.style.color="var(--bad)", td.style.fontWeight="700";
+    });
+  });
+
+  var uni={};
+  all.forEach(function(s){(s.apps||[]).forEach(function(a){
+    if(!a.univ) return; uni[a.univ]=uni[a.univ]||{n:0,pass:0};
+    uni[a.univ].n++; if(PASS[a.status]) uni[a.univ].pass++;
+  });});
+  var ut=document.getElementById("univTable"); ut.innerHTML="";
+  var uh=ut.createTHead().insertRow(); ["대학","지원","합격"].forEach(function(h,i){
+    var th=document.createElement("th"); th.textContent=h; if(i>0)th.style.textAlign="right"; uh.appendChild(th);
+  });
+  var ub=ut.createTBody();
+  Object.keys(uni).sort(function(a,b){return uni[b].n-uni[a].n;}).slice(0,25).forEach(function(u){
+    var r=ub.insertRow(); r.insertCell().textContent=u;
+    [uni[u].n,uni[u].pass].forEach(function(v){var td=r.insertCell();td.className="num";td.textContent=v;});
+  });
+  if(!Object.keys(uni).length){ var r=ub.insertRow(); var td=r.insertCell(); td.colSpan=3;
+    td.textContent="아직 입력된 지원 내역이 없습니다."; td.style.color="var(--ink-3)"; }
+}
+
+/* ── csv ───────────────────────────────────── */
+function csv(arr,name){
+  var head=["반","학번","이름","구분","대학","모집단위","전형명","전형유형","군","6장포함","면접일","충원마감","상태","수능최저기준","최저충족","예비번호","메모","점검"];
+  var lines=[head.join(",")];
+  var q=function(v){ v=String(v==null?"":v); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
+  arr.forEach(function(s){
+    var w=checkStudent(s).map(function(x){return x.code;}).join(" ");
+    var apps=s.apps&&s.apps.length?s.apps:[{}];
+    apps.forEach(function(a){
+      lines.push([s.cls,s.no,s.name,a.kind||"",a.univ||"",a.major||"",a.jh||"",a.type||"",a.group||"",
+        a.c6?"Y":"N",a.itv||"",a.due||"",a.status||"",a.mreq||"",a.mmet||"",a.rank||"",a.note||"",w].map(q).join(","));
+    });
+  });
+  var data="﻿"+lines.join("\r\n");
+  if(!downloadsCap){ alert("이 화면에서는 내려받기를 쓸 수 없습니다."); return; }
+  downloadsCap.save({filename:name, data:data}).catch(function(e){
+    if(e&&e.code==="declined") return;
+    alert("내려받지 못했습니다. 잠시 후 다시 시도해 주세요.");
+  });
+}
+
+/* ── boot ──────────────────────────────────── */
+function bindStatic(){
+  document.getElementById("tabClass").onclick=function(){ switchTab(true); };
+  document.getElementById("tabAll").onclick=function(){ switchTab(false); };
+  document.getElementById("btnAdd").onclick=addOne;
+  document.getElementById("btnBulk").onclick=function(){
+    var cls=getCls(); if(!cls){ showError("반을 먼저 선택해 주세요.",""); return; }
+    var text=document.getElementById("bulk").value;
+    if(!text.trim()){ showError("붙여넣은 내용이 없습니다.",""); return; }
+    route(parseDelimited(text), cls, "붙여넣은 내용");
+  };
+  ["stFile","stPaste","stOne"].forEach(function(id,i){
+    document.getElementById(id).onclick=function(){
+      ["stFile","stPaste","stOne"].forEach(function(x,j){
+        document.getElementById(x).setAttribute("aria-selected",String(i===j));
+      });
+      document.getElementById("paneFile").hidden=(i!==0);
+      document.getElementById("panePaste").hidden=(i!==1);
+      document.getElementById("paneOne").hidden=(i!==2);
+    };
+  });
+  var fi=document.getElementById("file"), drop=document.getElementById("drop");
+  document.getElementById("btnPick").onclick=function(){ fi.click(); };
+  fi.onchange=function(){ if(fi.files&&fi.files[0]) handleFile(fi.files[0]); };
+  ["dragenter","dragover"].forEach(function(ev){
+    drop.addEventListener(ev,function(e){ e.preventDefault(); drop.classList.add("over"); });
+  });
+  ["dragleave","drop"].forEach(function(ev){
+    drop.addEventListener(ev,function(e){ e.preventDefault(); drop.classList.remove("over"); });
+  });
+  drop.addEventListener("drop",function(e){
+    var f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];
+    if(f) handleFile(f);
+  });
+  document.getElementById("btnTmplRoster").onclick=tmplRoster;
+  document.getElementById("btnTmplApps").onclick=tmplApps;
+  var fmts=document.getElementById("fmts");
+  [["CSV",1],["TXT",1],["엑셀 .xlsx",typeof XLSX!=="undefined"],["한글 .hwpx",typeof JSZip!=="undefined"],["한글 .hwp",0]]
+  .forEach(function(t){
+    var sp=el("span","fmt"+(t[1]?"":" no"),t[0]); fmts.appendChild(sp);
+  });
+  document.getElementById("newNo").onkeydown=function(e){ if(e.key==="Enter") document.getElementById("newName").focus(); };
+  document.getElementById("newName").onkeydown=function(e){ if(e.key==="Enter") addOne(); };
+  document.getElementById("btnCsv").onclick=function(){
+    var c=getCls(); if(!c){alert("반을 먼저 선택해 주세요.");return;}
+    csv(byClass(c), "진학현황_"+YEAR+"_"+c+"반.csv");
+  };
+  document.getElementById("btnCsvAll").onclick=function(){ csv(sorted(list()), "진학현황_"+YEAR+"_전체.csv"); };
+  document.getElementById("yearLabel").textContent=YEAR+"학년도";
+}
+function switchTab(isClass){
+  document.getElementById("tabClass").setAttribute("aria-selected",String(isClass));
+  document.getElementById("tabAll").setAttribute("aria-selected",String(!isClass));
+  document.getElementById("viewClass").hidden=!isClass;
+  document.getElementById("viewAll").hidden=isClass;
+  if(!isClass) renderAll();
+}
+function addOne(){
+  var cls=getCls(); if(!cls){alert("반을 먼저 선택해 주세요.");return;}
+  var no=document.getElementById("newNo").value.trim();
+  var nm=document.getElementById("newName").value.trim();
+  if(!no||!nm){alert("학번과 이름을 모두 넣어 주세요.");return;}
+  putStudent(cls,no,nm);
+  document.getElementById("newNo").value=""; document.getElementById("newName").value="";
+  document.getElementById("newNo").focus();
+  render();
+}
+function putStudent(cls,no,name){
+  var key=String(no).replace(/[^0-9A-Za-z_.~:@+-]/g,"");
+  if(!key) key=uid();
+  var existing=students.get(key);
+  var st=existing||{id:key,cls:cls,no:no,name:name,apps:[]};
+  st.cls=cls; st.no=no; st.name=name;
+  if(demo){ demo=false; document.getElementById("banner").hidden=true; students.clear(); }
+  save(st);
+}
+
+/* ══ 명단 불러오기 ══════════════════════════════
+   CSV / TXT / 엑셀 / 한글(.hwpx) 에서 학번·이름을 찾아낸다.
+   열 순서는 고정하지 않고 칸의 생김새로 판별한다. */
+var HEADWORD=/^(학번|번호|연번|순번|성명|이름|학생|학년|반|비고|구분|계열|담임|No\.?)$/;
+var pending=null;
+
+function decodeText(buf){
+  var u8=new Uint8Array(buf);
+  if(u8.length>2&&u8[0]===0xEF&&u8[1]===0xBB&&u8[2]===0xBF) u8=u8.subarray(3);
+  try{ return new TextDecoder("utf-8",{fatal:true}).decode(u8); }
+  catch(e){
+    try{ return new TextDecoder("euc-kr").decode(u8); }
+    catch(e2){ return new TextDecoder("utf-8").decode(u8); }
+  }
+}
+function parseDelimited(text){
+  var rows=[], row=[], cur="", q=false, i=0, delim=null;
+  var first=text.split(/\r?\n/)[0]||"";
+  if(first.indexOf("\t")>-1) delim="\t";
+  else if(first.indexOf(",")>-1) delim=",";
+  else delim=null;
+  if(delim===null){
+    text.split(/\r?\n/).forEach(function(l){ if(l.trim()) rows.push(l.trim().split(/\s{1,}/)); });
+    return rows;
+  }
+  for(;i<text.length;i++){
+    var c=text[i];
+    if(q){
+      if(c==='"'){ if(text[i+1]==='"'){cur+='"';i++;} else q=false; }
+      else cur+=c;
+    } else if(c==='"'){ q=true; }
+    else if(c===delim){ row.push(cur); cur=""; }
+    else if(c==="\n"){ row.push(cur); rows.push(row); row=[]; cur=""; }
+    else if(c==="\r"){ }
+    else cur+=c;
+  }
+  if(cur!==""||row.length){ row.push(cur); rows.push(row); }
+  return rows.filter(function(r){ return r.some(function(c){return String(c).trim();}); });
+}
+function rowsFromHwpx(zip){
+  var names=Object.keys(zip.files).filter(function(n){ return /Contents\/section\d+\.xml$/i.test(n); });
+  if(!names.length) names=Object.keys(zip.files).filter(function(n){ return /\.xml$/i.test(n)&&/section/i.test(n); });
+  if(!names.length) return Promise.reject({code:"nosection"});
+  names.sort();
+  return Promise.all(names.map(function(n){ return zip.files[n].async("string"); })).then(function(xmls){
+    var rows=[];
+    xmls.forEach(function(xml){
+      var doc=new DOMParser().parseFromString(xml,"application/xml");
+      if(doc.getElementsByTagName("parsererror").length) return;
+      var all=doc.getElementsByTagName("*"), trs=[], ps=[];
+      for(var i=0;i<all.length;i++){
+        var ln=all[i].localName;
+        if(ln==="tr") trs.push(all[i]);
+        else if(ln==="p") ps.push(all[i]);
+      }
+      if(trs.length){
+        trs.forEach(function(tr){
+          var kids=tr.getElementsByTagName("*"), cells=[];
+          for(var j=0;j<kids.length;j++){
+            if(kids[j].localName==="tc") cells.push((kids[j].textContent||"").replace(/\s+/g," ").trim());
+          }
+          if(cells.length) rows.push(cells);
+        });
+      } else {
+        ps.forEach(function(pn){
+          var t=(pn.textContent||"").replace(/\s+/g," ").trim();
+          if(t) rows.push(t.split(/[\s,\t]+/));
+        });
+      }
+    });
+    return rows;
+  });
+}
+function pickStudents(rows, cls){
+  var out=[], skipped=[];
+  rows.forEach(function(cells){
+    var vals=cells.map(function(c){ return String(c==null?"":c).replace(/\s+/g," ").trim(); }).filter(function(v){return v;});
+    if(!vals.length) return;
+    var no=null, name=null, smalls=[];
+    vals.forEach(function(v){
+      if(HEADWORD.test(v)) return;
+      if(!no && /^\d{5,6}$/.test(v)) { no=v; return; }
+      if(!name && /^[가-힣]{2,6}$/.test(v)) { name=v; return; }
+      if(/^\d{1,2}$/.test(v)) smalls.push(v);
+    });
+    if(!name){
+      for(var i=0;i<vals.length;i++){
+        if(HEADWORD.test(vals[i])) continue;
+        if(/^[A-Za-z][A-Za-z .'-]{1,20}$/.test(vals[i])){ name=vals[i]; break; }
+      }
+    }
+    if(!name){ skipped.push(vals.join(" ")); return; }
+    var made=false;
+    if(!no && smalls.length){
+      var n=smalls[smalls.length-1];
+      var cc=String(cls); if(cc.length<2) cc="0"+cc;
+      no="3"+cc+(n.length<2?"0"+n:n);
+      made=true;
+    }
+    if(!no){ skipped.push(vals.join(" ")); return; }
+    out.push({no:no, name:name, made:made});
+  });
+  var seen={}, uniq=[];
+  out.forEach(function(o){ if(seen[o.no]) return; seen[o.no]=1; uniq.push(o); });
+  return {list:uniq, skipped:skipped};
+}
+function showError(title, how){
+  var host=document.getElementById("importMsg"); host.innerHTML="";
+  var d=el("div","err"); d.appendChild(el("b",null,title));
+  if(how) d.appendChild(el("div","how",how));
+  host.appendChild(d);
+  document.getElementById("preview").hidden=true;
+}
+function clearMsg(){ document.getElementById("importMsg").innerHTML=""; }
+
+function route(rows, cls, source){
+  var hdr=headerIndex(rows);
+  if(hdr){ showAppPreview(importApps(rows,cls,hdr), source); }
+  else { showPreview(pickStudents(rows,cls), source); }
+}
+function showPreview(res, source){
+  clearMsg();
+  var cls=getCls();
+  var host=document.getElementById("preview");
+  host.hidden=false; host.innerHTML="";
+  if(!res.list.length){
+    host.hidden=true;
+    showError("학번과 이름을 찾지 못했습니다.",
+      "학번(5자리)과 이름이 같은 줄에 있어야 읽을 수 있습니다. 표 안에 있어도 괜찮습니다. 그래도 안 되면 붙여넣기 탭을 써 보세요.");
+    return;
+  }
+  pending=res.list;
+  var hd=el("div","pvhead");
+  hd.appendChild(el("span","t", res.list.length+"명을 읽었습니다"));
+  hd.appendChild(el("span","s", source+" · "+cls+"반으로 넣습니다"));
+  var acts=el("div","acts");
+  var ok=el("button","btn","명단에 넣기");
+  ok.onclick=function(){
+    (pending&&pending.length?pending:[]).forEach(function(o){ putStudent(cls,o.no,o.name); });
+    pending=null; host.hidden=true; clearMsg();
+    document.getElementById("bulk").value="";
+    document.getElementById("file").value="";
+    render();
+  };
+  var no=el("button","ghost","취소");
+  no.onclick=function(){ pending=null; host.hidden=true; };
+  acts.appendChild(no); acts.appendChild(ok);
+  hd.appendChild(acts);
+  host.appendChild(hd);
+
+  var body=el("div","pvbody");
+  var t=document.createElement("table");
+  var hr=t.createTHead().insertRow();
+  ["학번","이름",""].forEach(function(h){ var th=document.createElement("th"); th.textContent=h; hr.appendChild(th); });
+  var tb=t.createTBody();
+  res.list.forEach(function(o){
+    var r=tb.insertRow();
+    var c1=r.insertCell(); c1.textContent=o.no; c1.className="mono";
+    r.insertCell().textContent=o.name;
+    var c3=r.insertCell();
+    if(students.has(String(o.no))&&!demo) c3.appendChild(el("span","badge up","이미 있음 · 이름 갱신"));
+    else if(o.made) c3.appendChild(el("span","badge","번호로 학번 생성"));
+  });
+  body.appendChild(t); host.appendChild(body);
+  if(res.skipped.length){
+    var sk=el("div","skip","읽지 못하고 건너뛴 줄 "+res.skipped.length+"개 — 예: "+res.skipped.slice(0,2).join(" / "));
+    host.appendChild(sk);
+  }
+}
+
+
+/* ══ 지원 현황 가져오기 ════════════════════════
+   열 이름으로 항목을 맞추고, 값은 흔히 쓰는 표현까지 받아준다.
+   못 알아본 값은 지어내지 않고 미리보기에서 빨갛게 표시한다. */
+var COLMAP=[
+  ["no",      /^(학번|학생번호|학적번호)$/],
+  ["name",    /^(이름|성명|학생명|학생)$/],
+  ["kind",    /^(구분|전형구분|수시정시|수시\/정시)$/],
+  ["univ",    /^(대학|대학명|지원대학|학교|학교명)$/],
+  ["major",   /^(모집단위|학과|전공|학부|모집단위명)$/],
+  ["jh",      /^(전형명|전형)$/],
+  ["type",    /^(전형유형|유형)$/],
+  ["group",   /^(군|모집군|분할모집군)$/],
+  ["c6",      /^(6장포함|6장|제한포함|6장제한)$/],
+  ["itv",     /^(면접일|면접일자|면접날짜|면접)$/],
+  ["due",     /^(충원마감|충원마감일|충원|예비마감|충원기간)$/],
+  ["status",  /^(상태|결과|합불|진행상태|합격여부)$/],
+  ["mreq",    /^(수능최저기준|수능최저|최저기준|최저학력기준|최저)$/],
+  ["mmet",    /^(최저충족|최저충족여부|충족여부|충족|최저달성)$/],
+  ["rank",    /^(예비번호|예비|충원순위|순위)$/],
+  ["note",    /^(메모|비고|특이사항)$/]
+];
+var STATUSMAP=[
+  /* 순서가 중요하다. '불합격'은 '합격'을 품고 '1단계 불합격'은 '불합격'을 품으므로
+     좁은 뜻부터, 부정 표현을 긍정 표현보다 먼저 본다. */
+  [/(등록포기|포기)/,"등록포기"],
+  [/^(등록완료|등록|등록함)$/,"등록완료"],
+  [/(1단계|서류|1차).*(불합|불합격|탈락|미선발|불)/,"1단계불"],
+  [/(1단계|서류|1차).*(합격|합|통과|선발)/,"1단계합"],
+  [/(추합|추가합격|충원합격|충원합|예비합격|예비합)/,"충원합"],
+  [/(충원대기|예비대기|예비번호|예비|대기)/,"충원대기"],
+  [/(면접완료|면접응시|면접함|면접봄)/,"면접완료"],
+  [/(불합격|불합|탈락|미합격|부적격|미선발|드랍|낙방)/,"불합격"],
+  [/(최초합격|최초합|합격|합)/,"최초합"],
+  [/(지원완료|지원|접수|원서)/,"지원완료"]
+];
+var MINMAP=[
+  [/(해당없음|해당\s*없|없음|무관|미적용)/,"해당없음"],
+  [/(미충족|불충족|못채움|미달|부족|^x$|^n$|아니오)/i,"미충족"],
+  [/(충족|만족|달성|통과|^o$|^y$|^예$)/i,"충족"],
+  [/(미정|미확인|모름|대기)/,"미정"]
+];
+function mapMin(v){
+  var t=norm(v); if(!t) return null;
+  for(var i=0;i<MINMAP.length;i++) if(MINMAP[i][0].test(t)) return MINMAP[i][1];
+  return null;
+}
+var TYPEMAP=[[/(학종|종합)/,"학종"],[/(교과)/,"교과"],[/(논술)/,"논술"],[/(실기|특기)/,"실기"],[/(정시|수능)/,"정시"]];
+function norm(v){ return String(v==null?"":v).replace(/\s+/g,"").trim(); }
+function mapStatus(v){
+  var t=norm(v); if(!t) return null;
+  for(var i=0;i<STATUSMAP.length;i++) if(STATUSMAP[i][0].test(t)) return STATUSMAP[i][1];
+  return null;
+}
+function mapType(v){
+  var t=norm(v); if(!t) return null;
+  for(var i=0;i<TYPEMAP.length;i++) if(TYPEMAP[i][0].test(t)) return TYPEMAP[i][1];
+  return null;
+}
+function pad2(n){ n=String(n); return n.length<2?"0"+n:n; }
+function parseDate(v, withTime){
+  if(v instanceof Date && !isNaN(v)){
+    var iso=v.getFullYear()+"-"+pad2(v.getMonth()+1)+"-"+pad2(v.getDate());
+    return withTime? iso+"T"+pad2(v.getHours())+":"+pad2(v.getMinutes()) : iso;
+  }
+  var t=String(v==null?"":v).trim(); if(!t) return "";
+  var time="", m;
+  var datePart=t, hasTime=false;
+  var tmatch=t.match(/(\d{1,2}):(\d{2})/);
+  if(tmatch){ time="T"+pad2(tmatch[1])+":"+tmatch[2]; hasTime=true; datePart=t.slice(0,tmatch.index); }
+  var y,mo,d;
+  if((m=datePart.match(/(\d{4})\s*[-./년]\s*(\d{1,2})\s*[-./월]\s*(\d{1,2})/))){ y=m[1];mo=m[2];d=m[3]; }
+  else if((m=datePart.match(/^(\d{4})(\d{2})(\d{2})$/))){ y=m[1];mo=m[2];d=m[3]; }
+  else if((m=datePart.match(/(\d{1,2})\s*[-./월]\s*(\d{1,2})/))){
+    mo=m[1]; d=m[2]; y=(parseInt(mo,10)>=9)? (YEAR-1) : YEAR;
+  } else return "";
+  var iso2=y+"-"+pad2(mo)+"-"+pad2(d);
+  if(!withTime) return iso2;
+  return iso2+(hasTime?time:"T00:00");
+}
+function parseYN(v){
+  var t=norm(v);
+  if(!t) return null;
+  if(/^(y|yes|o|예|포함|true|1|v)$/i.test(t)) return true;
+  if(/^(n|no|x|아니오|아님|제외|false|0)$/i.test(t)) return false;
+  return null;
+}
+function headerIndex(rows){
+  for(var r=0;r<Math.min(rows.length,8);r++){
+    var cells=(rows[r]||[]).map(norm), map={}, hits=0;
+    cells.forEach(function(c,i){
+      if(!c) return;
+      COLMAP.forEach(function(pair){
+        if(map[pair[0]]===undefined && pair[1].test(c)){ map[pair[0]]=i; hits++; }
+      });
+    });
+    if(map.univ!==undefined && (map.name!==undefined||map.no!==undefined)) return {row:r, map:map, hits:hits};
+  }
+  return null;
+}
+function importApps(rows, cls, hdr){
+  var m=hdr.map, out=[], skipped=[], notes={status:0, due:0};
+  for(var r=hdr.row+1;r<rows.length;r++){
+    var c=rows[r]||[];
+    var get=function(k){ return m[k]===undefined?"":c[m[k]]; };
+    var name=String(get("name")||"").trim();
+    var no=String(get("no")||"").trim();
+    var univ=String(get("univ")||"").trim();
+    if(/예시/.test(name)||/예시/.test(univ)) continue;
+    if(!univ && !name){ continue; }
+    if(!univ){ skipped.push((no||"")+" "+name+" — 대학이 비어 있음"); continue; }
+    if(!no && !name){ skipped.push("학생을 알 수 없는 줄"); continue; }
+    var kindRaw=norm(get("kind"));
+    var kind=/정시/.test(kindRaw)?"정시":(kindRaw?"수시":(norm(get("group"))?"정시":"수시"));
+    var st=mapStatus(get("status"));
+    if(get("status")&&!st) notes.status++;
+    var due=parseDate(get("due"),true);
+    if(due&&/T00:00$/.test(due)) notes.due++;
+    var yn=parseYN(get("c6"));
+    out.push({
+      no:no, name:name,
+      app:{id:uid(), kind:kind, univ:univ,
+        major:String(get("major")||"").trim(), jh:String(get("jh")||"").trim(),
+        type:mapType(get("type"))||(kind==="정시"?"정시":"학종"),
+        group:(function(){var g=norm(get("group")); return /^[가나다]$/.test(g)?g:"";})(),
+        c6:(yn===null? kind==="수시" : yn),
+        itv:parseDate(get("itv"),false), due:due,
+        mreq:String(get("mreq")||"").trim(),
+        mmet:(kind==="정시"?"해당없음":(mapMin(get("mmet"))||"미정")),
+        status:st||"지원완료", rank:String(get("rank")||"").trim(),
+        note:String(get("note")||"").trim()},
+      statusRaw:String(get("status")||"").trim(), statusOk:!!st||!String(get("status")||"").trim()
+    });
+  }
+  return {apps:out, skipped:skipped, notes:notes};
+}
+function showAppPreview(res, source){
+  clearMsg();
+  var cls=getCls();
+  var host=document.getElementById("preview");
+  host.hidden=false; host.innerHTML="";
+  if(!res.apps.length){
+    host.hidden=true;
+    showError("지원 내역을 찾지 못했습니다.","대학 이름이 든 열과 학번(또는 이름) 열이 있어야 합니다. 아래에서 지원 현황 서식을 받아 쓰시면 확실합니다.");
+    return;
+  }
+  var byStudent={};
+  res.apps.forEach(function(a){
+    var key=a.no||("_"+a.name);
+    byStudent[key]=byStudent[key]||{no:a.no,name:a.name,apps:[]};
+    byStudent[key].apps.push(a);
+  });
+  pending={kind:"apps", data:byStudent, raw:res};
+
+  var nStu=Object.keys(byStudent).length;
+  var hd=el("div","pvhead");
+  hd.appendChild(el("span","t","학생 "+nStu+"명 · 지원 "+res.apps.length+"건을 읽었습니다"));
+  hd.appendChild(el("span","s", source+" · "+cls+"반"));
+  var acts=el("div","acts");
+  var ok=el("button","btn","현황에 넣기");
+  ok.onclick=function(){ commitApps(byStudent, cls); };
+  var no=el("button","ghost","취소");
+  no.onclick=function(){ pending=null; host.hidden=true; };
+  acts.appendChild(no); acts.appendChild(ok); hd.appendChild(acts);
+  host.appendChild(hd);
+
+  var body=el("div","pvbody"); var t=document.createElement("table");
+  var hr=t.createTHead().insertRow();
+  ["학번","이름","구분","대학","전형","상태","최저","면접일"].forEach(function(h){
+    var th=document.createElement("th"); th.textContent=h; hr.appendChild(th);
+  });
+  var tb=t.createTBody();
+  res.apps.slice(0,60).forEach(function(a){
+    var r=tb.insertRow();
+    var c1=r.insertCell(); c1.textContent=a.no||"—"; c1.className="mono";
+    r.insertCell().textContent=a.name||"—";
+    r.insertCell().textContent=a.app.kind;
+    r.insertCell().textContent=a.app.univ;
+    r.insertCell().textContent=a.app.jh||a.app.type;
+    var c6=r.insertCell();
+    if(a.statusOk) c6.textContent=a.app.status;
+    else { c6.className="miss"; c6.textContent=a.app.status+" ← “"+a.statusRaw+"”"; }
+    var cm=r.insertCell();
+    cm.textContent=(a.app.kind==="정시")?"—":(a.app.mmet||"미정");
+    if(a.app.mmet==="미충족"){ cm.className="miss"; }
+    var c7=r.insertCell(); c7.textContent=a.app.itv||"—"; c7.className="mono";
+  });
+  body.appendChild(t); host.appendChild(body);
+  if(res.apps.length>60) host.appendChild(el("div","skip","위 60건만 보여드립니다. 넣기를 누르면 "+res.apps.length+"건 모두 들어갑니다."));
+  if(res.notes.status) host.appendChild(el("div","note","상태를 알아보지 못한 줄이 "+res.notes.status+"건 있어 ‘지원완료’로 두었습니다. 넣은 뒤 그 학생들의 상태를 확인해 주세요."));
+  if(res.notes.due) host.appendChild(el("div","note","충원 마감에 시각이 없는 줄이 "+res.notes.due+"건입니다. 마감 시각은 대학마다 다르니 요강을 보고 채워 주세요."));
+  if(res.skipped.length) host.appendChild(el("div","skip","건너뛴 줄 "+res.skipped.length+"개 — 예: "+res.skipped.slice(0,2).join(" / ")));
+}
+function commitApps(byStudent, cls){
+  var added=0, updated=0, newStu=0;
+  Object.keys(byStudent).forEach(function(key){
+    var g=byStudent[key];
+    var id=String(g.no||"").replace(/[^0-9A-Za-z_.~:@+-]/g,"");
+    var st=id?students.get(id):null;
+    if(!st){
+      var hit=null;
+      students.forEach(function(v){ if(!hit && g.name && v.name===g.name && v.cls===cls) hit=v; });
+      st=hit;
+    }
+    if(!st){
+      if(demo){ demo=false; document.getElementById("banner").hidden=true; students.clear(); }
+      st={id:id||uid(), cls:cls, no:g.no||"", name:g.name||"", apps:[]};
+      students.set(st.id, st); newStu++;
+    }
+    st.apps=st.apps||[];
+    g.apps.forEach(function(a){
+      var same=st.apps.filter(function(x){
+        return x.univ===a.app.univ && (x.jh||"")===(a.app.jh||"") && x.kind===a.app.kind;
+      })[0];
+      if(same){
+        ["major","type","group","itv","due","status","rank","note"].forEach(function(k){
+          if(a.app[k]) same[k]=a.app[k];
+        });
+        same.c6=a.app.c6; updated++;
+      } else { st.apps.push(a.app); added++; }
+    });
+    save(st);
+  });
+  pending=null;
+  document.getElementById("preview").hidden=true;
+  document.getElementById("file").value="";
+  clearMsg();
+  render();
+  var host=document.getElementById("importMsg");
+  var d=el("div","err"); d.style.borderLeftColor="var(--ok)"; d.style.background="var(--ok-soft)";
+  d.appendChild(el("b",null,"넣었습니다"));
+  d.appendChild(el("div","how","새 지원 "+added+"건, 갱신 "+updated+"건"+(newStu?", 새 학생 "+newStu+"명":"")+"."));
+  host.appendChild(d);
+}
+
+/* ══ 서식 내려받기 ═════════════════════════════ */
+function tmplRoster(){
+  var rows=[["학번","이름"],["30201","예시 김민수"],["30202","예시 이서연"]];
+  saveCsv(rows,"명단서식.csv");
+}
+function tmplApps(){
+  var rows=[
+    ["학번","이름","구분","대학","모집단위","전형명","전형유형","군","6장포함","면접일","충원마감","상태","수능최저기준","최저충족","예비번호","메모"],
+    ["30201","예시 김민수","수시","부산대학교","수학교육과","학생부교과(학교장추천)","교과","","Y","","","지원완료","국수영탐 중 2개합 5","미정","",""],
+    ["30201","예시 김민수","수시","경북대학교","통계학과","학생부종합(일반)","학종","","Y","2026-11-28","2026-12-26 18:00","1단계합","해당없음","해당없음","",""],
+    ["30202","예시 이서연","정시","동아대학교","기계공학과","수능위주","정시","가","N","","","지원완료","","","",""]
+  ];
+  saveCsv(rows,"지원현황서식.csv");
+}
+function saveCsv(rows,name){
+  var q=function(v){ v=String(v==null?"":v); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
+  var data="﻿"+rows.map(function(r){return r.map(q).join(",");}).join("\r\n");
+  if(!downloadsCap){ alert("이 화면에서는 내려받기를 쓸 수 없습니다."); return; }
+  downloadsCap.save({filename:name, data:data}).catch(function(e){
+    if(e&&e.code==="declined") return;
+    alert("내려받지 못했습니다.");
+  });
+}
+
+function handleFile(f){
+  var cls=getCls();
+  if(!cls){ showError("반을 먼저 선택해 주세요.",""); return; }
+  clearMsg();
+  var name=(f.name||"").toLowerCase();
+  var ext=name.slice(name.lastIndexOf(".")+1);
+
+  if(ext==="hwp"){
+    showError("구형 한글 파일(.hwp)은 이 화면에서 열 수 없습니다.",
+      "한글에서 파일을 연 뒤 [파일 → 다른 이름으로 저장]에서 한/글 문서(.hwpx)를 골라 저장하고 그 파일을 넣어 주세요. 표를 그대로 복사해 붙여넣기 탭에 붙여도 됩니다.");
+    return;
+  }
+  var reader=new FileReader();
+  reader.onerror=function(){ showError("파일을 읽지 못했습니다.","다른 파일로 다시 시도해 주세요."); };
+
+  if(ext==="hwpx"){
+    if(typeof JSZip==="undefined"){
+      showError("한글 파일을 여는 도구를 불러오지 못했습니다.","네트워크 상태를 확인하고 새로고침해 주세요. 급하면 붙여넣기 탭을 쓰시면 됩니다.");
+      return;
+    }
+    reader.onload=function(){
+      JSZip.loadAsync(reader.result).then(rowsFromHwpx).then(function(rows){
+        route(rows, cls, "한글 "+f.name);
+      }).catch(function(){
+        showError("한글 파일 안에서 표를 찾지 못했습니다.","학번과 이름이 든 표가 있는 문서인지 확인해 주세요. 표를 복사해 붙여넣기 탭에 붙이면 확실합니다.");
+      });
+    };
+    reader.readAsArrayBuffer(f);
+    return;
+  }
+  if(ext==="xlsx"||ext==="xls"||ext==="xlsm"){
+    if(typeof XLSX==="undefined"){
+      showError("엑셀 파일을 여는 도구를 불러오지 못했습니다.","네트워크 상태를 확인하고 새로고침해 주세요. 엑셀에서 CSV로 저장해 넣으셔도 됩니다.");
+      return;
+    }
+    reader.onload=function(){
+      try{
+        var wb=XLSX.read(new Uint8Array(reader.result),{type:"array",cellDates:true});
+        var rows=[];
+        wb.SheetNames.forEach(function(sn){
+          XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,blankrows:false,defval:""})
+            .forEach(function(r){ rows.push(r); });
+        });
+        route(rows, cls, "엑셀 "+f.name);
+      }catch(e){
+        showError("엑셀 파일을 읽지 못했습니다.","파일이 손상되지 않았는지 확인하거나 CSV로 저장해 넣어 주세요.");
+      }
+    };
+    reader.readAsArrayBuffer(f);
+    return;
+  }
+  reader.onload=function(){
+    var text=decodeText(reader.result);
+    route(parseDelimited(text), cls, f.name);
+  };
+  reader.readAsArrayBuffer(f);
+}
+
+function start(){
+  bindStatic();
+  demo=true;
+  var b=document.getElementById("banner");
+  b.hidden=false;
+  b.innerHTML="";
+  b.appendChild(document.createTextNode("지금 보이는 세 명은 "));
+  var s=el("b",null,"화면을 보여드리기 위한 예시"); b.appendChild(s);
+  b.appendChild(document.createTextNode("입니다. 아래에서 실제 명단을 넣으면 예시는 사라집니다."));
+  if(!getCls()) setCls(2);
+  render();
+  setSync("", "연결 중");
+
+  if(!window.claude||!window.claude.use){ setSync("off","이 화면에서는 저장되지 않습니다"); return; }
+
+  window.claude.use("user").then(function(u){
+    userCap=u;
+    if(!u) return null;
+    return u.can("data.write");
+  }).then(function(v){ canWrite=(v===undefined?null:v); render(); }).catch(function(){});
+
+  window.claude.use("downloads").then(function(d){
+    downloadsCap=d;
+    document.getElementById("btnCsv").hidden=!d;
+    document.getElementById("btnCsvAll").hidden=!d;
+  }).catch(function(){});
+
+  window.claude.use("db").then(function(x){
+    if(!x){ setSync("off","이 화면에서는 저장되지 않습니다"); return; }
+    db=x;
+    unsub=db.collection("students").onSnapshot(function(snap){
+      var next=new Map();
+      snap.docs.forEach(function(d){
+        var body=d.data()||{};
+        next.set(d.id, {id:d.id, cls:body.cls, no:body.no, name:body.name,
+          apps:Array.isArray(body.apps)?JSON.parse(JSON.stringify(body.apps)):[],
+          updatedAt:body.updatedAt});
+      });
+      students=next;
+      if(students.size>0){ demo=false; document.getElementById("banner").hidden=true; }
+      setSync("live", snap.metadata.fromCache?"동기화 중":"저장됨");
+      render();
+    }, function(e){
+      setSync("off", e&&e.code==="revoked"?"접근이 끝났습니다":"연결이 끊어졌습니다");
+    });
+  }).catch(function(){ setSync("off","이 화면에서는 저장되지 않습니다"); });
+}
+
+/* 로컬(file://)에서만 열리는 테스트용 통로. 게시된 페이지(https)에서는 만들어지지 않는다. */
+try{ if(location.protocol==="file:"){
+  window.__dev={mapStatus:mapStatus, mapMin:mapMin, mapType:mapType,
+    parseDate:parseDate, parseYN:parseYN, pickStudents:pickStudents,
+    parseDelimited:parseDelimited, headerIndex:headerIndex, importApps:importApps,
+    checkStudent:checkStudent};
+} }catch(e){}
+
+if(window.claude&&window.claude.hot&&window.claude.hot.ready){ window.claude.hot.ready(start); }
+else { start(); }
+})();
+</script>
