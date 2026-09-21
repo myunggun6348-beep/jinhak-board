@@ -1390,6 +1390,7 @@ function start(){
         var body=d.data()||{};
         next.set(d.id, {id:d.id, cls:body.cls, no:body.no, name:body.name,
           apps:Array.isArray(body.apps)?JSON.parse(JSON.stringify(body.apps)):[],
+          csat:body.csat&&typeof body.csat==="object"?JSON.parse(JSON.stringify(body.csat)):undefined,
           updatedAt:body.updatedAt});
       });
       students=next;
