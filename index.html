@@ -4,6 +4,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
 :root{
   --bg:#F5F7FA; --surface:#FFFFFF; --surface-2:#EDF1F6; --surface-3:#E3E9F1;
@@ -266,8 +267,8 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
         <div class="drop" id="drop">
           <b>학번과 이름이 든 파일을 여기에 끌어다 놓으세요</b>
           <button class="btn sec" id="btnPick">파일 선택</button>
-          <input type="file" id="file" accept=".csv,.tsv,.txt,.xlsx,.xls,.hwpx,.hwp" hidden>
-          <span class="hint">명단이든 지원 현황이든, 앱이 어느 쪽인지 알아서 가려냅니다. 넣기 전에 읽은 결과를 먼저 보여드립니다.</span>
+          <input type="file" id="file" accept=".pdf,.csv,.tsv,.txt,.xlsx,.xls,.hwpx,.hwp" hidden>
+          <span class="hint">PDF · CSV · 엑셀 · 한글(.hwpx)을 읽습니다. 표를 복사해 Ctrl+V 로 붙여넣어도 됩니다.</span>
           <span class="fmts" id="fmts"></span>
         </div>
       </div>
@@ -797,6 +798,7 @@ function csv(arr,name){
 
 /* ── boot ──────────────────────────────────── */
 function bindStatic(){
+  if(typeof pdfjsLib!=="undefined") pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
   document.getElementById("tabClass").onclick=function(){ switchTab(true); };
   document.getElementById("tabAll").onclick=function(){ switchTab(false); };
   document.getElementById("btnAdd").onclick=addOne;
@@ -819,20 +821,37 @@ function bindStatic(){
   var fi=document.getElementById("file"), drop=document.getElementById("drop");
   document.getElementById("btnPick").onclick=function(){ fi.click(); };
   fi.onchange=function(){ if(fi.files&&fi.files[0]) handleFile(fi.files[0]); };
+  /* 화면 어디에 놓아도 받는다. 점선 상자 밖에 놓으면 브라우저가 그 파일을 열어버리기 때문이다. */
   ["dragenter","dragover"].forEach(function(ev){
-    drop.addEventListener(ev,function(e){ e.preventDefault(); drop.classList.add("over"); });
+    document.addEventListener(ev,function(e){ e.preventDefault(); drop.classList.add("over"); });
   });
-  ["dragleave","drop"].forEach(function(ev){
-    drop.addEventListener(ev,function(e){ e.preventDefault(); drop.classList.remove("over"); });
+  ["dragleave","dragend"].forEach(function(ev){
+    document.addEventListener(ev,function(e){ if(!e.relatedTarget) drop.classList.remove("over"); });
   });
-  drop.addEventListener("drop",function(e){
+  document.addEventListener("drop",function(e){
+    e.preventDefault(); drop.classList.remove("over");
     var f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];
-    if(f) handleFile(f);
+    if(!f) return;
+    if(!getCls()){ showError("반을 먼저 선택해 주세요.",""); return; }
+    handleFile(f);
+    document.getElementById("addPanel").scrollIntoView({block:"nearest"});
+  });
+  /* 어느 화면에서든 Ctrl+V 로 표를 붙여넣을 수 있게 한다. 입력 칸 안에서는 그대로 둔다. */
+  document.addEventListener("paste",function(e){
+    var t=e.target&&e.target.tagName;
+    if(t==="INPUT"||t==="TEXTAREA"||(e.target&&e.target.isContentEditable)) return;
+    var text=e.clipboardData&&e.clipboardData.getData("text/plain");
+    if(!text||!text.trim()) return;
+    var cls=getCls();
+    if(!cls){ showError("반을 먼저 선택해 주세요.",""); return; }
+    e.preventDefault();
+    route(parseDelimited(text), cls, "붙여넣은 내용");
+    document.getElementById("preview").scrollIntoView({block:"nearest"});
   });
   document.getElementById("btnTmplRoster").onclick=tmplRoster;
   document.getElementById("btnTmplApps").onclick=tmplApps;
   var fmts=document.getElementById("fmts");
-  [["CSV",1],["TXT",1],["엑셀 .xlsx",typeof XLSX!=="undefined"],["한글 .hwpx",typeof JSZip!=="undefined"],["한글 .hwp",0]]
+  [["PDF",typeof pdfjsLib!=="undefined"],["CSV",1],["엑셀 .xlsx",typeof XLSX!=="undefined"],["한글 .hwpx",typeof JSZip!=="undefined"]]
   .forEach(function(t){
     var sp=el("span","fmt"+(t[1]?"":" no"),t[0]); fmts.appendChild(sp);
   });
@@ -943,6 +962,41 @@ function rowsFromHwpx(zip){
       }
     });
     return rows;
+  });
+}
+/* PDF 에는 표 구조가 없고 글자와 그 위치만 있다. 같은 높이에 있는 글자를 한 줄로,
+   가로 간격이 벌어진 곳을 칸 경계로 본다. 읽은 결과는 미리보기에서 확인하면 된다. */
+function rowsFromPdf(buf){
+  return pdfjsLib.getDocument({data:new Uint8Array(buf)}).promise.then(function(pdf){
+    var pages=[];
+    for(var i=1;i<=pdf.numPages;i++) pages.push(i);
+    return pages.reduce(function(chain,n){
+      return chain.then(function(acc){
+        return pdf.getPage(n).then(function(pg){ return pg.getTextContent(); }).then(function(tc){
+          var lines={};
+          tc.items.forEach(function(it){
+            var s=String(it.str||""); if(!s.trim()) return;
+            var x=it.transform[4], y=Math.round(it.transform[5]);
+            var key=null;
+            Object.keys(lines).forEach(function(k){ if(key===null&&Math.abs(k-y)<=3) key=k; });
+            if(key===null){ key=y; lines[key]=[]; }
+            lines[key].push({x:x, w:it.width||0, s:s});
+          });
+          Object.keys(lines).sort(function(a,b){return b-a;}).forEach(function(k){
+            var items=lines[k].sort(function(a,b){return a.x-b.x;});
+            var cells=[], cur=items[0].s, end=items[0].x+items[0].w;
+            for(var j=1;j<items.length;j++){
+              if(items[j].x-end>6){ cells.push(cur.trim()); cur=items[j].s; }
+              else cur+=items[j].s;
+              end=items[j].x+items[j].w;
+            }
+            cells.push(cur.trim());
+            if(cells.some(function(c){return c;})) acc.push(cells);
+          });
+          return acc;
+        });
+      });
+    }, Promise.resolve([]));
   });
 }
 function pickStudents(rows, cls){
@@ -1317,6 +1371,21 @@ function handleFile(f){
   var reader=new FileReader();
   reader.onerror=function(){ showError("파일을 읽지 못했습니다.","다른 파일로 다시 시도해 주세요."); };
 
+  if(ext==="pdf"){
+    if(typeof pdfjsLib==="undefined"){
+      showError("PDF를 여는 도구를 불러오지 못했습니다.","네트워크 상태를 확인하고 새로고침해 주세요. 표를 복사해 Ctrl+V 로 붙여넣으셔도 됩니다.");
+      return;
+    }
+    reader.onload=function(){
+      rowsFromPdf(reader.result).then(function(rows){
+        route(rows, cls, "PDF "+f.name);
+      }).catch(function(){
+        showError("PDF에서 글자를 읽지 못했습니다.","사진을 찍어 만든 PDF는 글자가 없어 읽을 수 없습니다. 표를 복사해 Ctrl+V 로 붙여넣어 주세요.");
+      });
+    };
+    reader.readAsArrayBuffer(f);
+    return;
+  }
   if(ext==="hwpx"){
     if(typeof JSZip==="undefined"){
       showError("한글 파일을 여는 도구를 불러오지 못했습니다.","네트워크 상태를 확인하고 새로고침해 주세요. 급하면 붙여넣기 탭을 쓰시면 됩니다.");
@@ -1410,11 +1479,11 @@ function start(){
 }
 
 /* 로컬(file://)에서만 열리는 테스트용 통로. 게시된 페이지(https)에서는 만들어지지 않는다. */
-try{ if(location.protocol==="file:"){
+try{ if(location.protocol==="file:"||location.hostname==="localhost"){
   window.__dev={mapStatus:mapStatus, mapMin:mapMin, mapType:mapType,
     parseDate:parseDate, parseYN:parseYN, pickStudents:pickStudents,
     parseDelimited:parseDelimited, headerIndex:headerIndex, importApps:importApps,
-    checkStudent:checkStudent, parseMin:parseMin, judgeMin:judgeMin};
+    checkStudent:checkStudent, parseMin:parseMin, judgeMin:judgeMin, rowsFromPdf:rowsFromPdf};
 } }catch(e){}
 
 if(window.claude&&window.claude.hot&&window.claude.hot.ready){ window.claude.hot.ready(start); }
