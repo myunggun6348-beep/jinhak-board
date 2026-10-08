@@ -153,6 +153,22 @@ button{cursor:pointer}
 .apphead{display:flex; align-items:center; gap:8px; margin-bottom:8px}
 .apphead .kind{font-size:11px; font-weight:700; letter-spacing:.05em; color:var(--accent);
   background:var(--accent-soft); padding:2px 8px; border-radius:5px}
+.f textarea{border:1px solid var(--line-2); background:var(--surface); border-radius:6px; padding:6px 8px; font-size:13px; min-height:0}
+.f textarea:disabled{background:var(--surface-3); color:var(--ink-3)}
+.apptable{min-width:760px}
+.apptable td{white-space:normal; vertical-align:middle}
+.apptable td:nth-child(2){white-space:nowrap; font-weight:700}
+.apptable tr.arow{cursor:pointer}
+.apptable tr.arow:hover td,.apptable tr.arow.open td{background:var(--surface-2)}
+.apptable tr.arow.warn td:first-child{box-shadow:inset 3px 0 0 var(--warn)}
+.apptable .kind{font-size:11px; font-weight:700; color:var(--accent); background:var(--accent-soft); padding:2px 7px; border-radius:5px; white-space:nowrap}
+.apptable select{border:1px solid var(--line-2); background:var(--surface); border-radius:6px; padding:4px 6px; font-size:12.5px}
+.apptable select:disabled{background:var(--surface-3); color:var(--ink-3)}
+.apptable .act{text-align:right; white-space:nowrap}
+.apptable .w{color:var(--bad); font-weight:700; font-size:12px; margin-right:8px}
+.apptable .edit{color:var(--ink-3); font-size:12px}
+.apptable td.editcell{background:var(--surface-2); padding:10px}
+.apptable td.editcell .app{background:var(--surface)}
 .minnote{margin-top:8px; font-size:12px; color:var(--ink-3)}
 .minnote.off{color:var(--warn); font-weight:700}
 .apphead .warnnote{font-size:11.5px; color:var(--bad); font-weight:700; margin-left:auto}
@@ -250,6 +266,7 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
       <h2 id="listTitle">학생</h2>
       <span class="cnt" id="listCount"></span>
       <span class="sp">
+        <button class="ghost" id="btnUndo" hidden disabled>↶ 되돌리기</button>
         <button class="ghost" id="btnCsv">CSV 내려받기</button>
       </span>
     </div>
@@ -325,7 +342,7 @@ var AWAIT = {"지원완료":1,"1단계합":1,"면접완료":1};   // 발표일�
 
 var db=null, userCap=null, downloadsCap=null, canWrite=null, unsub=null;
 var students=new Map();          // id -> doc body
-var openId=null, pendingRender=false, demo=false;
+var openId=null, editAppId=null, pendingRender=false, demo=false;
 var writeTimers=new Map();
 
 /* ── demo rows: shown only until real data exists ── */
@@ -485,7 +502,9 @@ function applyMin(st){
 
 /* ── data access ───────────────────────────── */
 function list(){ return demo ? DEMO.slice() : Array.from(students.values()); }
-function sorted(arr){ return arr.sort(function(a,b){ return String(a.no).localeCompare(String(b.no)); }); }
+// 학번 있는 학생을 학번순으로 먼저, 학번이 없으면 이름순
+function sorted(arr){ return arr.sort(function(a,b){
+  return (a.no?0:1)-(b.no?0:1) || String(a.no||"").localeCompare(String(b.no||"")) || String(a.name||"").localeCompare(String(b.name||""),"ko"); }); }
 function byClass(c){ return sorted(list().filter(function(s){return s.cls===c;})); }
 
 function save(st){
@@ -500,6 +519,49 @@ function save(st){
       setSync("off","저장 실패 — "+(e&&e.code==="invalid_argument"?"입력 권한이 없습니다":"다시 시도해 주세요"));
     });
   },500));
+}
+/* ── 되돌리기 ─────────────────────────────────
+   동작 직전과 직후를 비교해, 그 동작이 바꾼 학생만 기억한다. 되돌릴 때 그 학생들만
+   예전 상태로 돌리므로, 그사이 다른 선생님이 고친 다른 학생은 건드리지 않는다.
+   기록은 이 창에만 있고 새로고침하면 사라진다. */
+var undoStack=[];
+function snapAll(){ var m={}; students.forEach(function(s,id){ m[id]=JSON.stringify(s); }); return m; }
+function remember(label){
+  if(demo||canWrite===false) return;
+  var before=snapAll();
+  setTimeout(function(){
+    var after=snapAll(), prev={}, n=0;
+    Object.keys(before).forEach(function(id){ if(after[id]!==before[id]){ prev[id]=before[id]; n++; } });
+    Object.keys(after).forEach(function(id){ if(!(id in before)){ prev[id]=null; n++; } });
+    if(!n) return;
+    undoStack.push({label:label, prev:prev, n:n});
+    if(undoStack.length>30) undoStack.shift();
+    renderUndo();
+  },0);
+}
+function undo(){
+  var e=undoStack.pop(); if(!e) return;
+  Object.keys(e.prev).forEach(function(id){
+    if(writeTimers.has(id)){ clearTimeout(writeTimers.get(id)); writeTimers.delete(id); }
+    var j=e.prev[id];
+    if(j===null){
+      students.delete(id);
+      if(db) db.doc("students/"+id).delete().catch(function(){});
+    } else {
+      students.set(id, JSON.parse(j));
+      if(db) db.doc("students/"+id).set(JSON.parse(j)).catch(function(){
+        setSync("off","되돌리기 저장 실패 — 다시 시도해 주세요");
+      });
+    }
+  });
+  openId=null; clearMsg(); render(); renderUndo();
+}
+function renderUndo(){
+  var b=document.getElementById("btnUndo"); if(!b) return;
+  var e=undoStack[undoStack.length-1];
+  b.hidden=demo||canWrite===false;
+  b.disabled=!e;
+  b.textContent=e?"↶ 되돌리기 · "+e.label+(e.n>1?" ("+e.n+"명)":""):"↶ 되돌리기";
 }
 function setSync(kind,text){
   var d=document.getElementById("syncDot"), t=document.getElementById("syncText");
@@ -519,6 +581,7 @@ function render(){
   renderAlerts(document.getElementById("alerts"), mine, false);
   renderStats(document.getElementById("stats"), mine);
   renderRows(mine, cls);
+  renderUndo();
   if(!document.getElementById("viewAll").hidden) renderAll();
 }
 function renderClassbar(cls){
@@ -576,6 +639,40 @@ function renderAlerts(host, arr, showClass){
     host.appendChild(more);
   }
 }
+/* ── 짧게 보여주기 ─────────────────────────────
+   목록과 표에서만 쓴다. 저장된 값은 그대로다. */
+var METRO=/^(서울|부산|대구|인천|광주|대전|울산|세종)$/;
+function shortUniv(u){
+  u=String(u||"").trim(); var m=u.match(/^(.*?)\s*\(([^)]*)\)\s*$/);
+  var name=(m?m[1]:u).replace(/^국립/,"").replace(/대학교$/,"대"), camp=m?m[2]:"";
+  return name+(camp&&!METRO.test(camp)?"("+camp+")":"");
+}
+function shortMajor(s){
+  s=String(s||"").replace(/\s*\(.*\)\s*$/,"").replace(/학과$/,"").trim();
+  return s.length>12?s.slice(0,11)+"…":s;
+}
+function appLabel(a){
+  var t=[shortUniv(a.univ)||"미입력", shortMajor(a.major), a.kind==="정시"?(a.group?a.group+"군":"정시"):a.type].filter(Boolean).join(" ");
+  return a.status&&a.status!=="지원완료"? t+" · "+a.status : t;
+}
+/* 요강 문장에서 눈에 띄는 숫자만 뽑아 "2개합 5 · 한국사 4" 처럼 보여준다. 판정에는 쓰지 않는다. */
+function minShort(raw){
+  var t=String(raw||"").replace(/\s+/g," ").replace(/^\*?\s*수능\s*최저(학력)?\s*기준\s*:\s*/,"").trim();
+  if(!t) return "";
+  if(/^(없음|해당\s*없음|미적용|-|—)$/.test(t)) return "없음";
+  var p=[], m;
+  if(/수학\s*포함/.test(t)) p.push("수학 포함");
+  if((m=t.match(/(\d)\s*개(?:\s*(?:영역|과목))?(?:\s*등급)?(?:의)?\s*합(?:이)?\s*(\d{1,2})/))||(m=t.match(/(\d)\s*합\s*(\d{1,2})/))) p.push(m[1]+"개합 "+m[2]);
+  else if((m=t.match(/(\d)\s*개(?:\s*영역)?\s*각\s*(\d)/))) p.push(m[1]+"개 각 "+m[2]);
+  else if((m=t.match(/(\d)\s*개(?:\s*영역)?(?:\s*이상)?(?:이|가)?(?:\s*등급)?\s*(\d)\s*(?:등급)?\s*이내/))) p.push(m[1]+"개 "+m[2]+"등급");
+  if((m=t.match(/한국사\s*(\d)/))) p.push("한국사 "+m[1]);
+  if((m=t.match(/영어\s*(\d)\s*등급/))) p.push("영어 "+m[1]);
+  if(/(탐구?|과탐|사탐).{0,12}?1\s*(개\s*)?과목|상위\s*1\s*(개\s*)?과목/.test(t)&&!/2\s*(개\s*)?과목\s*(의\s*)?(등급\s*)?평균/.test(t)) p.push("탐1");
+  else if(/평균/.test(t)) p.push("탐2 평균");
+  return p.length? p.join(" · ") : (t.length>18?t.slice(0,17)+"…":t);
+}
+function mmdd(s){ var m=String(s||"").match(/^\d{4}-(\d{2})-(\d{2})/); return m?(+m[1])+"/"+(+m[2]):""; }
+
 function renderRows(arr, cls){
   var host=document.getElementById("rows");
   host.innerHTML="";
@@ -586,20 +683,21 @@ function renderRows(arr, cls){
     var row=el("div","row"+(warns.length?" flag":""));
     var head=el("button","rowhead");
     head.setAttribute("aria-expanded",String(openId===st.id));
-    head.appendChild(el("span","no mono",esc(st.no)));
+    head.appendChild(el("span","no mono",st.no?esc(st.no):"—"));
     head.appendChild(el("span","nm",esc(st.name)));
     var pills=el("div","pills");
     var apps=st.apps||[];
     if(!apps.length) pills.appendChild(el("span","pill empty","지원 없음"));
     apps.slice(0,7).forEach(function(a){
-      var p=el("span","pill "+statusClass(a.status), (a.univ||"미입력")+" · "+a.status);
+      var p=el("span","pill "+statusClass(a.status), appLabel(a));
+      p.title=[a.univ,a.major,a.jh||a.type,a.status].filter(Boolean).join(" · ");
       pills.appendChild(p);
     });
     if(apps.length>7) pills.appendChild(el("span","pill","+"+(apps.length-7)));
     head.appendChild(pills);
     if(warns.length) head.appendChild(el("span","flagmark","경고 "+warns.length));
     head.appendChild(el("span","caret",openId===st.id?"▲":"▼"));
-    head.onclick=function(){ openId=(openId===st.id?null:st.id); render(); };
+    head.onclick=function(){ openId=(openId===st.id?null:st.id); editAppId=null; render(); };
     row.appendChild(head);
     if(openId===st.id) row.appendChild(detail(st));
     host.appendChild(row);
@@ -618,7 +716,7 @@ function sel(options, value, onchange){
     var op=document.createElement("option"); op.value=o; op.textContent=o||"—";
     if(o===value) op.selected=true; s.appendChild(op);
   });
-  s.onchange=function(){ onchange(s.value); };
+  s.onchange=function(){ remember("수정"); onchange(s.value); };
   s.disabled=(canWrite===false||demo);
   return s;
 }
@@ -626,15 +724,24 @@ function txt(value, placeholder, onchange, cls){
   var i=document.createElement("input");
   i.value=value||""; if(placeholder) i.placeholder=placeholder;
   if(cls) i.className=cls;
-  i.onchange=function(){ onchange(i.value.trim()); };
+  i.onchange=function(){ remember("수정"); onchange(i.value.trim()); };
   i.onfocus=function(){ pendingRender=true; };
   i.onblur=function(){ pendingRender=false; };
   i.disabled=(canWrite===false||demo);
   return i;
 }
+function area(value, placeholder, onchange){
+  var a=document.createElement("textarea");
+  a.value=value||""; a.placeholder=placeholder||""; a.rows=3;
+  a.onchange=function(){ remember("수정"); onchange(a.value.trim()); };
+  a.onfocus=function(){ pendingRender=true; };
+  a.onblur=function(){ pendingRender=false; };
+  a.disabled=(canWrite===false||demo);
+  return a;
+}
 function dateInput(type,value,onchange){
   var i=document.createElement("input"); i.type=type; i.value=value||"";
-  i.onchange=function(){ onchange(i.value); };
+  i.onchange=function(){ remember("수정"); onchange(i.value); };
   i.disabled=(canWrite===false||demo);
   return i;
 }
@@ -650,15 +757,52 @@ function detail(st){
   });
   cs.appendChild(cg);
   d.appendChild(cs);
-  (st.apps||[]).forEach(function(a){
-    var w=appWarn(st,a);
+  /* 지원 한 건을 한 줄로. 줄을 누르면 그 아래에 고치는 칸이 열린다. 상태는 줄에서 바로 바꾼다. */
+  var apps=st.apps||[];
+  if(apps.length){
+    var tw=el("div","tablewrap"), t=document.createElement("table"); t.className="apptable";
+    var hr=t.createTHead().insertRow();
+    ["","대학","모집단위","전형","면접 · 발표","수능최저","상태",""].forEach(function(h){
+      var th=document.createElement("th"); th.textContent=h; hr.appendChild(th); });
+    var tb=t.createTBody();
+    apps.forEach(function(a){
+      var w=appWarn(st,a), open=(editAppId===a.id);
+      var tr=tb.insertRow(); tr.className="arow"+(w?" warn":"")+(open?" open":"");
+      tr.insertCell().appendChild(el("span","kind",a.kind==="정시"?(a.group?a.group+"군":"정시"):"수시"));
+      tr.insertCell().textContent=a.univ||"미입력";
+      tr.insertCell().textContent=a.major||"";
+      tr.insertCell().textContent=a.jh||a.type||"";
+      tr.insertCell().textContent=[a.itv?mmdd(a.itv)+" 면접":"", a.ann?mmdd(a.ann)+" 발표":""].filter(Boolean).join(" · ")||"—";
+      var mc=tr.insertCell();
+      mc.textContent=a.kind==="수시"?(minShort(a.mreq)||"—"):"—";
+      if(a.mreq) mc.title=a.mreq;
+      if(a.kind==="수시"&&a.mmet==="미충족") mc.className="miss";
+      var s=sel(STATUSES,a.status,function(v){a.status=v; save(st); render();});
+      s.onclick=function(e){ e.stopPropagation(); };
+      tr.insertCell().appendChild(s);
+      var ec=tr.insertCell(); ec.className="act";
+      if(w) ec.appendChild(el("span","w",w));
+      ec.appendChild(el("span","edit",open?"닫기 ▲":"고치기 ▼"));
+      tr.onclick=function(){ editAppId=open?null:a.id; render(); };
+      if(open){
+        var td=tb.insertRow().insertCell(); td.colSpan=8; td.className="editcell";
+        td.appendChild(appEditor(st,a,w));
+      }
+    });
+    tw.appendChild(t); d.appendChild(tw);
+  }
+  addRow(d,st);
+  return d;
+}
+function appEditor(st,a,w){
     var box=el("div","app"+(w?" warn":""));
     var hd=el("div","apphead");
-    hd.appendChild(el("span","kind",a.kind));
+    hd.appendChild(el("span","kind",a.kind+" 지원 고치기"));
     if(w) hd.appendChild(el("span","warnnote",w));
     var del=el("button","del","삭제");
     del.disabled=(canWrite===false||demo);
     del.onclick=function(){
+      remember("지원 삭제");
       st.apps=st.apps.filter(function(x){return x.id!==a.id;}); save(st); render();
     };
     hd.appendChild(del);
@@ -674,32 +818,33 @@ function detail(st){
     g.appendChild(field("면접일", dateInput("date",a.itv,function(v){a.itv=v; save(st); render();})));
     g.appendChild(field("발표일", dateInput("date",a.ann,function(v){a.ann=v; save(st); render();})));
     g.appendChild(field("충원 마감", dateInput("datetime-local",a.due,function(v){a.due=v; save(st); render();})));
-    g.appendChild(field("상태", sel(STATUSES,a.status,function(v){a.status=v; save(st); render();})));
-    if(a.kind==="수시"){
-      g.appendChild(field("수능최저 기준", txt(a.mreq,"예: 2개합 5",function(v){a.mreq=v; applyMin(st); save(st); render();})));
-      g.appendChild(field("최저 충족", sel(MINSTATES,a.mmet||"미정",function(v){a.mmet=v; save(st); render();})));
-    }
+    if(a.kind==="수시") g.appendChild(field("최저 충족", sel(MINSTATES,a.mmet||"미정",function(v){a.mmet=v; save(st); render();})));
     g.appendChild(field("예비번호", txt(a.rank,"",function(v){a.rank=v; save(st);},"mono")));
     g.appendChild(field("메모", txt(a.note,"",function(v){a.note=v; save(st);})));
     if(a.kind==="수시"){
       var cb=document.createElement("select");
       ["Y","N"].forEach(function(o){var op=document.createElement("option");op.value=o;op.textContent=o==="Y"?"포함":"제외";if((a.c6?"Y":"N")===o)op.selected=true;cb.appendChild(op);});
-      cb.onchange=function(){ a.c6=(cb.value==="Y"); save(st); render(); };
+      cb.onchange=function(){ remember("수정"); a.c6=(cb.value==="Y"); save(st); render(); };
       cb.disabled=(canWrite===false||demo);
       g.appendChild(field("6장 제한", cb));
     }
-    box.appendChild(g);
     if(a.kind==="수시"){
-      var r=judgeMin(a.mreq, st.csat);
-      if(a.mreq&&(hasCsat(st)||!r.res&&!/등급이 없습니다$/.test(r.why))){
-        var t=r.res?"자동 판정: "+r.res+" — "+r.why:"자동 판정 안 함 — "+r.why;
-        if(r.res&&r.res!==(a.mmet||"미정")) t+=" (지금은 ‘"+(a.mmet||"미정")+"’으로 직접 골라 두었습니다)";
-        box.appendChild(el("div","minnote"+(r.res&&r.res===a.mmet?"":" off"),t));
-      }
+      /* 요강 문장이 길어 한 줄 칸에서는 잘린다. 전체가 보이도록 넓은 칸으로 둔다. */
+      var mf=field("수능최저 기준", area(a.mreq,"예: 국수영탐 중 2개합 5, 한국사 4",function(v){a.mreq=v; applyMin(st); save(st); render();}));
+      mf.style.gridColumn="1 / -1";
+      g.appendChild(mf);
     }
-    d.appendChild(box);
-  });
-
+    box.appendChild(g);
+    /* 판정 안내는 수능 등급을 넣은 뒤에만 띄운다. 수능 전에는 판정할 수 없으니 안내도 소음일 뿐이다. */
+    if(a.kind==="수시"&&a.mreq&&hasCsat(st)){
+      var r=judgeMin(a.mreq, st.csat);
+      var t=r.res?"자동 판정: "+r.res+" — "+r.why:"자동 판정 안 함 — "+r.why+". ‘최저 충족’을 직접 골라 주세요.";
+      if(r.res&&r.res!==(a.mmet||"미정")) t+=" (지금은 ‘"+(a.mmet||"미정")+"’으로 직접 골라 두었습니다)";
+      box.appendChild(el("div","minnote"+(r.res&&r.res===a.mmet?"":" off"),t));
+    }
+    return box;
+}
+function addRow(d,st){
   var add=el("div","addrow");
   var b1=el("button","btn sec","+ 수시 지원 추가");
   b1.disabled=(canWrite===false||demo);
@@ -712,17 +857,19 @@ function detail(st){
   b3.style.marginLeft="auto";
   b3.onclick=function(){
     if(!window.confirm(st.name+" 학생을 명단에서 지웁니다. 계속할까요?")) return;
+    remember("학생 삭제");
     students.delete(st.id);
     if(db) db.doc("students/"+st.id).delete().catch(function(){});
     openId=null; render();
   };
   add.appendChild(b1); add.appendChild(b2); add.appendChild(b3);
   d.appendChild(add);
-  return d;
 }
 function addApp(st,kind){
+  remember("지원 추가");
   st.apps=st.apps||[];
-  st.apps.push({id:uid(),kind:kind,univ:"",major:"",jh:"",type:kind==="정시"?"정시":"학종",
+  editAppId=uid();   // 새 지원은 고치는 칸을 열어 둔 채로 보여준다
+  st.apps.push({id:editAppId,kind:kind,univ:"",major:"",jh:"",type:kind==="정시"?"정시":"학종",
     c6:kind==="수시",itv:"",ann:"",due:"",status:"지원완료",rank:"",note:"",
     mreq:"",mmet:kind==="수시"?"미정":"해당없음"});
   save(st); render();
@@ -848,6 +995,12 @@ function bindStatic(){
     route(parseDelimited(text), cls, "붙여넣은 내용");
     document.getElementById("preview").scrollIntoView({block:"nearest"});
   });
+  document.getElementById("btnUndo").onclick=undo;
+  document.addEventListener("keydown",function(e){
+    var t=e.target&&e.target.tagName;
+    if(t==="INPUT"||t==="TEXTAREA"||t==="SELECT") return;
+    if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&(e.key==="z"||e.key==="Z")&&undoStack.length){ e.preventDefault(); undo(); }
+  });
   document.getElementById("btnTmplRoster").onclick=tmplRoster;
   document.getElementById("btnTmplApps").onclick=tmplApps;
   var fmts=document.getElementById("fmts");
@@ -876,15 +1029,22 @@ function addOne(){
   var no=document.getElementById("newNo").value.trim();
   var nm=document.getElementById("newName").value.trim();
   if(!no||!nm){alert("학번과 이름을 모두 넣어 주세요.");return;}
+  remember("학생 추가");
   putStudent(cls,no,nm);
   document.getElementById("newNo").value=""; document.getElementById("newName").value="";
   document.getElementById("newNo").focus();
   render();
 }
+function noNoByName(cls,name){
+  var hit=null;
+  students.forEach(function(v){ if(!hit&&!v.no&&v.cls===cls&&name&&v.name===name) hit=v; });
+  return hit;
+}
 function putStudent(cls,no,name){
   var key=String(no).replace(/[^0-9A-Za-z_.~:@+-]/g,"");
   if(!key) key=uid();
   var existing=students.get(key);
+  if(!existing) existing=noNoByName(cls,name);   // 학번 없이 들어온 학생이면 이름으로 찾아 학번을 채운다
   var st=existing||{id:key,cls:cls,no:no,name:name,apps:[]};
   st.cls=cls; st.no=no; st.name=name;
   if(demo){ demo=false; document.getElementById("banner").hidden=true; students.clear(); }
@@ -1064,6 +1224,7 @@ function showPreview(res, source){
   var acts=el("div","acts");
   var ok=el("button","btn","명단에 넣기");
   ok.onclick=function(){
+    remember("명단 넣기");
     (pending&&pending.length?pending:[]).forEach(function(o){ putStudent(cls,o.no,o.name); });
     pending=null; host.hidden=true; clearMsg();
     document.getElementById("bulk").value="";
@@ -1087,6 +1248,7 @@ function showPreview(res, source){
     r.insertCell().textContent=o.name;
     var c3=r.insertCell();
     if(students.has(String(o.no))&&!demo) c3.appendChild(el("span","badge up","이미 있음 · 이름 갱신"));
+    else if(!demo&&noNoByName(cls,o.name)) c3.appendChild(el("span","badge up","이미 있음 · 학번 채움"));
     else if(o.made) c3.appendChild(el("span","badge","번호로 학번 생성"));
   });
   body.appendChild(t); host.appendChild(body);
@@ -1291,6 +1453,7 @@ function showAppPreview(res, source){
   if(res.skipped.length) host.appendChild(el("div","skip","건너뛴 줄 "+res.skipped.length+"개 — 예: "+res.skipped.slice(0,2).join(" / ")));
 }
 function commitApps(byStudent, cls){
+  remember("파일 넣기");
   var added=0, updated=0, newStu=0;
   Object.keys(byStudent).forEach(function(key){
     var g=byStudent[key];
@@ -1306,6 +1469,7 @@ function commitApps(byStudent, cls){
       st={id:id||uid(), cls:cls, no:g.no||"", name:g.name||"", apps:[]};
       students.set(st.id, st); newStu++;
     }
+    if(!st.no&&g.no) st.no=g.no;
     st.apps=st.apps||[];
     g.apps.forEach(function(a){
       var same=st.apps.filter(function(x){
@@ -1329,6 +1493,9 @@ function commitApps(byStudent, cls){
   var d=el("div","err"); d.style.borderLeftColor="var(--ok)"; d.style.background="var(--ok-soft)";
   d.appendChild(el("b",null,"넣었습니다"));
   d.appendChild(el("div","how","새 지원 "+added+"건, 갱신 "+updated+"건"+(newStu?", 새 학생 "+newStu+"명":"")+"."));
+  var ub=el("button","ghost","↶ 방금 넣은 것 되돌리기"); ub.style.marginTop="8px";
+  ub.onclick=function(){ undo(); };
+  d.appendChild(ub);
   host.appendChild(d);
 }
 
