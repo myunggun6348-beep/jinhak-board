@@ -97,48 +97,87 @@ function buildTestPage() {
 
   /* ── 4. 파일에서 명단 읽기 ─────────────────── */
   console.log("\n[파일에서 명단 읽기]");
+  /* 파일을 넣으면 확인 단계 없이 바로 들어간다. 읽은 결과는 __dev.last() 로, 안내는 #importMsg 로 본다. */
   async function importFile(file) {
     await p.locator("#stFile").click();
     await p.locator("#file").setInputFiles(file);
     await p.waitForTimeout(900);
-    const shown = await p.locator("#preview").isVisible();
-    if (!shown) return { ok: false, err: (await p.locator("#importMsg").textContent()).trim() };
-    const rows = await p.$$eval(".pvbody tbody tr", (trs) =>
-      trs.map((tr) => Array.from(tr.cells).map((td) => td.textContent.trim())));
-    await p.locator(".pvhead .btn").click();
-    await p.waitForTimeout(500);
-    return { ok: true, rows: rows };
+    const msg = (await p.locator("#importMsg").textContent()).trim();
+    const last = await p.evaluate(() => window.__dev.last());
+    return { ok: /^넣었습니다/.test(msg), msg: msg, last: last };
   }
   let r = await importFile(FIX("roster_euckr.csv"));
-  check("CSV(EUC-KR) 한글 안 깨짐", r.ok && r.rows.length, 4);
-  check("CSV 첫 줄", r.rows && r.rows[0].slice(0, 2), ["30201", "김민수"]);
+  const rosterRows = (x) => (x.last && x.last.kind === "roster" ? x.last.res.list.map((o) => [o.no, o.name]) : []);
+  check("CSV(EUC-KR) 한글 안 깨짐", r.ok && rosterRows(r).length, 4);
+  check("CSV 첫 줄", rosterRows(r)[0], ["30201", "김민수"]);
 
   r = await importFile(FIX("roster.xlsx"));
-  check("엑셀 학년/반/번호 → 학번 생성", r.ok && r.rows[0][0], "30201");
-  check("엑셀 두 자리 번호", r.ok && r.rows[3][0], "30212");
+  check("엑셀 학년/반/번호 → 학번 생성", r.ok && rosterRows(r)[0][0], "30201");
+  check("엑셀 두 자리 번호", r.ok && rosterRows(r)[3][0], "30212");
 
   r = await importFile(FIX("roster.hwpx"));
-  check("한글(.hwpx) 표에서 읽기", r.ok && r.rows.length, 3);
+  check("한글(.hwpx) 표에서 읽기", r.ok && rosterRows(r).length, 3);
 
   fs.writeFileSync(path.join(ROOT, ".fake.hwp"), "\xd0\xcf\x11\xe0");
   r = await importFile(path.join(ROOT, ".fake.hwp"));
   check("구형 .hwp 는 거절하고 안내", r.ok, false);
-  check("안내에 hwpx 저장법 포함", /hwpx/.test(r.err || ""), true);
+  check("안내에 hwpx 저장법 포함", /hwpx/.test(r.msg || ""), true);
   fs.unlinkSync(path.join(ROOT, ".fake.hwp"));
 
   /* ── 5. 지원 현황 읽기 ─────────────────────── */
   console.log("\n[지원 현황 읽기]");
-  await p.locator("#file").setInputFiles(FIX("apps_messy.csv"));
-  await p.waitForTimeout(900);
-  const head = await p.locator(".pvhead .t").textContent();
-  check("열 이름이 달라도 지원 현황으로 알아봄", /지원 5건/.test(head), true);
-  const cells = (await p.$$eval(".pvbody tbody tr", (trs) =>
-    trs.map((tr) => Array.from(tr.cells).map((td) => td.textContent.trim()).join(" | "))));
-  check("‘추합’ → 충원합", /충원합/.test(cells[2]), true);
-  check("‘탈락’ → 불합격", /불합격/.test(cells[3]), true);
-  check("못 알아본 상태는 원문을 같이 보여줌", /붙음\?/.test(cells[4]), true);
-  await p.locator(".pvhead .btn").click();
-  await p.waitForTimeout(600);
+  r = await importFile(FIX("apps_messy.csv"));
+  const apps = r.last && r.last.kind === "apps" ? r.last.res.apps : [];
+  check("열 이름이 달라도 지원 현황으로 알아보고 바로 넣음", r.ok && apps.length, 5);
+  check("‘추합’ → 충원합", apps[2] && apps[2].app.status, "충원합");
+  check("‘탈락’ → 불합격", apps[3] && apps[3].app.status, "불합격");
+  check("못 알아본 상태는 원문을 안내에 같이 보여줌", /붙음?/.test(r.msg), true);
+
+  /* 학교마다 다른 표 모양. 파일 대신 읽은 줄을 바로 넣어 본다. */
+  console.log("\n[여러 가지 표 모양]");
+  const shapes = await p.evaluate(() => {
+    const R = (rows) => window.__dev.readApps(rows).apps.map((a) => [a.no, a.name, a.app.univ, a.app.major].join("|"));
+    return {
+      merged: R([["이름", "대학", "학과"], ["김기현", "부산대학교", "국어국문학과"], ["", "건국대학교", "철학과"], ["최윤후", "동명대학교", "경영학부"]]),
+      wide: R([["학번", "이름", "대학1", "학과1", "대학2", "학과2"], ["30201", "김기현", "부산대학교", "국어국문학과", "건국대학교", "철학과"]]),
+      slot: R([["학번", "성명", "수시1", "수시2"], ["30201", "김기현", "부산대학교 국어국문학과 논술", "건국대학교/철학과/논술"]]),
+      noHeader: R([["수시 지원 현황"], ["30201", "김기현", "부산대학교(부산)", "국어국문학과", "논술"], ["", "", "건국대학교(서울)", "철학과", "논술"]]),
+      loose: R([["3학년 2반"], [], ["번호", "성 명", "지원대학명", "모집단위명(학과)"], ["1", "김기현", "부산대학교", "국어국문학과"]]),
+      repeatedHead: R([["이름", "대학"], ["김기현", "부산대학교"], ["이름", "대학"], ["최윤후", "동명대학교"]]),
+      roster: R([["학번", "이름"], ["30201", "김기현"]]),
+    };
+  });
+  check("병합된 이름칸은 위 학생으로", shapes.merged, ["|김기현|부산대학교|국어국문학과", "|김기현|건국대학교|철학과", "|최윤후|동명대학교|경영학부"]);
+  check("대학1·대학2 옆으로 늘어선 표", shapes.wide, ["30201|김기현|부산대학교|국어국문학과", "30201|김기현|건국대학교|철학과"]);
+  check("수시1·수시2 한 칸에 몰아 쓴 표", shapes.slot, ["30201|김기현|부산대학교|국어국문학과", "30201|김기현|건국대학교|철학과"]);
+  check("머리줄 없는 표(PDF)", shapes.noHeader, ["30201|김기현|부산대학교(부산)|국어국문학과", "30201|김기현|건국대학교(서울)|철학과"]);
+  check("제목줄과 느슨한 열 이름", shapes.loose, ["|김기현|부산대학교|국어국문학과"]);
+  check("쪽마다 반복된 머리줄은 건너뜀", shapes.repeatedHead, ["|김기현|부산대학교", "|최윤후|동명대학교"].map((x) => x + "|"));
+  check("명단 파일은 지원으로 읽지 않음", shapes.roster, []);
+
+  /* 진학 프로그램 PDF: 긴 칸이 여러 줄로 접히고, 번호 열은 가운데 맞춤이다(2027지원현황.pdf 모양). */
+  console.log("\n[PDF 표 복원]");
+  const pdf = await p.evaluate(() => {
+    const it = (x, y, w, s) => ({ x, y, w, s });
+    const items = [
+      it(33, 532, 8, "No"), it(46, 532, 16, "학년"), it(70, 532, 8, "반"), it(89, 536, 8, "번"), it(89, 528, 8, "호"),
+      it(109, 532, 16, "이름"), it(224, 532, 24, "대학명"), it(277, 532, 32, "모집단위"),
+      it(406, 538, 14, "수능"), it(406, 531, 14, "최저"), it(406, 524, 14, "유무"), it(515, 532, 32, "세부유형"),
+      it(35, 506, 4, "9"), it(52, 506, 4, "3"), it(72, 506, 4, "2"), it(91, 506, 4, "1"), it(105, 506, 24, "강준석"),
+      it(212, 510, 48, "국립부경대학"), it(220, 502, 32, "교(부산)"), it(267, 514, 52, "스마트헬스케"), it(267, 506, 52, "어학부(바이오"), it(283, 498, 20, "전공)"),
+      it(411, 506, 4, "Y"), it(509, 510, 44, "학생부교과("), it(521, 502, 20, "일반)"),
+      it(33, 471, 8, "10"), it(52, 471, 4, "3"), it(72, 471, 4, "2"), it(89, 471, 8, "12"), it(105, 471, 24, "최윤후"),
+      it(214, 471, 44, "동명대학교"), it(269, 471, 40, "경영학부"), it(411, 471, 4, "N"), it(509, 471, 44, "학생부교과"),
+    ];
+    const rows = window.__dev.pdfTableRows(items);
+    const apps = window.__dev.readApps(rows).apps.map((a) => [a.cls, a.no, a.name, a.app.univ, a.app.major, a.app.jh, a.app.mreq].join("|"));
+    return { head: rows && rows[0], apps };
+  });
+  check("머리줄 접힌 글자 잇기", pdf.head, ["No", "학년", "반", "번호", "이름", "대학명", "모집단위", "수능최저유무", "세부유형"]);
+  check("접힌 칸 잇기·학년반번호로 학번·최저 유무", pdf.apps, [
+    "2|30201|강준석|국립부경대학교(부산)|스마트헬스케어학부(바이오전공)|학생부교과(일반)|최저 있음(기준 미기재)",
+    "2|30212|최윤후|동명대학교|경영학부|학생부교과|없음",
+  ]);
 
   /* ── 6. 점검 규칙 ──────────────────────────── */
   console.log("\n[점검 규칙]");
@@ -151,6 +190,7 @@ function buildTestPage() {
     return {
       six: c(mk(six)).map((w) => w.code),
       itv: c(mk([{ kind: "수시", univ: "A", status: "1단계합", itv: "2026-11-28" }, { kind: "수시", univ: "B", status: "1단계합", itv: "2026-11-28" }])).map((w) => w.code),
+      itvSameUniv: c(mk([{ kind: "수시", univ: "A", jh: "교과", status: "지원완료", itv: "2026-10-17" }, { kind: "수시", univ: "A", jh: "종합", status: "지원완료", itv: "2026-10-17" }])).map((w) => w.code),
       jungsi: c(mk([{ kind: "수시", univ: "A", status: "최초합" }, { kind: "정시", univ: "B", status: "지원완료" }])).map((w) => w.code),
       jungsiGaveUp: c(mk([{ kind: "수시", univ: "A", status: "등록포기" }, { kind: "정시", univ: "B", status: "지원완료" }])).map((w) => w.code),
       jungsiPass: c(mk([{ kind: "정시", univ: "A", group: "가", status: "최초합" }, { kind: "정시", univ: "B", group: "나", status: "지원완료" }])).map((w) => w.code),
@@ -164,6 +204,7 @@ function buildTestPage() {
   });
   check("① 6장 초과", rules.six, ["6장초과"]);
   check("② 면접일 중복", rules.itv, ["면접중복"]);
+  check("② 같은 대학 두 전형이 같은 날이면 겹침 아님", rules.itvSameUniv, []);
   check("③ 수시 합격자의 정시 지원", rules.jungsi, ["정시지원불가"]);
   check("③ 등록을 포기해도 정시 지원 불가", rules.jungsiGaveUp, ["정시지원불가"]);
   check("정시 합격은 수시 합격으로 치지 않음", rules.jungsiPass, []);
