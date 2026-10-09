@@ -562,9 +562,11 @@ function undo(){
 function renderUndo(){
   var b=document.getElementById("btnUndo"); if(!b) return;
   var e=undoStack[undoStack.length-1];
-  b.hidden=demo||canWrite===false;
+  // 파일·명단을 넣은 직후에는 넣기 안내 아래의 취소 버튼만 둔다(위에도 있으면 넣기 버튼과 헷갈린다).
+  b.hidden=demo||canWrite===false||!!(e&&/넣기$/.test(e.label)&&document.querySelector("#importMsg button"));
   b.disabled=!e;
-  b.textContent=e?"↶ 되돌리기 · "+e.label+(e.n>1?" ("+e.n+"명)":""):"↶ 되돌리기";
+  b.textContent=e?"↶ "+e.label+" 취소"+(e.n>1?" ("+e.n+"명)":""):"↶ 되돌릴 작업 없음";
+  b.title=e?"방금 한 ‘"+e.label+"’을(를) 하기 전으로 되돌립니다":"";
 }
 function setSync(kind,text){
   var d=document.getElementById("syncDot"), t=document.getElementById("syncText");
@@ -1293,7 +1295,7 @@ function doneMsg(title, line, notes){
   d.appendChild(el("b",null,"넣었습니다 — "+title));
   d.appendChild(el("div","how",line));
   notes.forEach(function(n){ d.appendChild(el("div","how",n)); });
-  var ub=el("button","ghost","↶ 방금 넣은 것 되돌리기"); ub.style.marginTop="8px";
+  var ub=el("button","ghost","↶ 이번에 넣은 것 취소"); ub.style.marginTop="8px";
   ub.onclick=function(){ undo(); };
   d.appendChild(ub);
   host.appendChild(d);
@@ -1365,6 +1367,8 @@ function mapType(v){
   for(var i=0;i<TYPEMAP.length;i++) if(TYPEMAP[i][0].test(t)) return TYPEMAP[i][1];
   return null;
 }
+/* 2027학년도 입시 일정: 2026년 9월 수시 원서부터 2027년 2월 정시 추가모집까지 */
+function inYear(d){ var t=String(d).slice(0,10); return t>=(YEAR-1)+"-09-01"&&t<=YEAR+"-02-28"; }
 function pad2(n){ n=String(n); return n.length<2?"0"+n:n; }
 function parseDate(v, withTime){
   if(v instanceof Date && !isNaN(v)){
@@ -1436,8 +1440,12 @@ function pushApp(res, no, name, f, cls){
   var kind=/정시/.test(kindRaw)?"정시":(kindRaw?"수시":((norm(f.group)||/^(정시|수능)/.test(norm(f.type)))?"정시":"수시"));
   var st=mapStatus(f.status);
   if(f.status&&!st){ res.notes.status++; res.notes.statusRaw.push((name||no)+" “"+str(f.status)+"”"); }
+  var itv=parseDate(f.itv,false), ann=parseDate(f.ann,false);
   var due=parseDate(f.due,true);
   if(due&&/T00:00$/.test(due)) res.notes.due++;
+  [itv,ann,due].forEach(function(d){
+    if(d&&!inYear(d)){ res.notes.oldDate++; if(res.notes.oldRaw.length<3) res.notes.oldRaw.push((name||no)+" "+shortUniv(str(f.univ))+" "+d.slice(0,10)); }
+  });
   var yn=parseYN(f.c6);
   if(yn===null&&/전문|산업|사관|과학기술원|과기원|경찰대/.test(str(f.found))) yn=false;   // 6장 제한 밖
   if(!str(f.mreq)&&f.mflag!=null){
@@ -1452,12 +1460,12 @@ function pushApp(res, no, name, f, cls){
     type:mapType(f.type)||mapType(f.jh)||(kind==="정시"?"정시":"학종"),
     group:(function(){var g=norm(f.group).replace(/군$/,""); return /^[가나다]$/.test(g)?g:"";})(),
     c6:(yn===null? kind==="수시" : yn),
-    itv:parseDate(f.itv,false), ann:parseDate(f.ann,false), due:due,
+    itv:itv, ann:ann, due:due,
     mreq:str(f.mreq), mmet:(kind==="정시"?"해당없음":(mapMin(f.mmet)||"미정")),
     status:st||"지원완료", rank:str(f.rank), note:str(f.note)}});
 }
 function readApps(rows){
-  var res={apps:[], skipped:[], notes:{status:0, due:0, statusRaw:[]}};
+  var res={apps:[], skipped:[], notes:{status:0, due:0, statusRaw:[], oldDate:0, oldRaw:[]}};
   var hdr=findHeader(rows);
   if(hdr) readByHeader(rows,hdr,res); else readByLook(rows,res);
   return res;
@@ -1588,6 +1596,7 @@ function commitApps(byStudent, cls, res, source){
   render();
   var notes=[];
   if(res.notes.status) notes.push("상태를 알아보지 못해 ‘지원완료’로 둔 것 "+res.notes.status+"건 — "+res.notes.statusRaw.slice(0,3).join(", ")+(res.notes.status>3?" …":""));
+  if(res.notes.oldDate) notes.push(YEAR+"학년도 일정("+(YEAR-1)+"년 9월 ~ "+YEAR+"년 2월) 밖의 날짜 "+res.notes.oldDate+"개 — 지난해 자료가 섞였는지 확인해 주세요: "+res.notes.oldRaw.join(", ")+(res.notes.oldDate>3?" …":""));
   if(res.notes.due) notes.push("충원 마감에 시각이 없는 것 "+res.notes.due+"건 — 요강을 보고 시각을 채워 주세요.");
   if(res.skipped.length) notes.push("읽지 못한 줄 "+res.skipped.length+"개 — 예: "+res.skipped.slice(0,3).join(" / "));
   var cl=Object.keys(classes).sort(function(p,q){return p-q;});

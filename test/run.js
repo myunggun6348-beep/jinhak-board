@@ -155,6 +155,14 @@ function buildTestPage() {
   check("쪽마다 반복된 머리줄은 건너뜀", shapes.repeatedHead, ["|김기현|부산대학교", "|최윤후|동명대학교"].map((x) => x + "|"));
   check("명단 파일은 지원으로 읽지 않음", shapes.roster, []);
 
+  /* 2027학년도 기준: 연도 없는 9~12월 날짜는 2026년, 학년도 일정 밖 날짜(지난해 파일)는 알려준다. */
+  const yr = await p.evaluate(() => {
+    const r = window.__dev.readApps([["이름", "대학", "면접일"], ["김기현", "부산대학교", "2025-11-28"], ["최윤후", "동명대학교", "11/20"]]);
+    return { old: r.notes.oldDate, inferred: r.apps[1].app.itv };
+  });
+  check("연도 없는 11/20 → 2026-11-20", yr.inferred, "2026-11-20");
+  check("지난해 날짜는 안내", yr.old, 1);
+
   /* 진학 프로그램 PDF: 긴 칸이 여러 줄로 접히고, 번호 열은 가운데 맞춤이다(2027지원현황.pdf 모양). */
   console.log("\n[PDF 표 복원]");
   const pdf = await p.evaluate(() => {
