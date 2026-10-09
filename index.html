@@ -810,6 +810,14 @@ function appEditor(st,a,w){
       remember("지원 삭제");
       st.apps=st.apps.filter(function(x){return x.id!==a.id;}); save(st); render();
     };
+    // 고치는 칸에서도 바로 지원을 더할 수 있게(목록 맨 아래까지 내려가지 않도록)
+    [["수시","+ 수시 지원 추가"],["정시","+ 정시 지원 추가"]].forEach(function(k,i){
+      var b=el("button","btn sec",k[1]); b.style.padding="4px 10px"; b.style.fontSize="12px";
+      if(!i&&!w) b.style.marginLeft="auto";
+      b.disabled=(canWrite===false||demo);
+      b.onclick=function(){ addApp(st,k[0]); };
+      hd.appendChild(b);
+    });
     hd.appendChild(del);
     box.appendChild(hd);
 
