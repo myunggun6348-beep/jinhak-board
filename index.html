@@ -780,7 +780,7 @@ function detail(st){
       tr.insertCell().textContent=[a.itv?mmdd(a.itv)+" 면접":"", a.ann?mmdd(a.ann)+" 발표":""].filter(Boolean).join(" · ")||"—";
       var mc=tr.insertCell();
       mc.textContent=a.kind==="수시"?(minShort(a.mreq)||"—"):"—";
-      if(a.mreq) mc.title=a.mreq;
+      if(a.mreq) mc.title=a.mreq+(a.msrc?"\n출처: "+a.msrc:"");
       if(a.kind==="수시"&&a.mmet==="미충족") mc.className="miss";
       var s=sel(STATUSES,a.status,function(v){a.status=v; save(st); render();});
       s.onclick=function(e){ e.stopPropagation(); };
@@ -843,7 +843,8 @@ function appEditor(st,a,w){
     }
     if(a.kind==="수시"){
       /* 요강 문장이 길어 한 줄 칸에서는 잘린다. 전체가 보이도록 넓은 칸으로 둔다. */
-      var mf=field("수능최저 기준", area(a.mreq,"예: 국수영탐 중 2개합 5, 한국사 4",function(v){a.mreq=v; applyMin(st); save(st); render();}));
+      var mf=field("수능최저 기준", area(a.mreq,"예: 국수영탐 중 2개합 5, 한국사 4",function(v){a.mreq=v; a.msrc=v?"담임 입력":""; shareMin(a); applyMin(st); save(st); render();}));
+      if(a.msrc) mf.appendChild(el("div","minnote","출처: "+a.msrc));
       mf.style.gridColumn="1 / -1";
       g.appendChild(mf);
     }
@@ -1565,9 +1566,40 @@ function byStudentOf(apps){
 }
 /* 같은 지원인지: 대학·모집단위가 같고(띄어쓰기·가운뎃점 무시), 전형명이 같거나 한쪽이 비어 있으면 같은 지원 */
 function sameKey(v){ return String(v||"").replace(/[\s・·.,()\-]/g,""); }
+
+/* ── 학교 공용 수능최저 기준표 (db: minreq) ─────────────
+   파일에는 최저 "있음/없음"만 있는 경우가 많다. 기준 문장은 요강에서 찾아 이 표에 넣어 두고,
+   대학·모집단위·전형명이 똑같은 지원의 비어 있는(또는 "기준 미기재") 최저 칸을 이 표로 채운다.
+   담임이 최저를 직접 고쳐 적으면 그 문장도 표에 올라가 다른 반의 같은 지원에 쓰인다.
+   앱은 바깥 사이트에 접속할 수 없으므로 요강을 찾아 표에 넣는 일은 앱 밖에서 한다. */
+var minTable=new Map();   // key -> {univ,major,jh,text,source}
+function minKey(a){ return [a.univ,a.major,a.jh].map(sameKey).join("|"); }
+function minId(k){ var h=2166136261; for(var i=0;i<k.length;i++){ h^=k.charCodeAt(i); h=Math.imul(h,16777619)>>>0; } return "m"+h.toString(36)+"_"+k.length; }
+function needsMin(a){ return a.kind==="수시"&&(!a.mreq||/^최저 있음/.test(a.mreq)); }
+function fillMin(st){
+  var changed=false;
+  (st.apps||[]).forEach(function(a){
+    if(!needsMin(a)) return;
+    var e=minTable.get(minKey(a));
+    if(e&&e.text){ a.mreq=e.text; a.msrc=e.source||""; changed=true; }
+  });
+  if(changed) applyMin(st);
+  return changed;
+}
+function fillAll(){
+  if(demo||canWrite===false||!minTable.size) return;
+  students.forEach(function(st){ if(fillMin(st)) save(st); });
+}
+function shareMin(a){
+  if(!db||canWrite===false||demo||!a.univ||!a.mreq||/^최저 있음/.test(a.mreq)) return;
+  var k=minKey(a), d=new Date(), src="담임 입력 ("+d.getFullYear()+"-"+pad2(d.getMonth()+1)+"-"+pad2(d.getDate())+")";
+  var e={univ:a.univ, major:a.major||"", jh:a.jh||"", text:a.mreq, source:src, year:YEAR};
+  minTable.set(k,e);
+  db.doc("minreq/"+minId(k)).set(e).catch(function(){});
+}
 function commitApps(byStudent, cls, res, source){
   remember("파일 넣기");
-  var added=0, updated=0, newStu=0, classes={};
+  var added=0, updated=0, newStu=0, classes={}, noMin=0;
   Object.keys(byStudent).forEach(function(key){
     var g=byStudent[key], c=g.cls||cls;
     classes[c]=1;
@@ -1599,12 +1631,14 @@ function commitApps(byStudent, cls, res, source){
         updated++;
       } else { st.apps.push(a.app); added++; }
     });
-    applyMin(st); save(st);
+    fillMin(st); applyMin(st); save(st);
+    (st.apps||[]).forEach(function(a){ if(needsMin(a)&&/^최저 있음/.test(a.mreq||"")) noMin++; });
   });
   render();
   var notes=[];
   if(res.notes.status) notes.push("상태를 알아보지 못해 ‘지원완료’로 둔 것 "+res.notes.status+"건 — "+res.notes.statusRaw.slice(0,3).join(", ")+(res.notes.status>3?" …":""));
   if(res.notes.oldDate) notes.push(YEAR+"학년도 일정("+(YEAR-1)+"년 9월 ~ "+YEAR+"년 2월) 밖의 날짜 "+res.notes.oldDate+"개 — 지난해 자료가 섞였는지 확인해 주세요: "+res.notes.oldRaw.join(", ")+(res.notes.oldDate>3?" …":""));
+  if(noMin) notes.push("수능최저가 있다고만 적혀 있고 기준 문장이 없는 지원 "+noMin+"건 — 기준표에 없어 비워 두었습니다. "+YEAR+"학년도 요강에서 확인해 채워 주세요.");
   if(res.notes.due) notes.push("충원 마감에 시각이 없는 것 "+res.notes.due+"건 — 요강을 보고 시각을 채워 주세요.");
   if(res.skipped.length) notes.push("읽지 못한 줄 "+res.skipped.length+"개 — 예: "+res.skipped.slice(0,3).join(" / "));
   var cl=Object.keys(classes).sort(function(p,q){return p-q;});
@@ -1740,6 +1774,11 @@ function start(){
   window.claude.use("db").then(function(x){
     if(!x){ setSync("off","이 화면에서는 저장되지 않습니다"); return; }
     db=x;
+    db.collection("minreq").onSnapshot(function(snap){
+      var t=new Map();
+      snap.docs.forEach(function(d){ var b=d.data()||{}; if(b.text) t.set(minKey(b), b); });
+      minTable=t; fillAll();
+    }, function(){});
     unsub=db.collection("students").onSnapshot(function(snap){
       var next=new Map();
       snap.docs.forEach(function(d){
@@ -1750,6 +1789,7 @@ function start(){
           updatedAt:body.updatedAt});
       });
       students=next;
+      fillAll();
       if(students.size>0){ demo=false; document.getElementById("banner").hidden=true; }
       setSync("live", snap.metadata.fromCache?"동기화 중":"저장됨");
       render();
