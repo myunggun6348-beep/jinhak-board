@@ -165,6 +165,7 @@ button{cursor:pointer}
 .apptable tr.arow{cursor:pointer}
 .apptable tr.arow:hover td,.apptable tr.arow.open td{background:var(--surface-2)}
 .apptable tr.arow.warn td:first-child{box-shadow:inset 3px 0 0 var(--warn)}
+.apptable .kind.jc{color:var(--ok); background:var(--ok-soft)}
 .apptable .kind{font-size:11px; font-weight:700; color:var(--accent); background:var(--accent-soft); padding:2px 7px; border-radius:5px; white-space:nowrap}
 .apptable select{border:1px solid var(--line-2); background:var(--surface); border-radius:6px; padding:4px 6px; font-size:12.5px}
 .apptable select:disabled{background:var(--surface-3); color:var(--ink-3)}
@@ -657,7 +658,7 @@ function shortMajor(s){
   return s.length>12?s.slice(0,11)+"…":s;
 }
 function appLabel(a){
-  var t=[shortUniv(a.univ)||"미입력", shortMajor(a.major), a.kind==="정시"?(a.group?a.group+"군":"정시"):a.type].filter(Boolean).join(" ");
+  var t=(a.jc?"전문대 ":"")+[shortUniv(a.univ)||"미입력", shortMajor(a.major), a.kind==="정시"?(a.group?a.group+"군":"정시"):a.type].filter(Boolean).join(" ");
   return a.status&&a.status!=="지원완료"? t+" · "+a.status : t;
 }
 /* 요강 문장에서 눈에 띄는 숫자만 뽑아 "2개합 5 · 한국사 4" 처럼 보여준다. 판정에는 쓰지 않는다. */
@@ -773,7 +774,7 @@ function detail(st){
     apps.forEach(function(a){
       var w=appWarn(st,a), open=(editAppId===a.id);
       var tr=tb.insertRow(); tr.className="arow"+(w?" warn":"")+(open?" open":"");
-      tr.insertCell().appendChild(el("span","kind",a.kind==="정시"?(a.group?a.group+"군":"정시"):"수시"));
+      tr.insertCell().appendChild(el("span","kind"+(a.jc?" jc":""),(a.jc?"전문대 ":"")+(a.kind==="정시"?(a.group&&!a.jc?a.group+"군":"정시"):"수시")));
       tr.insertCell().textContent=a.univ||"미입력";
       tr.insertCell().textContent=a.major||"";
       tr.insertCell().textContent=a.jh||a.type||"";
@@ -811,30 +812,32 @@ function appEditor(st,a,w){
       st.apps=st.apps.filter(function(x){return x.id!==a.id;}); save(st); render();
     };
     // 고치는 칸에서도 바로 지원을 더할 수 있게(목록 맨 아래까지 내려가지 않도록)
-    [["수시","+ 수시 지원 추가"],["정시","+ 정시 지원 추가"]].forEach(function(k,i){
+    [["수시","+ 수시 지원 추가"],["정시","+ 정시 지원 추가"],["수시","+ 전문대 지원 추가",true]].forEach(function(k,i){
       var b=el("button","btn sec",k[1]); b.style.padding="4px 10px"; b.style.fontSize="12px";
       if(!i&&!w) b.style.marginLeft="auto";
       b.disabled=(canWrite===false||demo);
-      b.onclick=function(){ addApp(st,k[0]); };
+      b.onclick=function(){ addApp(st,k[0],k[2]); };
       hd.appendChild(b);
     });
     hd.appendChild(del);
     box.appendChild(hd);
 
     var g=el("div","grid");
-    g.appendChild(field("구분", sel(KINDS,a.kind,function(v){a.kind=v; if(v==="정시")a.type="정시"; save(st); render();})));
-    g.appendChild(field("대학", txt(a.univ,"부산대학교",function(v){a.univ=v; save(st); render();})));
+    g.appendChild(field("구분", sel(KINDS,a.kind,function(v){a.kind=v; if(v==="정시")a.type="정시"; a.c6=(v==="수시"&&!a.jc); save(st); render();})));
+    g.appendChild(field("대학 구분", sel(["4년제","전문대"],a.jc?"전문대":"4년제",function(v){
+      a.jc=(v==="전문대"); a.c6=(a.kind==="수시"&&!a.jc); if(a.jc) a.group=""; save(st); render(); })));
+    g.appendChild(field("대학", txt(a.univ,a.jc?"동의과학대학교":"부산대학교",function(v){a.univ=v; save(st); render();})));
     g.appendChild(field("모집단위", txt(a.major,"수학교육과",function(v){a.major=v; save(st);})));
     g.appendChild(field("전형명", txt(a.jh,"학생부종합(일반)",function(v){a.jh=v; save(st);})));
     g.appendChild(field("전형유형", sel(TYPES,a.type,function(v){a.type=v; save(st);})));
-    if(a.kind==="정시") g.appendChild(field("군", sel([""].concat(GROUPS),a.group||"",function(v){a.group=v; save(st);})));
+    if(a.kind==="정시"&&!a.jc) g.appendChild(field("군", sel([""].concat(GROUPS),a.group||"",function(v){a.group=v; save(st);})));
     g.appendChild(field("면접일", dateInput("date",a.itv,function(v){a.itv=v; save(st); render();})));
     g.appendChild(field("발표일", dateInput("date",a.ann,function(v){a.ann=v; save(st); render();})));
     g.appendChild(field("충원 마감", dateInput("datetime-local",a.due,function(v){a.due=v; save(st); render();})));
     if(a.kind==="수시") g.appendChild(field("최저 충족", sel(MINSTATES,a.mmet||"미정",function(v){a.mmet=v; save(st); render();})));
     g.appendChild(field("예비번호", txt(a.rank,"",function(v){a.rank=v; save(st);},"mono")));
     g.appendChild(field("메모", txt(a.note,"",function(v){a.note=v; save(st);})));
-    if(a.kind==="수시"){
+    if(a.kind==="수시"&&!a.jc){
       var cb=document.createElement("select");
       ["Y","N"].forEach(function(o){var op=document.createElement("option");op.value=o;op.textContent=o==="Y"?"포함":"제외";if((a.c6?"Y":"N")===o)op.selected=true;cb.appendChild(op);});
       cb.onchange=function(){ remember("수정"); a.c6=(cb.value==="Y"); save(st); render(); };
@@ -866,6 +869,10 @@ function addRow(d,st){
   var b2=el("button","btn sec","+ 정시 지원 추가");
   b2.disabled=(canWrite===false||demo);
   b2.onclick=function(){ addApp(st,"정시"); };
+  var b4=el("button","btn sec","+ 전문대 지원 추가");
+  b4.disabled=(canWrite===false||demo);
+  b4.title="전문대학 지원은 수시 6장 제한에 들어가지 않습니다";
+  b4.onclick=function(){ addApp(st,"수시",true); };
   var b3=el("button","del","학생 삭제");
   b3.disabled=(canWrite===false||demo);
   b3.style.marginLeft="auto";
@@ -876,15 +883,15 @@ function addRow(d,st){
     if(db) db.doc("students/"+st.id).delete().catch(function(){});
     openId=null; render();
   };
-  add.appendChild(b1); add.appendChild(b2); add.appendChild(b3);
+  add.appendChild(b1); add.appendChild(b2); add.appendChild(b4); add.appendChild(b3);
   d.appendChild(add);
 }
-function addApp(st,kind){
-  remember("지원 추가");
+function addApp(st,kind,jc){
+  remember(jc?"전문대 지원 추가":"지원 추가");
   st.apps=st.apps||[];
   editAppId=uid();   // 새 지원은 고치는 칸을 열어 둔 채로 보여준다
-  st.apps.push({id:editAppId,kind:kind,univ:"",major:"",jh:"",type:kind==="정시"?"정시":"학종",
-    c6:kind==="수시",itv:"",ann:"",due:"",status:"지원완료",rank:"",note:"",
+  st.apps.push({id:editAppId,kind:kind,jc:!!jc,univ:"",major:"",jh:"",type:kind==="정시"?"정시":(jc?"교과":"학종"),
+    c6:kind==="수시"&&!jc,itv:"",ann:"",due:"",status:"지원완료",rank:"",note:"",
     mreq:"",mmet:kind==="수시"?"미정":"해당없음"});
   save(st); render();
 }
@@ -938,14 +945,14 @@ function renderAll(){
 
 /* ── csv ───────────────────────────────────── */
 function csv(arr,name){
-  var head=["반","학번","이름","구분","대학","모집단위","전형명","전형유형","군","6장포함","면접일","발표일","충원마감","상태","수능최저기준","최저충족","예비번호","메모","점검"];
+  var head=["반","학번","이름","구분","대학구분","대학","모집단위","전형명","전형유형","군","6장포함","면접일","발표일","충원마감","상태","수능최저기준","최저충족","예비번호","메모","점검"];
   var lines=[head.join(",")];
   var q=function(v){ v=String(v==null?"":v); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
   arr.forEach(function(s){
     var w=checkStudent(s).map(function(x){return x.code;}).join(" ");
     var apps=s.apps&&s.apps.length?s.apps:[{}];
     apps.forEach(function(a){
-      lines.push([s.cls,s.no,s.name,a.kind||"",a.univ||"",a.major||"",a.jh||"",a.type||"",a.group||"",
+      lines.push([s.cls,s.no,s.name,a.kind||"",a.kind?(a.jc?"전문대":"4년제"):"",a.univ||"",a.major||"",a.jh||"",a.type||"",a.group||"",
         a.c6?"Y":"N",a.itv||"",a.ann||"",a.due||"",a.status||"",a.mreq||"",a.mmet||"",a.rank||"",a.note||"",w].map(q).join(","));
     });
   });
@@ -1464,7 +1471,7 @@ function pushApp(res, no, name, f, cls){
   }
   if(!str(f.itv)&&f.exam) f.itv=f.exam;
   var given={status:!!st, type:!!(mapType(f.type)||mapType(f.jh)), c6:yn!==null};
-  res.apps.push({no:String(no||""), name:String(name||""), cls:cls||null, given:given, app:{id:uid(), kind:kind, univ:str(f.univ),
+  res.apps.push({no:String(no||""), name:String(name||""), cls:cls||null, given:given, app:{id:uid(), kind:kind, jc:/전문/.test(str(f.found)), univ:str(f.univ),
     major:str(f.major), jh:str(f.jh),
     type:mapType(f.type)||mapType(f.jh)||(kind==="정시"?"정시":"학종"),
     group:(function(){var g=norm(f.group).replace(/군$/,""); return /^[가나다]$/.test(g)?g:"";})(),
