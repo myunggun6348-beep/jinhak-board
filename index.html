@@ -238,6 +238,21 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
 .banner{border:1px dashed var(--line-2); background:var(--surface-2); border-radius:var(--radius);
   padding:13px; margin-bottom:16px; font-size:13px; color:var(--ink-2)}
 .banner b{color:var(--ink)}
+.usearch{border:1px solid var(--line-2); background:var(--surface); color:var(--ink); border-radius:7px; padding:5px 10px; font-size:13px; width:190px}
+.uhint{font-size:12px; color:var(--ink-3); margin:-4px 2px 8px}
+#univTable tr.urow{cursor:pointer}
+#univTable tr.urow:hover td,#univTable tr.urow.open td{background:var(--surface-2)}
+#univTable tr.urow td:first-child{font-weight:600}
+#univTable .ucaret{color:var(--ink-3); font-size:10px; margin-left:6px}
+#univTable td.udetail{background:var(--surface-2); padding:4px 14px 12px; white-space:normal}
+.umajor{font-weight:700; font-size:12.5px; margin:10px 0 2px; color:var(--ink)}
+.umajor span{font-weight:400; color:var(--ink-3); margin-left:4px}
+.uitem{display:flex; flex-wrap:wrap; align-items:center; gap:3px 10px; padding:7px 0; border-top:1px solid var(--line); font-size:12.5px}
+.uitem .who{font-weight:700; color:var(--accent); background:none; border:0; padding:0; font-size:12.5px; cursor:pointer}
+.uitem .who:hover{text-decoration:underline}
+.uitem .sub{color:var(--ink-2)}
+.uitem .meta{color:var(--ink-3); flex-basis:100%}
+.uitem .meta .miss{color:var(--bad); font-weight:700}
 .empty-state{text-align:center; padding:40px 16px; color:var(--ink-3)}
 @media (max-width:560px){
   .rowhead .nm{width:auto; flex:1}
@@ -276,6 +291,8 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
   /* 전체 현황 표: 칸이 적어 좁혀도 들어간다 */
   #viewAll table{min-width:0; font-size:12.5px}
   #viewAll th,#viewAll td{padding:8px 7px; white-space:normal}
+  .usearch{width:100%; font-size:16px}
+  #viewAll .listhead .sp{flex-basis:100%}
   /* 아이폰은 16px 보다 작은 입력 칸을 누르면 화면을 확대한다 */
   .f input,.f select,.f textarea,.apptable select,input,select,textarea{font-size:16px}
 }
@@ -360,7 +377,9 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
     <div class="stats" id="allStats"></div>
     <div class="listhead"><h2>반별 현황</h2><span class="sp"><button class="ghost" id="btnCsvAll">전체 CSV 내려받기</button></span></div>
     <div class="tablewrap"><table id="classTable"></table></div>
-    <div class="listhead" style="margin-top:22px"><h2>대학별 지원 수</h2></div>
+    <div class="listhead" style="margin-top:22px"><h2>대학별 지원 현황</h2><span class="cnt" id="univCount"></span>
+      <span class="sp"><input id="univQ" class="usearch" type="search" placeholder="대학·학과·학생 찾기"></span></div>
+    <p class="uhint">대학을 누르면 지원한 학생이 학과별로 나옵니다. 학생 이름을 누르면 그 학생으로 갑니다.</p>
     <div class="tablewrap"><table id="univTable"></table></div>
   </div>
 </div>
@@ -990,22 +1009,82 @@ function renderAll(){
     });
   });
 
+  renderUniv(all);
+}
+
+/* ── 전체 현황: 대학별 ──
+   대학마다 지원·학생·합격·충원대기·불합격 수. 대학을 누르면 모집단위별로 지원 학생을 펼친다.
+   찾기 칸은 대학·모집단위·전형·학생 이름에 걸린다. */
+var openUniv=null;
+function renderUniv(all){
+  var q=(document.getElementById("univQ").value||"").replace(/\s+/g,"").toLowerCase();
+  var hit=function(v){ return String(v||"").replace(/\s+/g,"").toLowerCase().indexOf(q)>=0; };
   var uni={};
   all.forEach(function(s){(s.apps||[]).forEach(function(a){
-    if(!a.univ) return; uni[a.univ]=uni[a.univ]||{n:0,pass:0};
-    uni[a.univ].n++; if(PASS[a.status]) uni[a.univ].pass++;
+    if(!a.univ) return;
+    if(q&&!hit(a.univ)&&!hit(a.major)&&!hit(a.jh)&&!hit(s.name)) return;
+    var o=uni[a.univ]=uni[a.univ]||{n:0,pass:0,wait:0,fail:0,stu:{},list:[]};
+    o.n++; o.stu[s.id]=1; o.list.push({s:s,a:a});
+    if(PASS[a.status]) o.pass++;
+    else if(a.status==="충원대기") o.wait++;
+    else if(a.status==="불합격"||a.status==="1단계불") o.fail++;
   });});
+  var names=Object.keys(uni).sort(function(a,b){return uni[b].n-uni[a].n||a.localeCompare(b,"ko");});
+  document.getElementById("univCount").textContent=names.length?names.length+"개 대학":"";
   var ut=document.getElementById("univTable"); ut.innerHTML="";
-  var uh=ut.createTHead().insertRow(); ["대학","지원","합격"].forEach(function(h,i){
+  var heads=["대학","지원","학생","합격","충원대기","불합격"];
+  var uh=ut.createTHead().insertRow(); heads.forEach(function(h,i){
     var th=document.createElement("th"); th.textContent=h; if(i>0)th.style.textAlign="right"; uh.appendChild(th);
   });
   var ub=ut.createTBody();
-  Object.keys(uni).sort(function(a,b){return uni[b].n-uni[a].n;}).slice(0,25).forEach(function(u){
-    var r=ub.insertRow(); r.insertCell().textContent=u;
-    [uni[u].n,uni[u].pass].forEach(function(v){var td=r.insertCell();td.className="num";td.textContent=v;});
+  names.forEach(function(u){
+    var o=uni[u], open=(openUniv===u)||(!!q&&names.length===1);
+    var r=ub.insertRow(); r.className="urow"+(open?" open":"");
+    var c0=r.insertCell(); c0.textContent=u; c0.appendChild(el("span","ucaret",open?"▲":"▼"));
+    [o.n,Object.keys(o.stu).length,o.pass,o.wait,o.fail].forEach(function(v,i){
+      var td=r.insertCell(); td.className="num"; td.textContent=v;
+      if(i===2&&v) td.style.color="var(--ok)", td.style.fontWeight="700";
+      if(i===3&&v) td.style.color="var(--warn)", td.style.fontWeight="700";
+    });
+    r.onclick=function(){ openUniv=(openUniv===u?null:u); renderUniv(all); };
+    if(open){ var td=ub.insertRow().insertCell(); td.colSpan=heads.length; td.className="udetail"; td.appendChild(univDetail(o.list)); }
   });
-  if(!Object.keys(uni).length){ var r=ub.insertRow(); var td=r.insertCell(); td.colSpan=3;
-    td.textContent="아직 입력된 지원 내역이 없습니다."; td.style.color="var(--ink-3)"; }
+  if(!names.length){ var r=ub.insertRow(); var td=r.insertCell(); td.colSpan=heads.length;
+    td.textContent=q?"찾는 내용이 없습니다.":"아직 입력된 지원 내역이 없습니다."; td.style.color="var(--ink-3)"; }
+}
+function univDetail(list){
+  var box=el("div");
+  list.sort(function(x,y){ return String(x.a.major||"").localeCompare(String(y.a.major||""),"ko")||(x.s.cls-y.s.cls)||String(x.s.no||"").localeCompare(String(y.s.no||"")); });
+  var cur=null, cnt=null, n=0;
+  list.forEach(function(it){
+    var s=it.s, a=it.a, m=a.major||"모집단위 미입력";
+    if(m!==cur){ cur=m; n=0; var h=el("div","umajor",m); cnt=el("span"); h.appendChild(cnt); box.appendChild(h); }
+    cnt.textContent=++n+"명";
+    var row=el("div","uitem");
+    var who=el("button","who",(s.cls?s.cls+"반 ":"")+(s.no?s.no+" ":"")+(s.name||""));
+    who.title="이 학생 보기";
+    who.onclick=function(e){ e.stopPropagation(); goStudent(s); };
+    row.appendChild(who);
+    row.appendChild(el("span","pill "+statusClass(a.status),a.status||"지원완료"));
+    row.appendChild(el("span","sub",[a.jc?"전문대":"", a.kind==="정시"?(a.group&&!a.jc?a.group+"군":"정시"):"수시", a.jh||a.type].filter(Boolean).join(" · ")));
+    var meta=el("div","meta");
+    var bits=[a.itv?mmdd(a.itv)+" 면접":"", a.ann?mmdd(a.ann)+" 발표":"", a.due?"충원 "+fmtDue(a.due)+"까지":"", a.rank?"예비 "+a.rank:""].filter(Boolean);
+    if(a.kind==="수시"&&a.mreq) bits.push("최저 "+(minShort(a.mreq)||a.mreq));
+    meta.textContent=bits.join(" · ");
+    if(a.kind==="수시"&&a.mmet==="미충족"){ meta.appendChild(document.createTextNode(bits.length?" · ":"")); meta.appendChild(el("span","miss","최저 미충족")); }
+    if(meta.childNodes.length&&meta.textContent) row.appendChild(meta);
+    box.appendChild(row);
+  });
+  return box;
+}
+function goStudent(s){
+  if(s.cls) setCls(s.cls);
+  openId=s.id; editAppId=null;
+  switchTab(true); render();
+  setTimeout(function(){
+    var h=[].find.call(document.querySelectorAll("#rows [aria-expanded=true]"),function(){return true;});
+    if(h) h.scrollIntoView({block:"start"});
+  },0);
 }
 
 /* ── csv ───────────────────────────────────── */
@@ -1095,6 +1174,7 @@ function bindStatic(){
     csv(byClass(c), "진학현황_"+YEAR+"_"+c+"반.csv");
   };
   document.getElementById("btnClearLocal").onclick=clearLocal;
+  document.getElementById("univQ").oninput=function(){ openUniv=null; renderUniv(sorted(list())); };
   document.getElementById("btnCsvAll").onclick=function(){ csv(sorted(list()), "진학현황_"+YEAR+"_전체.csv"); };
   document.getElementById("yearLabel").textContent=YEAR+"학년도";
 }
