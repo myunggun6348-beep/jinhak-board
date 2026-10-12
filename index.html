@@ -240,9 +240,44 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
 .banner b{color:var(--ink)}
 .empty-state{text-align:center; padding:40px 16px; color:var(--ink-3)}
 @media (max-width:560px){
-  .rowhead .nm{width:62px}
-  .rowhead .no{width:46px}
+  .rowhead .nm{width:auto; flex:1}
+  .rowhead .no{width:auto}
   .wrap{padding-block:14px 56px}
+  /* 학생 줄: 학번·이름 한 줄, 대학 목록은 그 아래 전체 폭 */
+  .rowhead{flex-wrap:wrap; row-gap:7px}
+  .rowhead .pills{order:9; flex-basis:100%}
+  .pill{max-width:100%; overflow:hidden; text-overflow:ellipsis}
+  /* 통계: 4칸으로 낮게 */
+  .stats{grid-template-columns:repeat(4,1fr)}
+  .stat{padding:9px 10px}
+  .stat .n{font-size:18px}
+  .stat .k{font-size:10.5px; letter-spacing:0}
+  .listhead{flex-wrap:wrap; row-gap:6px}
+  .listhead .sp{flex-wrap:wrap}
+  .ghost{white-space:nowrap}
+  .detail{padding:10px}
+  /* 지원 표 → 카드 */
+  .tablewrap:has(.apptable){overflow:visible; border:0; background:transparent}
+  .apptable{min-width:0; font-size:13px}
+  .apptable thead{display:none}
+  .apptable,.apptable tbody,.apptable tr,.apptable td{display:block; width:auto}
+  .apptable tr.arow{border:1px solid var(--line); border-radius:9px; background:var(--surface); padding:9px 11px; margin-bottom:7px;
+    display:grid; grid-template-columns:auto 1fr; gap:3px 8px; align-items:center}
+  .apptable tr.arow.warn{border-color:var(--warn)}
+  .apptable tr.arow td{padding:0; border:0; background:transparent!important; box-shadow:none!important; white-space:normal}
+  .apptable tr.arow td:nth-child(2){white-space:normal}
+  .apptable tr.arow td:nth-child(n+3){grid-column:1/-1; font-size:12.5px; color:var(--ink-2)}
+  .apptable tr.arow td[data-l]:nth-child(n+3)::before{content:attr(data-l); display:inline-block; min-width:62px; color:var(--ink-3); font-size:11px}
+  .apptable tr.arow td.act{text-align:left; margin-top:2px}
+  .apptable td.editcell{padding:0; margin:-4px 0 9px; background:transparent}
+  .apphead{flex-wrap:wrap}
+  .apphead button{white-space:nowrap}
+  .addrow{flex-wrap:wrap}
+  /* 전체 현황 표: 칸이 적어 좁혀도 들어간다 */
+  #viewAll table{min-width:0; font-size:12.5px}
+  #viewAll th,#viewAll td{padding:8px 7px; white-space:normal}
+  /* 아이폰은 16px 보다 작은 입력 칸을 누르면 화면을 확대한다 */
+  .f input,.f select,.f textarea,.apptable select,input,select,textarea{font-size:16px}
 }
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
@@ -796,7 +831,8 @@ function detail(st){
   if(apps.length){
     var tw=el("div","tablewrap"), t=document.createElement("table"); t.className="apptable";
     var hr=t.createTHead().insertRow();
-    ["","대학","모집단위","전형","면접 · 발표","수능최저","상태",""].forEach(function(h){
+    var heads=["","대학","모집단위","전형","면접 · 발표","수능최저","상태",""];
+    heads.forEach(function(h){
       var th=document.createElement("th"); th.textContent=h; hr.appendChild(th); });
     var tb=t.createTBody();
     apps.forEach(function(a){
@@ -817,6 +853,7 @@ function detail(st){
       var ec=tr.insertCell(); ec.className="act";
       if(w) ec.appendChild(el("span","w",w));
       ec.appendChild(el("span","edit",open?"닫기 ▲":"고치기 ▼"));
+      [].forEach.call(tr.cells,function(c,i){ if(heads[i]) c.setAttribute("data-l",heads[i]); });
       tr.onclick=function(){ editAppId=open?null:a.id; render(); };
       if(open){
         var td=tb.insertRow().insertCell(); td.colSpan=8; td.className="editcell";
