@@ -346,7 +346,7 @@ var AWAIT = {"지원완료":1,"1단계합":1,"면접완료":1};   // 발표일�
 
 var db=null, userCap=null, downloadsCap=null, canWrite=null, unsub=null;
 var students=new Map();          // id -> doc body
-var openId=null, editAppId=null, pendingRender=false, demo=false;
+var openId=null, editAppId=null, pendingRender=false, demo=false, practice=false;
 var writeTimers=new Map();
 
 /* ── demo rows: shown only until real data exists ── */
@@ -505,7 +505,8 @@ function applyMin(st){
 }
 
 /* ── data access ───────────────────────────── */
-function list(){ return demo ? DEMO.slice() : Array.from(students.values()); }
+function list(){ return demo&&!practice ? DEMO.slice() : Array.from(students.values()); }
+function ro(){ return canWrite===false||(demo&&!practice); }
 // 학번 있는 학생을 학번순으로 먼저, 학번이 없으면 이름순
 function sorted(arr){ return arr.sort(function(a,b){
   return (a.no?0:1)-(b.no?0:1) || String(a.no||"").localeCompare(String(b.no||"")) || String(a.name||"").localeCompare(String(b.name||""),"ko"); }); }
@@ -564,7 +565,7 @@ function renderUndo(){
   var b=document.getElementById("btnUndo"); if(!b) return;
   var e=undoStack[undoStack.length-1];
   // 파일·명단을 넣은 직후에는 넣기 안내 아래의 취소 버튼만 둔다(위에도 있으면 넣기 버튼과 헷갈린다).
-  b.hidden=demo||canWrite===false||!!(e&&/넣기$/.test(e.label)&&document.querySelector("#importMsg button"));
+  b.hidden=ro()||!!(e&&/넣기$/.test(e.label)&&document.querySelector("#importMsg button"));
   b.disabled=!e;
   b.textContent=e?"↶ "+e.label+" 취소"+(e.n>1?" ("+e.n+"명)":""):"↶ 되돌릴 작업 없음";
   b.title=e?"방금 한 ‘"+e.label+"’을(를) 하기 전으로 되돌립니다":"";
@@ -723,7 +724,7 @@ function sel(options, value, onchange){
     if(o===value) op.selected=true; s.appendChild(op);
   });
   s.onchange=function(){ remember("수정"); onchange(s.value); };
-  s.disabled=(canWrite===false||demo);
+  s.disabled=ro();
   return s;
 }
 function txt(value, placeholder, onchange, cls){
@@ -733,7 +734,7 @@ function txt(value, placeholder, onchange, cls){
   i.onchange=function(){ remember("수정"); onchange(i.value.trim()); };
   i.onfocus=function(){ pendingRender=true; };
   i.onblur=function(){ pendingRender=false; };
-  i.disabled=(canWrite===false||demo);
+  i.disabled=ro();
   return i;
 }
 function area(value, placeholder, onchange){
@@ -742,13 +743,13 @@ function area(value, placeholder, onchange){
   a.onchange=function(){ remember("수정"); onchange(a.value.trim()); };
   a.onfocus=function(){ pendingRender=true; };
   a.onblur=function(){ pendingRender=false; };
-  a.disabled=(canWrite===false||demo);
+  a.disabled=ro();
   return a;
 }
 function dateInput(type,value,onchange){
   var i=document.createElement("input"); i.type=type; i.value=value||"";
   i.onchange=function(){ remember("수정"); onchange(i.value); };
-  i.disabled=(canWrite===false||demo);
+  i.disabled=ro();
   return i;
 }
 function detail(st){
@@ -806,7 +807,7 @@ function appEditor(st,a,w){
     hd.appendChild(el("span","kind",a.kind+" 지원 고치기"));
     if(w) hd.appendChild(el("span","warnnote",w));
     var del=el("button","del","삭제");
-    del.disabled=(canWrite===false||demo);
+    del.disabled=ro();
     del.onclick=function(){
       remember("지원 삭제");
       st.apps=st.apps.filter(function(x){return x.id!==a.id;}); save(st); render();
@@ -815,7 +816,7 @@ function appEditor(st,a,w){
     [["수시","+ 수시 지원 추가"],["정시","+ 정시 지원 추가"],["수시","+ 전문대 지원 추가",true]].forEach(function(k,i){
       var b=el("button","btn sec",k[1]); b.style.padding="4px 10px"; b.style.fontSize="12px";
       if(!i&&!w) b.style.marginLeft="auto";
-      b.disabled=(canWrite===false||demo);
+      b.disabled=ro();
       b.onclick=function(){ addApp(st,k[0],k[2]); };
       hd.appendChild(b);
     });
@@ -841,7 +842,7 @@ function appEditor(st,a,w){
       var cb=document.createElement("select");
       ["Y","N"].forEach(function(o){var op=document.createElement("option");op.value=o;op.textContent=o==="Y"?"포함":"제외";if((a.c6?"Y":"N")===o)op.selected=true;cb.appendChild(op);});
       cb.onchange=function(){ remember("수정"); a.c6=(cb.value==="Y"); save(st); render(); };
-      cb.disabled=(canWrite===false||demo);
+      cb.disabled=ro();
       g.appendChild(field("6장 제한", cb));
     }
     if(a.kind==="수시"){
@@ -864,17 +865,17 @@ function appEditor(st,a,w){
 function addRow(d,st){
   var add=el("div","addrow");
   var b1=el("button","btn sec","+ 수시 지원 추가");
-  b1.disabled=(canWrite===false||demo);
+  b1.disabled=ro();
   b1.onclick=function(){ addApp(st,"수시"); };
   var b2=el("button","btn sec","+ 정시 지원 추가");
-  b2.disabled=(canWrite===false||demo);
+  b2.disabled=ro();
   b2.onclick=function(){ addApp(st,"정시"); };
   var b4=el("button","btn sec","+ 전문대 지원 추가");
-  b4.disabled=(canWrite===false||demo);
+  b4.disabled=ro();
   b4.title="전문대학 지원은 수시 6장 제한에 들어가지 않습니다";
   b4.onclick=function(){ addApp(st,"수시",true); };
   var b3=el("button","del","학생 삭제");
-  b3.disabled=(canWrite===false||demo);
+  b3.disabled=ro();
   b3.style.marginLeft="auto";
   b3.onclick=function(){
     if(!window.confirm(st.name+" 학생을 명단에서 지웁니다. 계속할까요?")) return;
@@ -1642,7 +1643,7 @@ function fillMin(st){
   return changed;
 }
 function fillAll(){
-  if(demo||canWrite===false||!minTable.size) return;
+  if(ro()||!minTable.size) return;
   students.forEach(function(st){ if(fillMin(st)) save(st); });
 }
 function shareMin(a){
@@ -1799,6 +1800,18 @@ function handleFile(f){
   reader.readAsArrayBuffer(f);
 }
 
+function startPractice(){
+  setSync("off","이 화면에서는 저장되지 않습니다");
+  if(!demo||practice) return;
+  practice=true;
+  students=new Map(DEMO.map(function(d){ return [d.id, JSON.parse(JSON.stringify(d))]; }));
+  var b=document.getElementById("banner");
+  b.innerHTML="";
+  b.appendChild(document.createTextNode("이 화면은 "));
+  b.appendChild(el("b",null,"저장되지 않는 연습 화면"));
+  b.appendChild(document.createTextNode("입니다. 예시 학생에게 수시·정시·전문대 지원을 추가해 보거나 파일을 넣어 볼 수 있습니다(새로고침하면 사라집니다)."));
+  fillAll(); render();
+}
 function start(){
   bindStatic();
   demo=true;
@@ -1812,7 +1825,7 @@ function start(){
   render();
   setSync("", "연결 중");
 
-  if(!window.claude||!window.claude.use){ setSync("off","이 화면에서는 저장되지 않습니다"); return; }
+  if(!window.claude||!window.claude.use){ startPractice(); return; }
 
   window.claude.use("user").then(function(u){
     userCap=u;
@@ -1827,7 +1840,7 @@ function start(){
   }).catch(function(){});
 
   window.claude.use("db").then(function(x){
-    if(!x){ setSync("off","이 화면에서는 저장되지 않습니다"); return; }
+    if(!x){ startPractice(); return; }
     db=x;
     db.collection("minreq").onSnapshot(function(snap){
       var t=builtinMin();
@@ -1851,7 +1864,7 @@ function start(){
     }, function(e){
       setSync("off", e&&e.code==="revoked"?"접근이 끝났습니다":"연결이 끊어졌습니다");
     });
-  }).catch(function(){ setSync("off","이 화면에서는 저장되지 않습니다"); });
+  }).catch(function(){ startPractice(); });
 }
 
 /* 로컬(file://)에서만 열리는 테스트용 통로. 게시된 페이지(https)에서는 만들어지지 않는다. */
