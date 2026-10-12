@@ -245,6 +245,7 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
 #univTable tr.urow td:first-child{font-weight:600}
 #univTable .ucaret{color:var(--ink-3); font-size:10px; margin-left:6px}
 #univTable td.udetail{background:var(--surface-2); padding:4px 14px 12px; white-space:normal}
+.uvar{font-size:11.5px; color:var(--ink-3); margin-top:8px}
 .umajor{font-weight:700; font-size:12.5px; margin:10px 0 2px; color:var(--ink)}
 .umajor span{font-weight:400; color:var(--ink-3); margin-left:4px}
 .uitem{display:flex; flex-wrap:wrap; align-items:center; gap:3px 10px; padding:7px 0; border-top:1px solid var(--line); font-size:12.5px}
@@ -1016,20 +1017,44 @@ function renderAll(){
    대학마다 지원·학생·합격·충원대기·불합격 수. 대학을 누르면 모집단위별로 지원 학생을 펼친다.
    찾기 칸은 대학·모집단위·전형·학생 이름에 걸린다. */
 var openUniv=null;
+// 줄임말 → 정식 줄임(shortUniv 결과 기준). 캠퍼스 표기 (국제)(WISE) 등은 shortUniv 가 남긴다.
+var UNIV_ALIAS={"부산외대":"부산외국어대","한국외대":"한국외국어대","서울과기대":"서울과학기술대","한국해양대":"한국해양대","경상대":"경상국립대","부경대":"부경대"};
+var BRANCH=/^(국제|WISE|글로컬|미래|ERICA|세종|원주|천안|안성|다빈치|죽전|거제|서산|아산|충주|삼척|경주|글로벌|메디컬|제2)/i;
+function univKey(u){
+  var k=shortUniv(u).replace(/대학$/,"대");
+  var m=k.match(/^(.*?)(\(.*\))?$/), base=m[1], camp=m[2]||"";
+  return sameKey(UNIV_ALIAS[base]||base)+"|"+sameKey(camp);
+}
 function renderUniv(all){
   var q=(document.getElementById("univQ").value||"").replace(/\s+/g,"").toLowerCase();
   var hit=function(v){ return String(v||"").replace(/\s+/g,"").toLowerCase().indexOf(q)>=0; };
   var uni={};
   all.forEach(function(s){(s.apps||[]).forEach(function(a){
     if(!a.univ) return;
-    if(q&&!hit(a.univ)&&!hit(a.major)&&!hit(a.jh)&&!hit(s.name)) return;
-    var o=uni[a.univ]=uni[a.univ]||{n:0,pass:0,wait:0,fail:0,stu:{},list:[]};
-    o.n++; o.stu[s.id]=1; o.list.push({s:s,a:a});
+    if(q&&!hit(a.univ)&&!hit(shortUniv(a.univ))&&!hit(a.major)&&!hit(a.jh)&&!hit(s.name)) return;
+    var key=univKey(a.univ);
+    var o=uni[key]=uni[key]||{n:0,pass:0,wait:0,fail:0,stu:{},list:[],names:{}};
+    o.n++; o.stu[s.id]=1; o.list.push({s:s,a:a}); o.names[a.univ]=(o.names[a.univ]||0)+1;
     if(PASS[a.status]) o.pass++;
     else if(a.status==="충원대기") o.wait++;
     else if(a.status==="불합격"||a.status==="1단계불") o.fail++;
   });});
-  var names=Object.keys(uni).sort(function(a,b){return uni[b].n-uni[a].n||a.localeCompare(b,"ko");});
+  // 캠퍼스 표기 없는 이름은, 같은 대학의 캠퍼스 표기가 하나뿐이면 그쪽에 합친다(경상대 → 경상국립대학교(진주)).
+  Object.keys(uni).forEach(function(k){
+    if(!/\|$/.test(k)||!uni[k]) return;
+    var others=Object.keys(uni).filter(function(x){ return x!==k&&x.indexOf(k)===0; });
+    if(others.length!==1) return;
+    var t=uni[others[0]], f=uni[k];
+    // "(서울)"처럼 본교라고 적힌 이름이 있거나, 상대가 분교 캠퍼스면 합치지 않는다
+    if(Object.keys(f.names).some(function(n){ return /\(/.test(n); })||BRANCH.test(others[0].split("|")[1])) return;
+    t.n+=f.n; t.pass+=f.pass; t.wait+=f.wait; t.fail+=f.fail; t.list=t.list.concat(f.list);
+    Object.keys(f.stu).forEach(function(x){ t.stu[x]=1; });
+    Object.keys(f.names).forEach(function(x){ t.names[x]=(t.names[x]||0)+f.names[x]; });
+    delete uni[k];
+  });
+  Object.keys(uni).forEach(function(k){ var nm=uni[k].names;
+    uni[k].label=Object.keys(nm).sort(function(a,b){ return nm[b]-nm[a]||b.length-a.length; })[0]; });
+  var names=Object.keys(uni).sort(function(a,b){return uni[b].n-uni[a].n||uni[a].label.localeCompare(uni[b].label,"ko");});
   document.getElementById("univCount").textContent=names.length?names.length+"개 대학":"";
   var ut=document.getElementById("univTable"); ut.innerHTML="";
   var heads=["대학","지원","학생","합격","충원대기","불합격"];
@@ -1040,14 +1065,16 @@ function renderUniv(all){
   names.forEach(function(u){
     var o=uni[u], open=(openUniv===u)||(!!q&&names.length===1);
     var r=ub.insertRow(); r.className="urow"+(open?" open":"");
-    var c0=r.insertCell(); c0.textContent=u; c0.appendChild(el("span","ucaret",open?"▲":"▼"));
+    var c0=r.insertCell(); c0.textContent=o.label; c0.appendChild(el("span","ucaret",open?"▲":"▼"));
     [o.n,Object.keys(o.stu).length,o.pass,o.wait,o.fail].forEach(function(v,i){
       var td=r.insertCell(); td.className="num"; td.textContent=v;
       if(i===2&&v) td.style.color="var(--ok)", td.style.fontWeight="700";
       if(i===3&&v) td.style.color="var(--warn)", td.style.fontWeight="700";
     });
     r.onclick=function(){ openUniv=(openUniv===u?null:u); renderUniv(all); };
-    if(open){ var td=ub.insertRow().insertCell(); td.colSpan=heads.length; td.className="udetail"; td.appendChild(univDetail(o.list)); }
+    if(open){ var td=ub.insertRow().insertCell(); td.colSpan=heads.length; td.className="udetail";
+      var vs=Object.keys(o.names); if(vs.length>1) td.appendChild(el("div","uvar","파일 표기: "+vs.join(", ")));
+      td.appendChild(univDetail(o.list)); }
   });
   if(!names.length){ var r=ub.insertRow(); var td=r.insertCell(); td.colSpan=heads.length;
     td.textContent=q?"찾는 내용이 없습니다.":"아직 입력된 지원 내역이 없습니다."; td.style.color="var(--ink-3)"; }
