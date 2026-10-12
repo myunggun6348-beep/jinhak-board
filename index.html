@@ -273,6 +273,7 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
       <span class="sp">
         <button class="ghost" id="btnUndo" hidden disabled>↶ 되돌리기</button>
         <button class="ghost" id="btnCsv">CSV 내려받기</button>
+        <button class="ghost" id="btnClearLocal" hidden title="이 브라우저에 저장된 자료만 지웁니다">이 브라우저 자료 지우기</button>
       </span>
     </div>
     <div class="rows" id="rows"></div>
@@ -515,6 +516,7 @@ function byClass(c){ return sorted(list().filter(function(s){return s.cls===c;})
 function save(st){
   st.updatedAt=new Date().toISOString();
   students.set(st.id, st);
+  persistLocal();
   if(demo||!db||canWrite===false) return;
   var k=st.id;
   if(writeTimers.has(k)) clearTimeout(writeTimers.get(k));
@@ -570,6 +572,29 @@ function renderUndo(){
   b.textContent=e?"↶ "+e.label+" 취소"+(e.n>1?" ("+e.n+"명)":""):"↶ 되돌릴 작업 없음";
   b.title=e?"방금 한 ‘"+e.label+"’을(를) 하기 전으로 되돌립니다":"";
 }
+/* ── 이 브라우저에 저장(저장소 없는 화면) ──
+   공용 저장소가 없을 때 넣은 자료를 이 브라우저에만 남긴다. 다른 컴퓨터·다른 선생님과는 공유되지 않는다. */
+var LOCAL_KEY="jh.local.students", localTimer=null;
+function loadLocal(){
+  try{ var a=JSON.parse(localStorage.getItem(LOCAL_KEY)||"null"); return Array.isArray(a)&&a.length?a:null; }catch(e){ return null; }
+}
+function persistLocal(){
+  if(!practice||demo) return;
+  clearTimeout(localTimer);
+  localTimer=setTimeout(function(){
+    try{
+      var real=Array.from(students.values()).filter(function(x){ return !/^d\d$/.test(x.id); });   // 되돌리기로 돌아온 예시 학생은 빼고
+      if(real.length) localStorage.setItem(LOCAL_KEY, JSON.stringify(real));
+      else localStorage.removeItem(LOCAL_KEY);
+      setSync("live","이 브라우저에 저장됨");
+    }catch(e){ setSync("off","브라우저에 저장하지 못했습니다"); }
+  },300);
+}
+function clearLocal(){
+  if(!window.confirm("이 브라우저에 저장된 학생·지원 자료를 모두 지웁니다. 다른 컴퓨터의 자료는 그대로입니다. 계속할까요?")) return;
+  try{ localStorage.removeItem(LOCAL_KEY); }catch(e){}
+  location.reload();
+}
 function setSync(kind,text){
   var d=document.getElementById("syncDot"), t=document.getElementById("syncText");
   d.className="dot"+(kind==="live"?" live":kind==="off"?" off":"");
@@ -578,6 +603,7 @@ function setSync(kind,text){
 
 /* ── render: class view ────────────────────── */
 function render(){
+  persistLocal();
   if(pendingRender) return;
   var cls=getCls();
   renderClassbar(cls);
@@ -589,6 +615,7 @@ function render(){
   renderStats(document.getElementById("stats"), mine);
   renderRows(mine, cls);
   renderUndo();
+  document.getElementById("btnClearLocal").hidden=!(practice&&!demo);
   if(!document.getElementById("viewAll").hidden) renderAll();
 }
 function renderClassbar(cls){
@@ -957,12 +984,7 @@ function csv(arr,name){
         a.c6?"Y":"N",a.itv||"",a.ann||"",a.due||"",a.status||"",a.mreq||"",a.mmet||"",a.rank||"",a.note||"",w].map(q).join(","));
     });
   });
-  var data="﻿"+lines.join("\r\n");
-  if(!downloadsCap){ alert("이 화면에서는 내려받기를 쓸 수 없습니다."); return; }
-  downloadsCap.save({filename:name, data:data}).catch(function(e){
-    if(e&&e.code==="declined") return;
-    alert("내려받지 못했습니다. 잠시 후 다시 시도해 주세요.");
-  });
+  saveFile(name,"﻿"+lines.join("\r\n"));
 }
 
 /* ── boot ──────────────────────────────────── */
@@ -1035,6 +1057,7 @@ function bindStatic(){
     var c=getCls(); if(!c){alert("반을 먼저 선택해 주세요.");return;}
     csv(byClass(c), "진학현황_"+YEAR+"_"+c+"반.csv");
   };
+  document.getElementById("btnClearLocal").onclick=clearLocal;
   document.getElementById("btnCsvAll").onclick=function(){ csv(sorted(list()), "진학현황_"+YEAR+"_전체.csv"); };
   document.getElementById("yearLabel").textContent=YEAR+"학년도";
 }
@@ -1717,14 +1740,23 @@ function tmplApps(){
   ];
   saveCsv(rows,"지원현황서식.csv");
 }
-function saveCsv(rows,name){
-  var q=function(v){ v=String(v==null?"":v); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
-  var data="﻿"+rows.map(function(r){return r.map(q).join(",");}).join("\r\n");
+function saveFile(name,data){
+  if(!downloadsCap&&!window.claude){
+    var u=URL.createObjectURL(new Blob([data],{type:"text/csv;charset=utf-8"}));
+    var a=document.createElement("a"); a.href=u; a.download=name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(u); },1000);
+    return;
+  }
   if(!downloadsCap){ alert("이 화면에서는 내려받기를 쓸 수 없습니다."); return; }
   downloadsCap.save({filename:name, data:data}).catch(function(e){
     if(e&&e.code==="declined") return;
-    alert("내려받지 못했습니다.");
+    alert("내려받지 못했습니다. 잠시 후 다시 시도해 주세요.");
   });
+}
+function saveCsv(rows,name){
+  var q=function(v){ v=String(v==null?"":v); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
+  saveFile(name,"﻿"+rows.map(function(r){return r.map(q).join(",");}).join("\r\n"));
 }
 
 function handleFile(f){
@@ -1801,15 +1833,23 @@ function handleFile(f){
 }
 
 function startPractice(){
-  setSync("off","이 화면에서는 저장되지 않습니다");
+  setSync("","예시 화면 · 아직 저장된 자료 없음");
   if(!demo||practice) return;
   practice=true;
-  students=new Map(DEMO.map(function(d){ return [d.id, JSON.parse(JSON.stringify(d))]; }));
+  var saved=loadLocal();
   var b=document.getElementById("banner");
   b.innerHTML="";
+  if(saved){
+    students=new Map(saved.map(function(d){ return [d.id, d]; }));
+    demo=false;
+    b.hidden=true;
+    setSync("live","이 브라우저에 저장됨");
+    fillAll(); render(); return;
+  }
+  students=new Map(DEMO.map(function(d){ return [d.id, JSON.parse(JSON.stringify(d))]; }));
   b.appendChild(document.createTextNode("이 화면은 "));
-  b.appendChild(el("b",null,"저장되지 않는 연습 화면"));
-  b.appendChild(document.createTextNode("입니다. 예시 학생에게 수시·정시·전문대 지원을 추가해 보거나 파일을 넣어 볼 수 있습니다(새로고침하면 사라집니다)."));
+  b.appendChild(el("b",null,"이 브라우저에만 저장되는 화면"));
+  b.appendChild(document.createTextNode("입니다. 파일을 넣거나 학생을 추가하면 예시는 사라지고, 넣은 자료는 이 브라우저에 저장됩니다(다른 컴퓨터·다른 선생님과는 공유되지 않습니다)."));
   fillAll(); render();
 }
 function start(){
