@@ -255,6 +255,13 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
 .shint{font-size:12px; color:var(--ink-3); margin-top:4px}
 .sitem .late{color:var(--bad); font-size:12px}
 .sitem select{margin-left:auto; border:1px solid var(--line-2); background:var(--surface); color:var(--ink); border-radius:6px; padding:3px 6px; font-size:12.5px}
+#csatPanel table{min-width:0}
+#csatPanel th,#csatPanel td{padding:5px 6px}
+#csatPanel th.g,#csatPanel td.g{text-align:center; width:40px}
+#csatPanel input.g{width:34px; text-align:center; border:1px solid var(--line-2); background:var(--surface); color:var(--ink); border-radius:6px; padding:4px 0; font-size:14px}
+#csatPanel input.g:focus{outline:2px solid var(--accent); outline-offset:0}
+#csatPanel td.mres{white-space:normal; font-size:12px; min-width:140px}
+#csatPanel td.mres .pill{margin:1px 3px 1px 0; display:inline-block}
 .sempty{font-size:12.5px; color:var(--ink-3); margin-top:8px}
 .smore{margin-top:8px}
 .usearch{border:1px solid var(--line-2); background:var(--surface); color:var(--ink); border-radius:7px; padding:5px 10px; font-size:13px; width:190px}
@@ -317,6 +324,14 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
   #viewAll th,#viewAll td{padding:8px 7px; white-space:normal}
   #viewAll th{white-space:nowrap}
   .usearch{width:100%; font-size:16px}
+  #csatPanel input.g{font-size:16px; width:30px}
+  #csatPanel th.no,#csatPanel td.no,#csatPanel th.mres{display:none}
+  /* 한 학생 = 이름·등급 6칸 한 줄 + 아래에 판정 */
+  #csatPanel table,#csatPanel thead,#csatPanel tbody{display:block}
+  #csatPanel tr{display:grid; grid-template-columns:1fr repeat(6,34px); gap:3px; align-items:center; padding:5px 8px; border-bottom:1px solid var(--line)}
+  #csatPanel th,#csatPanel td{padding:0; border:0; width:auto!important}
+  #csatPanel td.mres{grid-column:1/-1; min-width:0; padding-top:2px}
+  #csatPanel .tablewrap{overflow:visible}
   #viewAll .listhead .sp{flex-basis:100%}
   /* 아이폰은 16px 보다 작은 입력 칸을 누르면 화면을 확대한다 */
   .f input,.f select,.f textarea,.apptable select,input,select,textarea{font-size:16px}
@@ -351,10 +366,12 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
       <span class="cnt" id="listCount"></span>
       <span class="sp">
         <button class="ghost" id="btnUndo" hidden disabled>↶ 되돌리기</button>
+        <button class="ghost" id="btnCsat" title="반 학생 전체의 수능(가채점) 등급을 표 한 장에 넣고 최저 충족을 바로 봅니다">수능 등급 넣기</button>
         <button class="ghost" id="btnCsv">CSV 내려받기</button>
         <button class="ghost" id="btnClearLocal" hidden title="이 브라우저에 저장된 자료만 지웁니다">이 브라우저 자료 지우기</button>
       </span>
     </div>
+    <div class="sched" id="csatPanel" hidden></div>
     <div class="rows" id="rows"></div>
 
     <div class="panel" id="addPanel">
@@ -520,33 +537,59 @@ function parseMin(raw){
   var s=String(raw||"").replace(/\s+/g,"");
   if(!s) return {err:"기준이 비어 있습니다"};
   if(/^(없음|해당없음|미적용|최저없음|무|-|—|x|X)$/.test(s)) return {none:true};
-  if(/(미적|기하|확통|확률|과탐|사탐|직탐|제2외|외국어|한문|또는|혹은)/.test(s))
+  s=s.replace(/^[*\-∙•]*(수능최저(학력)?기준|최저(학력)?기준)?:?/,"").replace(/※?선택과목과관계없이모두인정함\.?/g,"");
+  // 선택과목·대체·과탐 필수 같은 조건은 등급만으로 판정할 수 없다
+  if(/(미적|기하|확통|확률|직탐|직업탐구|제2외|외국어|한문|과(학)?탐(구)?\(?1과목(이상)?\)?(이상)?(필수|응시자))/.test(s))
     return {err:"선택과목·대체 조건이 있어 직접 확인해야 합니다"};
+  // 영어 1·2등급을 1등급으로 보는 대학
+  var eng12=false;
+  s=s.replace(/,?영어(영역)?1[·,]2등급(은|을)?(통합하여)?1등급으로간주(하여수능최저학력기준충족여부를산정함)?\)?/g,function(){ eng12=true; return ""; });
+  // 탐구 이름들 → 탐
+  s=s.replace(/사회\/과학탐구|사탐\/과탐|사\/과탐|사회혹은과학탐구|사회·과학|사회\/과학|사\/과/g,"탐")
+     .replace(/\(탐구?:탐\)/g,"").replace(/\(탐\)/g,"").replace(/\(탐(?=\d|중)/g,"(");
+  // 판정과 상관없는 말
+  s=s.replace(/\(필수응시:[^)]*\)/g,"")
+     .replace(/,?한국사(는|를)?(필수)?응시(필수)?(\((등급미반영|반영영역제외)\))?/g,"")
+     .replace(/\([^()]*기준\d+에서1등급하향적용\)/g,"")
+     .replace(/\(?\d{4}학년도완화\)?/g,"")
+     .replace(/^\[[^\]]*\]|인문계열|자연계열/g,"");
+  // 탐구 반영 방식
+  var noCut=/(버림|절사)없이/.test(s);
+  s=s.replace(/,?소수점(자리|이하)?(버림|절사)없이그대로반영(함)?\.?/g,"")
+     .replace(/(탐구?(영역)?(과목)?(은|는)?)?(반드시)?2과목(을)?응시(하여야하며|하여|후|하고)?,?/g,"")
+     .replace(/2과목중/g,"").replace(/높은과목/g,"1과목")
+     .replace(/\((상위)?([12])개과목/g,"($1$2과목").replace(/([12])개과목(의)?(등급)?평균/g,"$1과목평균");   // 괄호 속이거나 평균일 때만 탐구 과목 수
   s=s.replace(/(수능최저학력기준|수능최저기준|수능최저|최저학력기준|최저기준|최저|등급|이내|영역|반영|적용|:)/g,"")
      .replace(/국어/g,"국").replace(/수학/g,"수").replace(/영어/g,"영").replace(/탐구/g,"탐").replace(/한국사/g,"한");
-  var top=/1과목|\(1\)/.test(s), avg=/2과목|\(2\)|평균/.test(s), cut=/절사|버림/.test(s);
+  var top=/1과목|\(1\)/.test(s), avg=/2과목|\(2\)|평균/.test(s), cut=!noCut&&/절사|버림/.test(s);
   if(top&&avg) return {err:"탐구 반영 방식이 두 가지로 적혀 있습니다"};
-  var modes=top?["top"]:avg?(cut?["floor"]:["avg","floor"]):["top","avg","floor"];
-  s=s.replace(/\([12]\)|(상위)?[12]과목|평균|소수점?(이하)?(절사|버림)|절사|버림/g,"")
-     .replace(/([국수영탐한])[,·\/]+(?=[국수영탐한])/g,"$1");
-  var must=null;
-  s=s.replace(/\(?([국수영탐])(?:필수)?포함\)?|\(?([국수영탐])필수\)?/g,function(_,a,b){must=a||b; return ",";});
-  var conds=[];
-  s=s.replace(/([국수영탐]+)?중?(\d)개?(합|각)(\d{1,2})/g,function(_,set,n,op,m){
+  var modes=top?["top"]:avg?(cut?["floor"]:["avg"]):["top","avg","floor"];
+  if(avg&&!cut&&!noCut) modes=["avg","floor"];
+  s=s.replace(/\([12]\)|(상위)?[12]과목(의)?|평균|소수점?(이하)?(절사|버림)|절사|버림/g,"").replace(/\((중)?\)/g,"")
+     .replace(/수능|상위|의(?=합)|하되|그대로|단,?/g,"").replace(/합이/g,"합")
+     .replace(/\d개(?=\[|중)/g,"")
+     .replace(/([국수영탐한])[,·\/]+(?=[국수영탐한])/g,"$1").replace(/\[([국수영탐]+)\]/g,"$1");
+  var must=null, conds=[];
+  // "국어, 영어, 탐구 중 상위 1개와 수학 합 6" = 수학 포함 2개 합
+  s=s.replace(/([국수영탐]{2,})중1개과([국수영탐])합(\d{1,2})/g,function(_,set,m1,m){ conds.push({set:set+m1,n:2,op:"합",m:+m,must:m1}); return ","; });
+  s=s.replace(/\(?([국수영탐]{2,})중1개(과목)?(을|를)?포함(하여)?\)?/g,function(_,set){ must=set; return ""; });
+  s=s.replace(/\(?([국수영탐])(?:필수)?포함\)?|\(?([국수영탐])필수\)?/g,function(_,a,b){must=a||b; return "";});
+  s=s.replace(/1개(이상)?(이|가)?(\d)(?!\d)/g,"1개각$3");
+  s=s.replace(/([국수영탐]+)?중?(\d)개?(과목)?(합|각)(\d{1,2})/g,function(_,set,n,x,op,m){
     conds.push({set:set||"국수영탐",n:+n,op:op,m:+m}); return ",";});
   s=s.replace(/([국수영탐]{2,})각(\d)/g,function(_,set,m){ conds.push({set:set,n:set.length,op:"각",m:+m}); return ",";});
   s=s.replace(/([국수영탐한])(\d)(?![\d개합각])/g,function(_,a,m){ conds.push({set:a,n:1,op:"각",m:+m}); return ",";});
-  var rest=s.replace(/[,+\/·&()\[\]、.]|및|중|이고|그리고|탐/g,"");
+  var rest=s.replace(/[,+\/·&()\[\]、.*\-∙※"“”']|및|중|이고|이며|그리고|탐|하며|함|은|는|을|를/g,"");
   if(rest) return {err:"알아보지 못한 표현이 있습니다. 예: 국수영탐 중 2개합 5, 한국사 4"};
   if(!conds.length) return {err:"조건을 찾지 못했습니다"};
   for(var i=0;i<conds.length;i++){
     var c=conds[i]; c.set=c.set.split("").filter(function(x,j,arr){return arr.indexOf(x)===j;}).join("");
-    if(must&&c.n>1){ if(c.set.indexOf(must)<0) return {err:"포함 과목이 영역 목록에 없습니다"}; c.must=must; }
+    if(must&&c.n>1){ if(must.split("").some(function(x){ return c.set.indexOf(x)<0; })) return {err:"포함 과목이 영역 목록에 없습니다"}; c.must=must; }
     if(c.n>c.set.length) return {err:c.set+" 중 "+c.n+"개는 고를 수 없습니다"};
   }
-  return {conds:conds, modes:modes};
+  return {conds:conds, modes:modes, eng12:eng12||undefined};
 }
-function minEval(conds,g,mode){
+function minEval(conds,g,mode,eng12){
   var miss=null;
   function gv(a){
     if(a==="탐"){
@@ -555,14 +598,16 @@ function minEval(conds,g,mode){
       if(!x||!y) return 0;
       return mode==="floor"?Math.floor((x+y)/2):(x+y)/2;
     }
-    return +g[CSATKEY[a]]||0;
+    var v=+g[CSATKEY[a]]||0;
+    return a==="영"&&eng12&&v===2?1:v;
   }
   var ok=true, why=[];
   conds.forEach(function(c){
     var vals=c.set.split("").map(function(a){ var v=gv(a); if(!v) miss=miss||CSATNAME[a]; return {a:a,v:v}; });
     if(miss) return;
-    var pick=c.must?vals.filter(function(x){return x.a===c.must;}):[];
-    pick=pick.concat(vals.filter(function(x){return x.a!==c.must;}).sort(function(p,q){return p.v-q.v;}).slice(0,c.n-pick.length));
+    var inMust=function(x){ return !!c.must&&c.must.indexOf(x.a)>=0; };
+    var pick=vals.filter(inMust).sort(function(p,q){return p.v-q.v;}).slice(0,1);
+    pick=pick.concat(vals.filter(function(x){ return pick.indexOf(x)<0; }).sort(function(p,q){return p.v-q.v;}).slice(0,c.n-pick.length));
     var nums=pick.map(function(x){return x.v;});
     var got=c.op==="합"?nums.reduce(function(p,q){return p+q;},0):Math.max.apply(null,nums);
     if(got>c.m) ok=false;
@@ -574,7 +619,7 @@ function judgeMin(raw,g){
   var p=parseMin(raw);
   if(p.none) return {res:"해당없음", why:"수능최저 없음"};
   if(p.err) return {res:null, why:p.err};
-  var outs=p.modes.map(function(m){ return minEval(p.conds,g||{},m); });
+  var outs=p.modes.map(function(m){ return minEval(p.conds,g||{},m,p.eng12); });
   if(outs[0].miss) return {res:null, why:outs[0].miss+" 등급이 없습니다"};
   if(outs.some(function(o){return o.ok!==outs[0].ok;}))
     return {res:null, why:"탐구 반영 방식(1과목·2과목 평균)에 따라 결과가 갈립니다. 요강을 보고 기준에 적어 주세요"};
@@ -702,6 +747,7 @@ function render(){
   document.getElementById("sched").hidden=!cls;
   renderTodo(document.getElementById("todo"), cls?mine:[], false);
   renderRows(mine, cls);
+  renderCsat(cls?mine:[]);
   renderUndo();
   document.getElementById("btnClearLocal").hidden=!(practice&&!demo);
   if(!document.getElementById("viewAll").hidden) renderAll();
@@ -1248,6 +1294,100 @@ function renderTodo(host, arr, showClass){
   }
 }
 function st0(s){ return students.get(s.id)||s; }
+/* ── 수능 등급 한 번에 넣기 ── */
+var csatOpen=false;
+var GK=CSAT.map(function(k){ return k[0]; });
+function minResult(st){
+  var ok=0, bad=[], none=[];
+  (st.apps||[]).forEach(function(a){
+    if(a.kind!=="수시"||!a.mreq) return;
+    var r=judgeMin(a.mreq, st.csat);
+    if(r.res==="충족") ok++;
+    else if(r.res==="미충족") bad.push(shortUniv(a.univ));
+    else if(r.res!=="해당없음") none.push(shortUniv(a.univ)+": "+r.why);
+  });
+  var box=el("span");
+  if(!hasCsat(st)&&(ok||bad.length||none.length)){ box.appendChild(el("span","pill empty","등급 입력 전")); return box; }
+  if(ok) box.appendChild(el("span","pill s-ok","충족 "+ok));
+  if(bad.length) box.appendChild(el("span","pill s-bad","미충족: "+bad.join(", ")));
+  if(none.length){ var p=el("span","pill empty","판정 못함 "+none.length); p.title=none.join("\n"); box.appendChild(p); }
+  if(!box.childNodes.length) box.appendChild(el("span","pill empty","최저 있는 지원 없음"));
+  return box;
+}
+function renderCsat(mine){
+  var host=document.getElementById("csatPanel");
+  host.hidden=!csatOpen;
+  document.getElementById("btnCsat").setAttribute("aria-pressed",String(csatOpen));
+  if(!csatOpen) return;
+  host.innerHTML="";
+  var hd=el("div","schedhead");
+  hd.appendChild(el("h2",null,"수능 등급 넣기"));
+  var x=el("button","ghost","닫기"); x.style.marginLeft="auto";
+  x.onclick=function(){ csatOpen=false; render(); };
+  hd.appendChild(x);
+  host.appendChild(hd);
+  host.appendChild(el("div","shint","숫자(1~9)를 치면 다음 칸으로 넘어갑니다. 엑셀에서 등급 칸을 복사해 첫 칸에 붙여넣어도 됩니다. 탐구는 과목별 등급, 넣는 즉시 수시 최저를 다시 판정합니다."));
+  var tw=el("div","tablewrap"); tw.style.marginTop="8px";
+  var t=document.createElement("table"), hr=t.createTHead().insertRow();
+  [["학번","no"],["이름",""]].concat(CSAT.map(function(k){ return [k[1].replace("탐구","탐"),"g"]; })).concat([["최저 판정","mres"]]).forEach(function(h){
+    var th=el("th",h[1]||null,h[0]); hr.appendChild(th); });
+  var tb=t.createTBody(), cells=[];
+  mine.forEach(function(st,ri){
+    var r=tb.insertRow();
+    var c=r.insertCell(); c.className="no"; c.textContent=st.no||"";
+    r.insertCell().textContent=st.name||"";
+    var row=[];
+    GK.forEach(function(k,ci){
+      var td=r.insertCell(); td.className="g";
+      var i=document.createElement("input"); i.className="g"; i.maxLength=1; i.inputMode="numeric";
+      i.value=(st.csat&&st.csat[k])||""; i.disabled=ro();
+      i.setAttribute("aria-label",(st.name||"")+" "+CSAT[ci][1]);
+      i.oninput=function(){
+        i.value=i.value.replace(/[^1-9]/g,"").slice(-1);
+        setGrade(st,k,i.value);
+        res.innerHTML=""; res.appendChild(minResult(st));
+        if(i.value) move(ri,ci,1);
+      };
+      i.onkeydown=function(e){
+        if(e.key==="Enter"||e.key==="ArrowDown"){ e.preventDefault(); move(ri,ci,GK.length); }
+        else if(e.key==="ArrowUp"){ e.preventDefault(); move(ri,ci,-GK.length); }
+        else if(e.key==="ArrowRight"&&i.selectionStart===i.value.length){ move(ri,ci,1); }
+        else if(e.key==="ArrowLeft"&&!i.selectionStart){ move(ri,ci,-1); }
+      };
+      i.onfocus=function(){ i.select(); };
+      i.onpaste=function(e){
+        var text=(e.clipboardData||window.clipboardData).getData("text");
+        if(!/[\t\n ,]/.test(text.trim())) return;   // 한 칸짜리는 보통 붙여넣기
+        e.preventDefault();
+        remember("수능 등급 붙여넣기");
+        text.replace(/\r/g,"").split("\n").filter(function(l){ return l.trim(); }).forEach(function(line,dr){
+          var st2=mine[ri+dr]; if(!st2) return;
+          line.trim().split(/[\t ,]+/).forEach(function(v,dc){
+            var k2=GK[ci+dc]; v=String(v).replace(/[^1-9]/g,"").slice(0,1);
+            if(k2&&v) setGrade(st2,k2,v,true);
+          });
+        });
+        pendingRender=false; render();
+      };
+      td.appendChild(i); row.push(i);
+    });
+    cells.push(row);
+    var res=r.insertCell(); res.className="mres"; res.appendChild(minResult(st));
+  });
+  function move(ri,ci,step){
+    var flat=ri*GK.length+ci+step, r2=Math.floor(flat/GK.length), c2=flat%GK.length;
+    if(flat<0||!cells[r2]) return;
+    cells[r2][c2].focus();
+  }
+  tw.appendChild(t); host.appendChild(tw);
+  // 표 밖으로 나가면 화면 전체(경고·통계)를 새로 그린다
+  host.onfocusout=function(){ setTimeout(function(){ if(!host.contains(document.activeElement)){ pendingRender=false; render(); } },0); };
+  host.onfocusin=function(){ pendingRender=true; };
+}
+function setGrade(st,k,v,quiet){
+  if(!quiet) remember("수능 등급");
+  st.csat=st.csat||{}; st.csat[k]=v; applyMin(st); save(st);
+}
 function goStudent(s){
   if(s.cls) setCls(s.cls);
   openId=s.id; editAppId=null;
@@ -1354,6 +1494,10 @@ function bindStatic(){
       renderUniv(sorted(list()));
     };
   });
+  document.getElementById("btnCsat").onclick=function(){
+    csatOpen=!csatOpen; render();
+    if(csatOpen){ var p=document.getElementById("csatPanel"); p.scrollIntoView({block:"start"}); var f=p.querySelector("input.g"); if(f) f.focus(); }
+  };
   document.getElementById("btnCsvAll").onclick=function(){ csv(sorted(list()), "진학현황_"+YEAR+"_전체.csv"); };
   document.getElementById("yearLabel").textContent=YEAR+"학년도";
 }
