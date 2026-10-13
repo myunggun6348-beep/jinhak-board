@@ -335,6 +335,11 @@ function buildTestPage() {
   check("지역: 괄호 속 지명·파일의 지역 칸", res.region, "부산,경남,경기,경북,미상,경남");
   check("최종 결과: 등록 > 합격(등록포기 제외) > 진행 중 > 진로", res.outcome, "등록,합격,미정,진행 중,재수,미정");
 
+  const kd = await p.evaluate(() => { const K = window.__dev.KEYDATES;
+    return { sorted: K.every((k, i) => !i || K[i - 1].s <= k.s) && K.every((k) => !k.e || k.e >= k.s), csat: K.find((k) => k.id === "csat").s, jApp: K.find((k) => k.id === "j-app").s }; });
+  check("입시 공통 일정: 날짜순", kd.sorted, true);
+  check("2027 수능 2026-11-19 · 정시 접수 2027-01-04", kd.csat + " " + kd.jApp, "2026-11-19 2027-01-04");
+
   check("자바스크립트 오류 없음", errors, []);
   await browser.close();
   fs.unlinkSync(page404);

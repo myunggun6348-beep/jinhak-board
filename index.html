@@ -264,6 +264,7 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
 #csatPanel td.gsel{white-space:nowrap}
 #csatPanel td.gsel select{border:1px solid var(--line-2); background:var(--surface); color:var(--ink); border-radius:6px; padding:3px 2px; font-size:12.5px; margin-right:3px}
 #csatPanel td.mres .pill{margin:1px 3px 1px 0; display:inline-block}
+[hidden]{display:none!important}
 .lockbar{display:flex; flex-wrap:wrap; align-items:center; gap:8px; border:1px solid var(--warn); background:var(--warn-soft); color:var(--ink); border-radius:var(--radius); padding:10px 13px; margin-bottom:14px; font-size:13px}
 .lockbar b{font-weight:700}
 .lockbar .sp{margin-left:auto; display:flex; gap:6px; flex-wrap:wrap}
@@ -277,6 +278,17 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
 #jungsiPanel .jadd{font-size:12px; padding:2px 8px}
 #jungsiPanel .jno{color:var(--ink-3)}
 .jsum{display:flex; flex-wrap:wrap; gap:6px; margin:8px 0}
+.keydates{display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin:0 0 14px; font-size:12.5px}
+.keydates .kd{display:inline-flex; gap:6px; align-items:baseline; border:1px solid var(--line-2); background:var(--surface); border-radius:999px; padding:4px 11px}
+.keydates .kd b{color:var(--accent)}
+.keydates .kd.soon b{color:var(--bad)}
+.keydates .kdmore{font-size:12px}
+.kdlist{width:100%; border:1px solid var(--line); border-radius:var(--radius); background:var(--surface); padding:8px 12px; margin-top:4px}
+.kdlist .kdrow{display:flex; gap:10px; padding:4px 0; border-top:1px solid var(--line)}
+.kdlist .kdrow:first-child{border-top:0}
+.kdlist .kdrow.past{color:var(--ink-3); text-decoration:line-through}
+.kdlist .kdd{min-width:150px; font-variant-numeric:tabular-nums}
+.kdlist .src{font-size:11px; color:var(--ink-3); margin-top:6px}
 .sempty{font-size:12.5px; color:var(--ink-3); margin-top:8px}
 .smore{margin-top:8px}
 .usearch{border:1px solid var(--line-2); background:var(--surface); color:var(--ink); border-radius:7px; padding:5px 10px; font-size:13px; width:190px}
@@ -372,6 +384,7 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
 <div class="wrap">
   <div id="banner" class="banner" hidden></div>
 
+  <div class="keydates" id="keydates"></div>
   <div id="viewClass">
     <div class="classbar" id="classbar"></div>
     <div class="lockbar" id="lockbar" hidden></div>
@@ -811,6 +824,7 @@ function setSync(kind,text){
 function render(){
   persistLocal();
   if(pendingRender) return;
+  renderKeydates();
   var cls=getCls();
   curCls=cls;
   renderClassbar(cls);
@@ -1382,8 +1396,65 @@ function saveIcs(ev, label){
       "BEGIN:VALARM","ACTION:DISPLAY","DESCRIPTION:"+icsText(title),"TRIGGER:"+(e.kind==="due"&&/T\d/.test(a.due)?"-PT3H":"-PT15H"),"END:VALARM",
       "END:VEVENT");
   });
+  KEYDATES.forEach(function(k){
+    if(kdDays(k).b<0) return;
+    var end=new Date((k.e||k.s)+"T00:00:00"); end=new Date(end.getTime()+86400000);
+    L.push("BEGIN:VEVENT","UID:key-"+k.id+"-"+YEAR+"@jinhak-board","DTSTAMP:"+now,
+      "DTSTART;VALUE=DATE:"+k.s.replace(/-/g,""),"DTEND;VALUE=DATE:"+end.getFullYear()+pad2(end.getMonth()+1)+pad2(end.getDate()),"TRANSP:TRANSPARENT",
+      "SUMMARY:"+icsText("[입시] "+k.t+(k.time?" "+k.time:"")),"DESCRIPTION:"+icsText("2027학년도 공통 일정. 대학별 세부 일정은 모집요강 확인."),
+      "BEGIN:VALARM","ACTION:DISPLAY","DESCRIPTION:"+icsText(k.t),"TRIGGER:-PT15H","END:VALARM","END:VEVENT");
+  });
   L.push("END:VCALENDAR");
   saveFile(YEAR+"_진학일정_"+label+".ics", L.map(icsFold).join("\r\n")+"\r\n");
+}
+/* ── 2027학년도 공통 일정 ── 대학별 세부 일정은 각 모집요강이 우선 */
+var KEYDATES=[
+  {id:"csat",   s:"2026-11-19", t:"대학수학능력시험"},
+  {id:"score",  s:"2026-12-11", t:"수능 성적 통지"},
+  {id:"s-ann",  s:"2026-12-18", t:"수시 합격자 발표 마감"},
+  {id:"s-reg",  s:"2026-12-21", e:"2026-12-23", t:"수시 합격자 등록"},
+  {id:"s-add",  s:"2026-12-29", time:"18:00", t:"수시 충원 합격 통보 마감"},
+  {id:"s-addr", s:"2026-12-30", t:"수시 충원 등록 마감(대학별 시각)"},
+  {id:"j-app",  s:"2027-01-04", e:"2027-01-07", t:"정시 원서 접수(대학별 3일 이상)"},
+  {id:"j-ga",   s:"2027-01-11", e:"2027-01-17", t:"정시 가군 전형"},
+  {id:"j-na",   s:"2027-01-18", e:"2027-01-24", t:"정시 나군 전형"},
+  {id:"j-da",   s:"2027-01-25", e:"2027-01-31", t:"정시 다군 전형"},
+  {id:"j-ann",  s:"2027-02-05", t:"정시 합격자 발표 마감"},
+  {id:"j-reg",  s:"2027-02-10", e:"2027-02-12", t:"정시 합격자 등록"},
+  {id:"j-add",  s:"2027-02-17", time:"18:00", t:"정시 충원 합격 통보 마감"},
+  {id:"j-addr", s:"2027-02-18", t:"정시 충원 등록 마감(추가모집 지원 위한 등록 포기는 16시까지)"},
+  {id:"extra",  s:"2027-02-19", e:"2027-02-26", t:"추가모집(원서·전형·발표)"}
+];
+var kdOpen=false;
+function kdDays(k){ var a=daysTo(k.s), b=daysTo(k.e||k.s); return {a:a, b:b}; }
+function kdWhen(k){
+  var f=function(d){ var x=new Date(d+"T00:00:00"); return (x.getMonth()+1)+"/"+x.getDate()+"("+WD[x.getDay()]+")"; };
+  return f(k.s)+(k.e?" ~ "+f(k.e):"")+(k.time?" "+k.time:"");
+}
+function renderKeydates(){
+  var host=document.getElementById("keydates"); host.innerHTML="";
+  var next=KEYDATES.filter(function(k){ return kdDays(k).b>=0; });
+  next.slice(0,3).forEach(function(k){
+    var d=kdDays(k), c=el("span","kd"+(d.a<=7?" soon":""));
+    c.appendChild(el("b",null,d.a>0?"D-"+d.a:(d.b>=0&&d.a<=0?(d.a===0&&d.b===0?"오늘":"진행 중"):"")));
+    c.appendChild(el("span",null,k.t));
+    c.appendChild(el("span","jno",kdWhen(k)));
+    host.appendChild(c);
+  });
+  var m=el("button","ghost kdmore",kdOpen?"접기":"입시 일정 전체");
+  m.onclick=function(){ kdOpen=!kdOpen; renderKeydates(); };
+  host.appendChild(m);
+  if(!kdOpen) return;
+  var box=el("div","kdlist");
+  KEYDATES.forEach(function(k){
+    var d=kdDays(k), r=el("div","kdrow"+(d.b<0?" past":""));
+    r.appendChild(el("span","kdd",kdWhen(k)));
+    r.appendChild(el("span",null,k.t));
+    if(d.b>=0) r.appendChild(el("span","jno",d.a>0?"D-"+d.a:"진행 중"));
+    box.appendChild(r);
+  });
+  box.appendChild(el("div","src","2027학년도 대학입학전형기본사항 기준 공통 일정입니다(서강대·성균관대 2027 모집요강으로 확인). 대학별 세부 일정과 시각은 각 대학 모집요강이 우선입니다."));
+  host.appendChild(box);
 }
 function renderSched(host, arr, showClass){
   host.innerHTML="";
@@ -1402,7 +1473,7 @@ function renderSched(host, arr, showClass){
   if(all.length&&(downloadsCap||!window.claude)){
     var ib=el("button","ghost","달력에 넣기");
     ib.style.marginLeft="auto";
-    ib.title="오늘 이후 면접·고사, 발표(날짜별로 묶음), 충원 마감을 달력 파일(.ics)로 받습니다. 핸드폰에서 열거나 구글 캘린더에서 가져오면 한 번에 들어갑니다.";
+    ib.title="오늘 이후 면접·고사, 발표(날짜별로 묶음), 충원 마감, 입시 공통 일정(수능·등록·정시 접수 등)을 달력 파일(.ics)로 받습니다. 핸드폰에서 열거나 구글 캘린더에서 가져오면 한 번에 들어갑니다.";
     ib.onclick=function(){ saveIcs(all, showClass?"전체":getCls()+"반"); icsHint=true; render(); };
     hd.appendChild(ib);
   }
@@ -2948,7 +3019,7 @@ try{ if(location.protocol==="file:"||location.hostname==="localhost"){
     parseDelimited:parseDelimited, readApps:readApps, pdfTableRows:pdfTableRows, last:function(){ return lastRead; },
     checkStudent:checkStudent, parseMin:parseMin, judgeMin:judgeMin, rowsFromPdf:rowsFromPdf,
     univFound:univFound, univRegion:univRegion, outcomeOf:outcomeOf, resultsOf:resultsOf,
-    univKey:univKey, majorKey:majorKey, upcoming:upcoming, pending:pending, icsFold:icsFold, jungsiOf:jungsiOf};
+    KEYDATES:KEYDATES, univKey:univKey, majorKey:majorKey, upcoming:upcoming, pending:pending, icsFold:icsFold, jungsiOf:jungsiOf};
 } }catch(e){}
 
 if(window.claude&&window.claude.hot&&window.claude.hot.ready){ window.claude.hot.ready(start); }
