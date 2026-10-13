@@ -132,6 +132,7 @@ function buildTestPage() {
   r = await importFile(FIX("apps_messy.csv"));
   const apps = r.last && r.last.kind === "apps" ? r.last.res.apps : [];
   check("열 이름이 달라도 지원 현황으로 알아보고 바로 넣음", r.ok && apps.length, 5);
+  check("변경 기록: 파일 넣기로 묶어 남김", await p.evaluate(() => window.__dev.logs().some((e) => e.src === "파일 넣기")), true);
   check("‘추합’ → 충원합", apps[2] && apps[2].app.status, "충원합");
   check("‘탈락’ → 불합격", apps[3] && apps[3].app.status, "불합격");
   check("못 알아본 상태는 원문을 안내에 같이 보여줌", /붙음?/.test(r.msg), true);
@@ -351,6 +352,11 @@ function buildTestPage() {
              { kind: "수시", type: "논술", univ: "A대학교", status: "등록포기" }, { kind: "정시", univ: "B대학교(서울)", status: "1단계합" }] },
     { apps: [] },
   ]); return JSON.stringify([D.R, D.T, D.G, D.H, D.n]); });
+  const dl = await p.evaluate(() => window.__dev.diffLines(
+    { name: "가", cls: 2, csat: { kor: "3" }, apps: [{ id: "a", kind: "수시", univ: "부산대학교", major: "국어국문학과", status: "지원완료", itv: "2026-11-28", c6: true }, { id: "b", univ: "경성대학교" }] },
+    { name: "가", cls: 2, csat: { kor: "2", mathSel: "미적" }, apps: [{ id: "a", kind: "수시", univ: "부산대학교", major: "국어국문학과", status: "최초합", itv: "2026-11-29", c6: true, note: "메모" }, { id: "c", kind: "정시", univ: "동아대학교" }] }));
+  check("변경 기록: 수능·상태·날짜·메모·추가·삭제", dl, ["수능: 국어 3→2, 수학 선택 –→미적", "부산대 국어국문학 — 상태 지원완료 → 최초합, 면접·고사일 11/28 → 11/29, 메모 바뀜", "지원 추가: 동아대 (정시)", "지원 삭제: 경성대"]);
+  check("변경 기록: 바뀐 것 없으면 남기지 않음", await p.evaluate(() => window.__dev.diffLines({ name: "가", apps: [{ id: "a", c6: false }] }, { name: "가", apps: [{ id: "a" }] })), []);
   check("한눈에 보기: 결과 묶음·전형·지역·지원 장수", gl,
     JSON.stringify([{ ok: 1, wait: 1, go: 1, bad: 1, none: 0 }, { 학종: 1, 교과: 1, 논술: 1, 정시: 1 }, { 부산: 1, 서울: 2, 미상: 1 }, [1, 0, 0, 1, 0, 0, 0], 4]));
 

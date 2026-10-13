@@ -268,7 +268,17 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
 .lockbar{display:flex; flex-wrap:wrap; align-items:center; gap:8px; border:1px solid var(--warn); background:var(--warn-soft); color:var(--ink); border-radius:var(--radius); padding:10px 13px; margin-bottom:14px; font-size:13px}
 .lockbar b{font-weight:700}
 .lockbar .sp{margin-left:auto; display:flex; gap:6px; flex-wrap:wrap}
-.lastby{font-size:11.5px; color:var(--ink-3); margin:-2px 2px 0}
+.lastby{font-size:11.5px; color:var(--ink-3); margin:-2px 2px 0; display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px}
+.lastby .logbtn{font-size:11.5px; padding:2px 8px}
+.loglist{border:1px solid var(--line); border-radius:8px; background:var(--surface-2); padding:4px 10px; max-height:280px; overflow:auto; margin:6px 2px 0}
+.logrow{display:grid; grid-template-columns:92px 1fr; gap:2px 10px; padding:6px 0; border-top:1px solid var(--line); font-size:12px}
+.logrow:first-child{border-top:0}
+.logrow .lt{color:var(--ink-3); font-variant-numeric:tabular-nums}
+.logrow .lt .uname{display:block; color:var(--ink-2)}
+.logrow .lw div{color:var(--ink)}
+.logrow .lsrc{font-size:10.5px; color:var(--accent); background:var(--accent-soft); border-radius:4px; padding:0 5px; margin-right:5px}
+.logrow .who{margin-right:6px}
+@media (max-width:560px){ .logrow{grid-template-columns:1fr} }
 #jungsiPanel table,#jungsiTable{min-width:560px}
 #jungsiPanel td{white-space:normal; vertical-align:top; font-size:12.5px}
 #jungsiPanel td.gun{min-width:96px}
@@ -350,8 +360,8 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
 .umajor{font-weight:700; font-size:12.5px; margin:10px 0 2px; color:var(--ink)}
 .umajor span{font-weight:400; color:var(--ink-3); margin-left:4px}
 .uitem{display:flex; flex-wrap:wrap; align-items:center; gap:3px 10px; padding:7px 0; border-top:1px solid var(--line); font-size:12.5px}
-.sitem .who,.uitem .who{font-weight:700; color:var(--accent); background:none; border:0; padding:0; font-size:12.5px; cursor:pointer}
-.sitem .who:hover,.uitem .who:hover{text-decoration:underline}
+.sitem .who,.uitem .who,.logrow .who{font-weight:700; color:var(--accent); background:none; border:0; padding:0; font-size:12.5px; cursor:pointer}
+.sitem .who:hover,.uitem .who:hover,.logrow .who:hover{text-decoration:underline}
 .uitem .sub{color:var(--ink-2)}
 .uitem .meta{color:var(--ink-3); flex-basis:100%}
 .uitem .meta .miss{color:var(--bad); font-weight:700}
@@ -502,6 +512,7 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
     <div class="glance" id="allGlance"></div>
     <div class="sched" id="allSched"></div>
     <div class="sched" id="allTodo" hidden></div>
+    <div class="sched" id="allLog"></div>
     <div class="listhead"><h2>반별 현황</h2><span class="sp"><button class="ghost" id="btnBackup" title="모든 반 학생·지원 자료를 파일 하나로 받습니다">전체 백업 받기</button><button class="ghost" id="btnRestore" title="백업 파일의 학생 자료로 되돌립니다">백업 되살리기</button><input type="file" id="restoreFile" accept=".json,application/json" hidden><button class="ghost" id="btnCsvAll">전체 CSV 내려받기</button></span></div>
     <div class="tablewrap"><table id="classTable"></table></div>
     <div class="listhead" style="margin-top:22px"><h2>정시 현황</h2><span class="cnt">수시 합격자는 정시 지원 불가</span></div>
@@ -781,10 +792,78 @@ function sorted(arr){ return arr.sort(function(a,b){
   return (a.no?0:1)-(b.no?0:1) || String(a.no||"").localeCompare(String(b.no||"")) || String(a.name||"").localeCompare(String(b.name||""),"ko"); }); }
 function byClass(c){ return sorted(list().filter(function(s){return s.cls===c;})); }
 
+/* ── 변경 기록 ─────────────────────────────
+   마지막으로 저장·수신한 모습(base)과 지금을 비교해 바뀐 것을 학생 문서의 log 에 쌓는다.
+   항목: {t:시각, by:사용자 id(이름은 저장하지 않음), w:[바뀐 내용], src:파일 넣기 같은 묶음 작업 이름} */
+var base=new Map(), actLabel="", LOGMAX=80, logOpenId=null;
+function setBase(st){ base.set(st.id, JSON.stringify(st)); }
+function resetBase(){ base=new Map(); students.forEach(function(st){ setBase(st); }); }
+var LOGF=[["status","상태"],["univ","대학"],["major","모집단위"],["jh","전형명"],["type","전형"],["kind","구분"],["group","군"],
+  ["itv","면접·고사일"],["ann","발표일"],["due","충원 마감"],["rank","예비 순번"],["mreq","최저 기준"],["mmet","최저 충족"],
+  ["c6","6장 포함"],["jc","전문대"],["region","지역"],["note","메모"]];
+function lnorm(v){ return v==null||v===false?"":String(v); }
+function lval(v){
+  if(v===true) return "예";
+  var x=lnorm(v); if(!x) return "–";
+  var m=x.match(/^\d{4}-(\d{2})-(\d{2})(?:[T ](\d{2}:\d{2}))?/);
+  if(m) return (+m[1])+"/"+(+m[2])+(m[3]?" "+m[3]:"");
+  return x.length>18?x.slice(0,17)+"…":x;
+}
+function appName(a){ return [shortUniv(a.univ)||"대학 미입력", shortMajor(a.major)].filter(Boolean).join(" ")+(a.kind==="정시"?" (정시)":""); }
+function diffLines(p,s){
+  if(!p) return ["학생 추가"+((s.apps||[]).length?" (지원 "+s.apps.length+"건)":"")];
+  var L=[];
+  [["name","이름"],["no","학번"],["cls","반"],["fate","진로"]].forEach(function(f){
+    if(lnorm(p[f[0]])!==lnorm(s[f[0]])) L.push(f[1]+": "+lval(p[f[0]])+" → "+lval(s[f[0]])); });
+  var pc=p.csat||{}, sc=s.csat||{}, cg=[];
+  CSAT.concat(CSATSEL).forEach(function(k){ if(lnorm(pc[k[0]])!==lnorm(sc[k[0]])) cg.push(k[1]+" "+lval(pc[k[0]])+"→"+lval(sc[k[0]])); });
+  if(cg.length) L.push("수능: "+cg.join(", "));
+  var pa={}, seen={};
+  (p.apps||[]).forEach(function(a){ pa[a.id]=a; });
+  (s.apps||[]).forEach(function(a){
+    var o=pa[a.id]; seen[a.id]=1;
+    if(!o){ L.push("지원 추가: "+appName(a)+(a.type&&a.kind!=="정시"?" "+a.type:"")); return; }
+    var ch=[];
+    LOGF.forEach(function(f){
+      var x=o[f[0]], y=a[f[0]]; if(lnorm(x)===lnorm(y)) return;
+      ch.push(f[0]==="mreq"||f[0]==="note"? f[1]+" 바뀜" : f[1]+" "+lval(x)+" → "+lval(y));
+    });
+    if(ch.length) L.push(appName(a)+" — "+ch.join(", "));
+  });
+  (p.apps||[]).forEach(function(a){ if(!seen[a.id]) L.push("지원 삭제: "+appName(a)); });
+  return L;
+}
+function logEntry(lines){
+  if(lines.length>4) lines=lines.slice(0,3).concat(["외 "+(lines.length-3)+"건"]);
+  var e={t:new Date().toISOString(), w:lines}; if(myId) e.by=myId; if(actLabel&&!LOGQUIET[actLabel]) e.src=actLabel;
+  return e;
+}
+var LOGQUIET={"수정":1,"수능 등급":1};   // 한 칸씩 고친 것은 묶음 이름을 달지 않는다
+function pushLog(log,e){
+  log=(log||[]).slice();
+  // 같은 사람이 3분 안에 이어서 고친 것은 한 항목으로 묶는다(등급을 과목마다 넣을 때 등)
+  var last=log[log.length-1];
+  var solo=function(w){ return w.some(function(x){ return /^(외 |되돌리기|학생 추가)/.test(x); }); };
+  if(last&&last.by===e.by&&last.src===e.src&&Date.parse(e.t)-Date.parse(last.t)<180000&&!solo(last.w)&&!solo(e.w)&&last.w.length+e.w.length<=6){
+    log[log.length-1]={t:e.t, by:e.by, src:e.src, w:last.w.concat(e.w).filter(function(x,i,a){ return a.indexOf(x)===i; })};
+    if(!e.by) delete log[log.length-1].by; if(!e.src) delete log[log.length-1].src;
+    return log;
+  }
+  log.push(e); return log.length>LOGMAX?log.slice(-LOGMAX):log; }
+function logChange(st){
+  var pj=base.get(st.id), p=pj?JSON.parse(pj):null;
+  var lines=diffLines(p,st);
+  // 되돌리기·백업처럼 학생 자료를 통째로 바꿔도 그동안 쌓인 기록은 이어 간다
+  var log=p&&Array.isArray(p.log)?p.log:st.log;
+  if(lines.length) log=pushLog(log, logEntry(lines));
+  if(log&&log.length) st.log=log; else delete st.log;
+}
 function save(st){
+  logChange(st);
   st.updatedAt=new Date().toISOString();
   if(myId) st.updatedBy=myId; else delete st.updatedBy;
   students.set(st.id, st);
+  setBase(st);
   persistLocal();
   if(demo||!db||canWrite===false) return;
   var k=st.id;
@@ -805,7 +884,9 @@ function snapAll(){ var m={}; students.forEach(function(s,id){ m[id]=JSON.string
 function remember(label){
   if(canWrite===false) return;
   var before=snapAll();
+  actLabel=label;
   setTimeout(function(){
+    actLabel="";
     var after=snapAll(), prev={}, n=0;
     Object.keys(before).forEach(function(id){ if(after[id]!==before[id]){ prev[id]=before[id]; n++; } });
     Object.keys(after).forEach(function(id){ if(!(id in before)){ prev[id]=null; n++; } });
@@ -821,10 +902,14 @@ function undo(){
     if(writeTimers.has(id)){ clearTimeout(writeTimers.get(id)); writeTimers.delete(id); }
     var j=e.prev[id];
     if(j===null){
-      students.delete(id);
+      students.delete(id); base.delete(id);
       if(db) db.doc("students/"+id).delete().catch(function(){});
     } else {
-      students.set(id, JSON.parse(j));
+      var back=JSON.parse(j), cur=students.get(id);
+      var ul=cur?diffLines(cur,back):[];
+      back.log=pushLog((cur&&cur.log)||back.log, logEntry(ul.length?ul.map(function(x,i){ return i?x:"되돌리기 — "+x; }):["되돌리기: '"+e.label+"' 하기 전으로"]));
+      j=JSON.stringify(back);
+      students.set(id, JSON.parse(j)); setBase(students.get(id));
       if(db) db.doc("students/"+id).set(JSON.parse(j)).catch(function(){
         setSync("off","되돌리기 저장 실패 — 다시 시도해 주세요");
       });
@@ -1073,6 +1158,17 @@ function detail(st){
     if(st.updatedBy){ lb.appendChild(document.createTextNode(" · ")); var who=el("span","uname"); who.dataset.uid=st.updatedBy; lb.appendChild(who); }
     d.appendChild(lb);
   }
+  if(st.log&&st.log.length){
+    var lbox=d.querySelector(".lastby"); if(!lbox){ lbox=el("div","lastby"); d.appendChild(lbox); }
+    var open=logOpenId===st.id, lbtn=el("button","ghost logbtn",(open?"변경 기록 접기":"변경 기록 "+st.log.length+"건"));
+    lbtn.onclick=function(){ logOpenId=open?null:st.id; render(); };
+    lbox.appendChild(lbtn);
+    if(open){
+      var ll=el("div","loglist");
+      st.log.slice().reverse().forEach(function(e){ ll.appendChild(logRow(e)); });
+      d.appendChild(ll);
+    }
+  }
   var cs=el("div","app");
   cs.appendChild(el("div","apphead")).appendChild(el("span","kind","수능 등급"));
   var cg=el("div","grid csat");
@@ -1241,6 +1337,7 @@ function renderAll(){
   document.getElementById("allGlance").hidden=!all.length;
   renderSched(document.getElementById("allSched"), all, true);
   renderTodo(document.getElementById("allTodo"), all, true);
+  renderRecent(document.getElementById("allLog"), all);
 
   var byCls={};
   all.forEach(function(s){
@@ -1880,6 +1977,35 @@ function renderLockBar(cls){
   mk.onclick=function(){ setMyCls(cls); renderClassbar(cls); document.getElementById("classbar").innerHTML=""; render(); };
   sp.appendChild(mk);
   bar.appendChild(sp);
+}
+function logRow(e, st){
+  var r=el("div","logrow"), t=el("span","lt",fmtWhen(e.t));
+  if(e.by){ var u=el("span","uname"); u.dataset.uid=e.by; t.appendChild(u); }
+  r.appendChild(t);
+  var w=el("div","lw");
+  (e.w||[]).forEach(function(x,i){
+    var line=el("div");
+    if(!i&&st){ var b=el("button","who",(st.cls?st.cls+"반 ":"")+(st.name||"")); b.onclick=function(){ goStudent(st); }; line.appendChild(b); }
+    if(!i&&e.src) line.appendChild(el("span","lsrc",e.src));
+    line.appendChild(document.createTextNode(x)); w.appendChild(line);
+  });
+  r.appendChild(w);
+  return r;
+}
+var recentAll=false;
+function renderRecent(host, all){
+  host.innerHTML="";
+  var since=Date.now()-14*86400000, ev=[];
+  all.forEach(function(st){ (st.log||[]).forEach(function(e){ var t=Date.parse(e.t); if(t>=since) ev.push({e:e, st:st, t:t}); }); });
+  ev.sort(function(a,b){ return b.t-a.t; });
+  var hd=el("div","schedhead"); hd.appendChild(el("h2",null,"최근 변경")); hd.appendChild(el("span","cnt","2주 "+ev.length+"건"));
+  host.appendChild(hd);
+  if(!ev.length){ host.appendChild(el("div","sempty","최근 2주 동안 바뀐 내용이 없습니다. 고치면 누가·언제·무엇을 바꿨는지 여기와 학생 카드에 남습니다.")); return; }
+  var box=el("div","loglist"); box.style.maxHeight="none"; box.style.background="none"; box.style.border="0"; box.style.padding="0";
+  ev.slice(0,recentAll?200:12).forEach(function(x){ box.appendChild(logRow(x.e, x.st)); });
+  host.appendChild(box);
+  if(ev.length>12){ var m=el("button","ghost",recentAll?"접기":"더 보기 ("+(ev.length-12)+"건)"); m.onclick=function(){ recentAll=!recentAll; render(); }; host.appendChild(m); }
+  fillNames(host);
 }
 function fmtWhen(iso){
   var d=new Date(iso); if(isNaN(d)) return "";
@@ -3032,7 +3158,9 @@ function fillMin(st){
 }
 function fillAll(){
   if(canWrite===false||(demo&&!practice)||!minTable.size) return;
+  actLabel="최저 기준표";
   students.forEach(function(st){ if(fillMin(st)) save(st); });
+  actLabel="";
 }
 function shareMin(a){
   if(!db||canWrite===false||demo||!a.univ||!a.mreq||/^최저 있음/.test(a.mreq)) return;
@@ -3207,12 +3335,14 @@ function startPractice(){
   b.innerHTML="";
   if(saved){
     students=new Map(saved.map(function(d){ return [d.id, d]; }));
+    resetBase();
     demo=false;
     b.hidden=true;
     setSync("live","이 브라우저에 저장됨");
     fillAll(); render(); return;
   }
   students=new Map(DEMO.map(function(d){ return [d.id, JSON.parse(JSON.stringify(d))]; }));
+  resetBase();
   b.appendChild(document.createTextNode("이 화면은 "));
   b.appendChild(el("b",null,"이 브라우저에만 저장되는 화면"));
   b.appendChild(document.createTextNode("입니다. 파일을 넣거나 학생을 추가하면 예시는 사라지고, 넣은 자료는 이 브라우저에 저장됩니다(다른 컴퓨터·다른 선생님과는 공유되지 않습니다)."));
@@ -3265,9 +3395,11 @@ function start(){
         next.set(d.id, {id:d.id, cls:body.cls, no:body.no, name:body.name,
           apps:Array.isArray(body.apps)?JSON.parse(JSON.stringify(body.apps)):[],
           csat:body.csat&&typeof body.csat==="object"?JSON.parse(JSON.stringify(body.csat)):undefined,
-          updatedAt:body.updatedAt, updatedBy:body.updatedBy, fate:body.fate});
+          updatedAt:body.updatedAt, updatedBy:body.updatedBy, fate:body.fate,
+          log:Array.isArray(body.log)?JSON.parse(JSON.stringify(body.log)):undefined});
       });
       students=next;
+      resetBase();
       fillAll();
       if(students.size>0){ demo=false; document.getElementById("banner").hidden=true; }
       setSync("live", snap.metadata.fromCache?"동기화 중":"저장됨");
@@ -3285,7 +3417,7 @@ try{ if(location.protocol==="file:"||location.hostname==="localhost"){
     parseDelimited:parseDelimited, readApps:readApps, pdfTableRows:pdfTableRows, last:function(){ return lastRead; },
     checkStudent:checkStudent, parseMin:parseMin, judgeMin:judgeMin, rowsFromPdf:rowsFromPdf,
     univFound:univFound, univRegion:univRegion, outcomeOf:outcomeOf, resultsOf:resultsOf,
-    KEYDATES:KEYDATES, minGaps:minGaps, glanceData:glanceData, univKey:univKey, majorKey:majorKey, upcoming:upcoming, pending:pending, icsFold:icsFold, jungsiOf:jungsiOf};
+    KEYDATES:KEYDATES, minGaps:minGaps, diffLines:diffLines, logs:function(){ var o=[]; students.forEach(function(x){ (x.log||[]).forEach(function(e){ o.push(e); }); }); return o; }, glanceData:glanceData, univKey:univKey, majorKey:majorKey, upcoming:upcoming, pending:pending, icsFold:icsFold, jungsiOf:jungsiOf};
 } }catch(e){}
 
 if(window.claude&&window.claude.hot&&window.claude.hot.ready){ window.claude.hot.ready(start); }
