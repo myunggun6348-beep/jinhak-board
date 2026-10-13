@@ -81,11 +81,6 @@ button{cursor:pointer}
 .gate h2{font-size:16px; margin:0 0 6px}
 .gate p{font-size:13px; color:var(--ink-2); margin:4px 0 12px}
 .gate .btn{font-size:14px}
-.folderbar{display:flex; flex-wrap:wrap; align-items:center; gap:6px 10px; border:1px dashed var(--line-2); background:var(--surface); border-radius:var(--radius); padding:9px 12px; margin-bottom:14px; font-size:12.5px; color:var(--ink-2)}
-.folderbar.on{border-style:solid; border-color:var(--line)}
-.folderbar.ask{border-style:solid; border-color:var(--warn); background:var(--warn-soft); color:var(--warn)}
-.folderbar b{color:var(--ink)}
-.folderbar .sp{margin-left:auto; display:flex; gap:6px}
 .codeform{display:flex; flex-direction:column; gap:8px; max-width:420px; margin:0 auto; text-align:left}
 .codeform input:not([type]){border:1px solid var(--line-2); background:var(--surface); color:var(--ink); border-radius:8px; padding:9px 11px; font-size:14px}
 .codeform .ckrow{font-size:12.5px; color:var(--ink-2)}
@@ -476,7 +471,6 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
 
 <div class="wrap">
   <div id="banner" class="banner" hidden></div>
-  <div id="folderBar" class="folderbar" hidden></div>
 
   <div class="keydates" id="keydates"></div>
   <div id="viewClass">
@@ -947,7 +941,6 @@ function save(st){
   students.set(st.id, st);
   setBase(st);
   persistLocal();
-  folderDirty();
   if(demo||!db||canWrite===false) return;
   var k=st.id;
   if(writeTimers.has(k)) clearTimeout(writeTimers.get(k));
@@ -985,7 +978,7 @@ function undo(){
     if(writeTimers.has(id)){ clearTimeout(writeTimers.get(id)); writeTimers.delete(id); }
     var j=e.prev[id];
     if(j===null){
-      students.delete(id); base.delete(id); if(practice) addTomb(id);
+      students.delete(id); base.delete(id);
       if(db) db.doc("students/"+id).delete().catch(function(){});
     } else {
       var back=JSON.parse(j), cur=students.get(id);
@@ -1000,7 +993,6 @@ function undo(){
     }
   });
   openId=null; clearMsg(); render(); renderUndo();
-  folderDirty();
 }
 function renderUndo(){
   var b=document.getElementById("btnUndo"); if(!b) return;
@@ -1402,7 +1394,7 @@ function addRow(d,st){
   b3.onclick=function(){
     if(!window.confirm(st.name+" 학생을 명단에서 지웁니다. 계속할까요?")) return;
     remember("학생 삭제");
-    students.delete(st.id); addTomb(st.id); folderDirty();
+    students.delete(st.id);
     if(db) db.doc("students/"+st.id).delete().catch(function(){});
     openId=null; render();
   };
@@ -2271,7 +2263,7 @@ function mergeFiles(files){
     remember("반 파일 합치기");
     if(demo){ demo=false; document.getElementById("banner").hidden=true; students.clear(); }
     var R=mergeData(ok);
-    fillAll(); render(); folderDirty();
+    fillAll(); render();
     var msg=["반 파일 "+ok.length+"개를 합쳤습니다.",""];
     R.files.forEach(function(r){ var c=Object.keys(r.cls).sort(function(a,b){return a-b;}).map(function(x){ return x+"반"; }).join("·");
       msg.push("· "+(c||r.name)+(r.by?" ("+r.by+")":"")+": 새로 "+r.add+"명, 새 내용으로 "+r.upd+"명, 그대로 "+r.keep+"명"); });
@@ -3684,139 +3676,11 @@ function handleFile(f){
   reader.readAsArrayBuffer(f);
 }
 
-/* ── 공유 폴더(OneDrive) 자동 저장·공유 ───────────────────────
-   크롬·엣지 PC 에서 폴더를 한 번 고르면, 고칠 때마다 그 폴더의 내 파일(진학현황_이름.json)에 저절로 저장하고,
-   1분마다(또 화면으로 돌아올 때) 폴더의 진학현황 파일을 모두 읽어 합친다. 같은 학생은 더 최근에 고친 쪽.
-   폴더를 학교 OneDrive 공유 폴더로 고르면 선생님끼리 자동으로 나뉜다(동기화 시간만큼 늦다). 서버는 쓰지 않는다.
-   각자 자기 파일에만 쓰므로 서로 덮어쓰지 않는다. 지운 학생은 deleted(지운 시각)로 알린다. */
-var fsDir=null, fsSeen={}, fsDirty=false, fsTimer=null, fsLast=null, fsBusy=false, fsState="";
-function fsOk(){ return !!(window.__fsMock||window.showDirectoryPicker)&&practice&&!window.claude; }
-// 폴더 손잡이는 IndexedDB 에만 남길 수 있다(localStorage 불가)
-function idb(op,val){
-  if(window.__fsMock) return Promise.resolve(op==="get"?window.__fsMock.get():window.__fsMock.set(op==="put"?val:null));
-  return new Promise(function(res,rej){
-    var r=indexedDB.open("jinhak-board",1);
-    r.onupgradeneeded=function(){ r.result.createObjectStore("kv"); };
-    r.onerror=function(){ rej(r.error); };
-    r.onsuccess=function(){
-      var s=r.result.transaction("kv",op==="get"?"readonly":"readwrite").objectStore("kv");
-      var q=op==="get"?s.get("dir"):op==="del"?s.delete("dir"):s.put(val,"dir");
-      q.onsuccess=function(){ res(q.result); }; q.onerror=function(){ rej(q.error); };
-    };
-  });
-}
-function myFileName(){ return "진학현황_"+(myName()||"선생님").replace(/[\\\/:*?"<>|\s]+/g,"_")+".json"; }
-function tombs(){ try{ return JSON.parse(localStorage.getItem("jh.tomb")||"{}"); }catch(e){ return {}; } }
-function setTombs(t){ try{ localStorage.setItem("jh.tomb",JSON.stringify(t)); }catch(e){} }
-function addTomb(id){ var t=tombs(); t[id]=new Date().toISOString(); setTombs(t); }
-function folderInit(){
-  if(!fsOk()) return;
-  try{ if(navigator.storage&&navigator.storage.persist) navigator.storage.persist(); }catch(e){}   // 브라우저가 저절로 지우지 않게
-  idb("get").then(function(h){
-    if(!h){ fsState="none"; renderFolderBar(); return; }
-    fsDir=h;
-    return h.queryPermission({mode:"readwrite"}).then(function(p){
-      if(p==="granted") folderStart(); else { fsState="ask"; renderFolderBar(); }
-    });
-  }).catch(function(){ fsState="none"; renderFolderBar(); });
-}
-function folderPick(){
-  askMyName();
-  if(!myName()){ alert("내 파일 이름에 쓸 선생님 이름이 필요합니다."); return; }
-  var pick=window.__fsMock?window.__fsMock.pick():window.showDirectoryPicker({id:"jinhak",mode:"readwrite"});
-  pick.then(function(h){ fsDir=h; return idb("put",h); }).then(function(){ fsDirty=true; folderStart(); })
-    .catch(function(e){ if(e&&e.name!=="AbortError") alert("폴더를 연결하지 못했습니다. ("+(e.message||e.name||"")+")"); });
-}
-function folderAllow(){
-  fsDir.requestPermission({mode:"readwrite"}).then(function(p){ if(p==="granted") folderStart(); else alert("허용해야 공유 폴더에 저장할 수 있습니다."); });
-}
-function folderStart(){
-  fsState="on"; fsSeen={}; renderFolderBar();
-  folderSync();
-  clearInterval(fsTimer); fsTimer=setInterval(folderSync,60000);
-}
-function folderOff(){
-  if(!window.confirm("공유 폴더 연결을 끊습니다. 자료는 이 브라우저에 그대로 남고, 폴더의 파일도 지우지 않습니다. 계속할까요?")) return;
-  clearInterval(fsTimer); fsDir=null; fsState="none"; idb("del").catch(function(){});
-  renderFolderBar(); setSync("live","이 브라우저에 저장됨");
-}
-function folderDirty(){
-  if(fsState!=="on") return;
-  fsDirty=true; clearTimeout(folderDirty.t); folderDirty.t=setTimeout(folderSync,1500);
-}
-// 폴더의 진학현황 파일을 모두 읽어 합치고, 이쪽에서 고친 게 있으면 내 파일에 쓴다
-function folderSync(){
-  if(fsState!=="on"||!fsDir) return Promise.resolve();
-  if(fsBusy){ folderDirty.t=setTimeout(folderSync,1500); return Promise.resolve(); }
-  fsBusy=true;
-  var mine=myFileName(), changed=0, it=fsDir.values(), hs=[];
-  var walk=function(){ return it.next().then(function(r){
-    if(r.done) return hs;
-    if(r.value.kind==="file"&&/^진학현황.*\.json$/i.test(r.value.name)) hs.push(r.value);
-    return walk(); }); };
-  return walk().then(function(){
-    return Promise.all(hs.map(function(h){ return h.getFile().then(function(f){
-      if(fsSeen[h.name]===f.lastModified) return null;
-      return f.text().then(function(t){ fsSeen[h.name]=f.lastModified; return t; });
-    }).catch(function(){ return null; }); }));
-  }).then(function(texts){
-    var tb=tombs();
-    texts.forEach(function(t){
-      var b=null; try{ b=t&&JSON.parse(t); }catch(e){}
-      if(!b||b.app!=="jinhak-board"||!Array.isArray(b.students)) return;
-      Object.keys(b.deleted||{}).forEach(function(id){ if(!tb[id]||tb[id]<b.deleted[id]) tb[id]=b.deleted[id]; });
-      var real=b.students.filter(function(s){ return s&&s.id&&Array.isArray(s.apps)&&!/^d\d$/.test(s.id); });
-      if(demo&&real.length){ demo=false; document.getElementById("banner").hidden=true; students.clear(); }
-      real.forEach(function(s){ if(mergeStudent(s)!=="keep") changed++; });
-      (b.minreq||[]).forEach(function(e){ if(e&&e.univ&&e.text&&!minTable.has(minKey(e))) minTable.set(minKey(e),e); });
-    });
-    // 지운 뒤로 고친 적이 없는 학생은 뺀다
-    Object.keys(tb).forEach(function(id){ var s=students.get(id); if(s&&String(s.updatedAt||"")<=tb[id]){ students.delete(id); base.delete(id); changed++; } });
-    setTombs(tb);
-    if(changed){ persistLocal(); render(); }
-    if(!fsDirty) return;
-    var real=Array.from(students.values()).filter(function(s){ return !/^d\d$/.test(s.id); });
-    var body=JSON.stringify({app:"jinhak-board", year:YEAR, savedAt:new Date().toISOString(), by:myName(), students:real, minreq:sharedMins(), deleted:tb});
-    fsDirty=false;
-    return fsDir.getFileHandle(mine,{create:true}).then(function(h){
-      return h.createWritable().then(function(w){ return w.write(body).then(function(){ return w.close(); }); })
-        .then(function(){ return h.getFile(); }).then(function(f){ fsSeen[mine]=f.lastModified; });
-    }).catch(function(e){ fsDirty=true; throw e; });
-  }).then(function(){
-    fsLast=new Date();
-    setSync("live","공유 폴더에 저장됨 "+pad2(fsLast.getHours())+":"+pad2(fsLast.getMinutes()));
-    renderFolderBar();
-  }).catch(function(e){
-    if(e&&(e.name==="NotAllowedError"||e.name==="SecurityError")){ fsState="ask"; renderFolderBar(); }
-    setSync("off","공유 폴더에 저장하지 못했습니다 — 폴더를 확인해 주세요");
-  }).then(function(){ fsBusy=false; });
-}
-function renderFolderBar(){
-  var bar=document.getElementById("folderBar");
-  if(!fsOk()||demo&&!practice){ bar.hidden=true; return; }
-  bar.hidden=false; bar.innerHTML=""; bar.className="folderbar"+(fsState==="on"?" on":fsState==="ask"?" ask":"");
-  var sp=el("span","sp");
-  if(fsState==="on"){
-    var t=el("span"); t.appendChild(document.createTextNode("공유 폴더 ")); t.appendChild(el("b",null,(fsDir&&fsDir.name)||""));
-    t.appendChild(el("span","jno"," · 내 파일 "+myFileName()+(fsLast?" · "+pad2(fsLast.getHours())+":"+pad2(fsLast.getMinutes())+"에 맞춤":"")));
-    bar.appendChild(t);
-    var now=el("button","ghost","지금 맞추기"); now.title="폴더의 다른 선생님 파일을 바로 다시 읽습니다";
-    now.onclick=function(){ fsSeen={}; folderSync(); };
-    var off=el("button","ghost","연결 끊기"); off.onclick=folderOff;
-    sp.appendChild(now); sp.appendChild(off);
-  } else if(fsState==="ask"){
-    bar.appendChild(el("span",null,"공유 폴더"+(fsDir&&fsDir.name?" '"+fsDir.name+"'":"")+"에 이어서 저장하려면 한 번 허용해 주세요."));
-    var a=el("button","btn","허용하고 이어 쓰기"); a.onclick=folderAllow; sp.appendChild(a);
-  } else {
-    bar.appendChild(el("span",null,"지금은 이 브라우저에만 저장됩니다. 학교 OneDrive 공유 폴더를 연결하면 고칠 때마다 저절로 저장되고 다른 선생님과 자동으로 나뉩니다."));
-    var c=el("button","btn sec","공유 폴더 연결"); c.onclick=folderPick; sp.appendChild(c);
-  }
-  bar.appendChild(sp);
-}
 function startPractice(){
   setSync("","예시 화면 · 아직 저장된 자료 없음");
   if(!demo||practice) return;
   practice=true;
+  try{ if(navigator.storage&&navigator.storage.persist) navigator.storage.persist(); }catch(e){}
   var saved=loadLocal();
   var b=document.getElementById("banner");
   b.innerHTML="";
@@ -3826,14 +3690,14 @@ function startPractice(){
     demo=false;
     b.hidden=true;
     setSync("live","이 브라우저에 저장됨");
-    fillAll(); render(); folderInit(); return;
+    fillAll(); render(); return;
   }
   students=new Map(DEMO.map(function(d){ return [d.id, JSON.parse(JSON.stringify(d))]; }));
   resetBase();
   b.appendChild(document.createTextNode("이 화면은 "));
   b.appendChild(el("b",null,"이 브라우저에만 저장되는 화면"));
   b.appendChild(document.createTextNode("입니다. 파일을 넣거나 학생을 추가하면 예시는 사라지고, 넣은 자료는 이 브라우저에 저장됩니다(다른 컴퓨터·다른 선생님과는 공유되지 않습니다)."));
-  fillAll(); render(); folderInit();
+  fillAll(); render();
 }
 /* ── 공용 장부(Vercel 판): 학교 공용 코드 + 암호화 + Firebase ─────────────
    로그인 없이 같은 코드를 넣은 선생님끼리 실시간으로 함께 쓴다. 코드에서 장부 위치(room)와
@@ -4125,7 +3989,7 @@ setInterval(function(){
   if(document.hidden||pendingRender||t==="INPUT"||t==="SELECT"||t==="TEXTAREA") return;
   render();
 },60000);
-document.addEventListener("visibilitychange",function(){ if(document.hidden) return; if(!pendingRender) render(); folderSync(); });
+document.addEventListener("visibilitychange",function(){ if(document.hidden) return; if(!pendingRender) render(); });
 if(window.claude&&window.claude.hot&&window.claude.hot.ready){ window.claude.hot.ready(start); }
 else { start(); }
 })();
