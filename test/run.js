@@ -387,50 +387,63 @@ function buildTestPage() {
   });
   check("반 파일 합치기: 최근 쪽 남김·기록 합침·같은 학생 중복 없음", mg, { upd: 1, keep: 1, status: "최초합", log: ["처음", "합격"], dup: 1, nAppsB: 0 });
 
-  /* ── 공용 장부(Vercel 판) ── 가짜 Firebase 로 코드 넣기·암호화·실시간 반영·틀린 코드 */
-  console.log("\n[공용 장부(학교 코드)]");
+  /* ── 학교별 공용 장부(Vercel 판) ── 가짜 Firebase 로 학교 만들기·가입 승인·암호화·실시간·빼기·학교끼리 막힘 */
+  console.log("\n[학교별 공용 장부]");
   const srv = require("http").createServer((q, r) => {
     const f = q.url.split("?")[0] === "/" ? page404 : path.join(ROOT, decodeURIComponent(q.url.split("?")[0]));
     try { r.end(fs.readFileSync(f)); } catch (e) { r.statusCode = 404; r.end(); }
   }).listen(0);
-  const port = srv.address().port, fctx = await browser.newContext({ viewport: { width: 1200, height: 900 } });
-  await fctx.addInitScript(fs.readFileSync(FIX("fbmock.js"), "utf8"));
-  const fpage = async () => { const x = await fctx.newPage(); x.on("pageerror", (e) => errors.push(String(e))); x.on("dialog", (d) => d.accept()); return x; };
-  const fp = await fpage();
-  await fp.goto("http://localhost:" + port + "/?fb=1"); await fp.waitForTimeout(400);
-  await fp.evaluate(() => { localStorage.clear(); localStorage.setItem("jh.cls", "2");
-    localStorage.setItem("jh.local.students", JSON.stringify([{ id: "30201", cls: 2, no: "30201", name: "김예시", updatedAt: "2026-10-01T00:00:00Z", apps: [{ id: "a1", kind: "수시", univ: "부산대학교", major: "국어국문학과", type: "학종", status: "지원완료", c6: true }] }])); });
-  await fp.reload(); await fp.waitForTimeout(500);
-  check("코드 넣기 전: 코드 화면", (await fp.innerText("#banner")).split("\n")[0], "학교 공용 코드 넣기");
-  await fp.click("#banner .codeform .ghost");
-  await fp.fill("#banner .codeform input >> nth=1", "2반 김담임");
-  await fp.click("#banner .codeform .btn"); await fp.waitForTimeout(3600);
-  const dump = () => fp.evaluate(() => window.__fbMock.dump());
-  let D = await dump(), keys = Object.keys(D);
-  check("새 코드로 들어가 이 브라우저 자료 올림", keys.filter((k) => /\/students\//.test(k)).length, 1);
-  check("저장소엔 암호문만(이름·학번·대학 안 보임)", /김예시|30201|부산대/.test(JSON.stringify(D)), false);
-  check("장부 위치·문서 이름도 알아볼 수 없는 40자", keys.every((k) => /^rooms\/[0-9a-f]{40}\/(students|minreq|meta)\/(?:[0-9a-f]{40}|check)$/.test(k)), true);
-  // 같은 브라우저의 두 번째 창 = 다른 선생님(코드는 기억돼 바로 들어감)
-  const fq = await fpage();
-  await fq.goto("http://localhost:" + port + "/?fb=1"); await fq.waitForTimeout(1500);
-  check("코드를 기억한 컴퓨터는 바로 들어감", await fq.evaluate(() => [...document.querySelectorAll(".row .nm")].map((x) => x.textContent)), ["김예시"]);
-  await fq.click(".row >> nth=0 >> .rowhead"); await fq.waitForTimeout(200);
-  const si = await fq.evaluate(() => [...document.querySelectorAll(".detail select")].findIndex((x) => [...x.options].some((o) => o.value === "최초합")));
-  await (await fq.$$(".detail select"))[si].selectOption("최초합"); await fq.waitForTimeout(1500);
-  check("다른 창에서 고친 결과가 바로 반영", await fp.evaluate(() => document.querySelector(".row .pills").textContent.includes("최초합")), true);
-  check("변경 기록에 고친 선생님 이름", await fp.evaluate(() => window.__dev.logs().some((e) => e.nm === "2반 김담임" && /최초합/.test(e.w.join()))), true);
-  // 틀린 코드: 새 장부를 만들지 않고(취소) 자료도 안 보임
-  const fr = await fctx.newPage(); fr.on("pageerror", (e) => errors.push(String(e))); fr.on("dialog", (d) => d.dismiss());
-  await fr.goto("http://localhost:" + port + "/?fb=1"); await fr.waitForTimeout(300);
-  await fr.evaluate(() => localStorage.removeItem("jh.code")); await fr.reload(); await fr.waitForTimeout(400);
-  await fr.fill("#banner .codeform input >> nth=0", "AAAA-BBBB-CCCC-DDDD"); await fr.fill("#banner .codeform input >> nth=1", "누구");
-  await fr.click("#banner .codeform .btn"); await fr.waitForTimeout(1500);
-  check("틀린 코드: 다시 코드 화면, 자료 안 보임", [(await fr.innerText("#banner")).split("\n")[0], await fr.evaluate(() => [...document.querySelectorAll(".row .nm")].some((x) => x.textContent === "김예시"))], ["학교 공용 코드 넣기", false]);
-  check("틀린 코드로 빈 장부를 만들지 않음", Object.keys(await dump()).filter((k) => /meta\/check$/.test(k)).length, 1);
-  check("충원 마감 남은 시간", await fp.evaluate(() => { const t = new Date(Date.now() + 3 * 3600e3 + 20 * 60e3); const p = (n) => String(n).padStart(2, "0");
-    return window.__dev.leftText(t.getFullYear() + "-" + p(t.getMonth() + 1) + "-" + p(t.getDate()) + "T" + p(t.getHours()) + ":" + p(t.getMinutes())); }), "(앞으로 3시간 19분)");
-  await fctx.close();
-
+  const port = srv.address().port, KV = {};
+  const kv = (op, p, d) => { if (op === "get") return KV[p] || null; if (op === "set") { if (d === null) delete KV[p]; else KV[p] = d; return null; }
+    return Object.keys(KV).filter((k) => k.startsWith(p + "/") && !k.slice(p.length + 1).includes("/")).map((k) => ({ path: k, data: KV[k] })); };
+  let lastCode = "";
+  const who = async (o) => {
+    const c = await browser.newContext({ viewport: { width: 1200, height: 900 } });
+    await c.exposeFunction("__kv", kv);
+    await c.addInitScript(fs.readFileSync(FIX("fbmock.js"), "utf8"));
+    await c.addInitScript((a) => { if (!sessionStorage.getItem("seeded")) { sessionStorage.setItem("seeded", "1"); localStorage.setItem("jh.cls", "2");
+      if (a.local) localStorage.setItem("jh.local.students", JSON.stringify(a.local)); } if (a.email) window.__fbEmail = a.email; }, o);
+    const x = await c.newPage(); x.on("pageerror", (e) => errors.push(String(e)));
+    x.on("dialog", (d) => { if (d.type() === "prompt" && /학교 이름/.test(d.message())) d.accept(o.school || "테스트고");
+      else { if (d.type() === "prompt") lastCode = d.defaultValue(); d.accept(); } });
+    await x.goto("http://localhost:" + port + "/?fb=1"); await x.waitForTimeout(500);
+    return x;
+  };
+  const rowNames = (x) => x.evaluate(() => [...document.querySelectorAll(".row .nm")].map((e) => e.textContent));
+  const gateTitle = (x) => x.evaluate(() => { const b = document.getElementById("banner"); return b.hidden ? "" : b.querySelector("h2").textContent; });
+  const join = async (x, code, name, cls) => {
+    await x.fill("#banner .codeform input >> nth=0", code); await x.fill("#banner .codeform input >> nth=1", name); await x.fill("#banner .codeform input >> nth=2", String(cls));
+    await x.click("#banner .codeform .btn"); await x.waitForTimeout(1500);
+  };
+  const adm = await who({ email: "admin@x.com", local: [{ id: "30201", cls: 2, no: "30201", name: "김예시", updatedAt: "2026-10-01T00:00:00Z", apps: [{ id: "a1", kind: "수시", univ: "부산대학교", major: "국어국문학과", type: "학종", status: "지원완료", c6: true }] }] });
+  check("처음: 학교 코드 화면", await gateTitle(adm), "학교 코드 넣기");
+  await adm.click("#banner .adminrow .ghost >> text=새 학교 만들기(관리자)"); await adm.waitForTimeout(4000);
+  const sids = Object.keys(KV).filter((k) => /^schools\/[0-9a-f]{40}$/.test(k));
+  check("관리자: 학교 만들기(이름·관리자 이메일)", sids.length === 1 && KV[sids[0]].name + "/" + KV[sids[0]].admins.join(), "테스트고/admin@x.com");
+  check("관리자: 이 브라우저 자료를 학교 장부로", Object.keys(KV).filter((k) => /\/students\//.test(k)).length, 1);
+  check("저장소엔 암호문만(이름·학번·대학 안 보임)", /김예시|30201|부산대/.test(JSON.stringify(KV)), false);
+  const t5 = await who({});
+  await join(t5, lastCode, "박담임", 2);
+  check("선생님: 코드 넣으면 승인 대기, 자료 안 보임", [await gateTitle(t5), (await rowNames(t5)).includes("김예시")], ["관리자 승인을 기다리는 중입니다", false]);
+  await adm.click("#tabAll"); await adm.waitForTimeout(800);
+  check("관리자: 승인 기다리는 선생님 보임", /박담임 \(2반\)/.test(await adm.innerText("#schoolPanel")), true);
+  await adm.click("#schoolPanel button >> text=승인"); await t5.waitForTimeout(2500);
+  check("승인되면 선생님 화면이 저절로 열림", [await gateTitle(t5), await rowNames(t5)], ["", ["김예시"]]);
+  await t5.click(".row >> nth=0 >> .rowhead"); await t5.waitForTimeout(200);
+  const ti = await t5.evaluate(() => [...document.querySelectorAll(".detail select")].findIndex((x) => [...x.options].some((o) => o.value === "최초합")));
+  await (await t5.$$(".detail select"))[ti].selectOption("최초합"); await adm.waitForTimeout(2500);
+  await adm.click("#tabClass"); await adm.waitForTimeout(300);
+  check("선생님이 고친 결과가 관리자 화면에 실시간", await adm.evaluate(() => document.querySelector(".row .pills").textContent.includes("최초합")), true);
+  const other = await who({ email: "other@x.com", school: "다른고" });
+  await other.click("#banner .adminrow .ghost >> text=새 학교 만들기(관리자)"); await other.waitForTimeout(3000);
+  check("다른 학교는 서로 안 보임", [Object.keys(KV).filter((k) => /^schools\/[0-9a-f]{40}$/.test(k)).length, (await rowNames(other)).includes("김예시")], [2, false]);
+  const wrong = await who({});
+  await join(wrong, "AAAA-BBBB-CCCC-DDDD", "누구", 1);
+  check("틀린 코드: 학교 없음", /이 코드의 학교가 없습니다/.test(await wrong.innerText("#banner")), true);
+  await adm.click("#tabAll"); await adm.waitForTimeout(500);
+  await adm.click("#schoolPanel button >> text=빼기"); await t5.waitForTimeout(2500);
+  check("관리자가 빼면 선생님 화면이 막힘", [await gateTitle(t5), (await rowNames(t5)).includes("김예시")], ["학교 코드 넣기", false]);
+  for (const x of [adm, t5, other, wrong]) await x.context().close();
   srv.close();
 
   check("자바스크립트 오류 없음", errors, []);
