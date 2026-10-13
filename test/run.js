@@ -367,6 +367,9 @@ function buildTestPage() {
     return { head: /^\[3학년 2반\] 가나 학생/.test(lines[0]), kinds: lines.slice(1).map((l) => (l.match(/ (면접·고사|논술|합격자 발표|충원 합격 마감|수능) —/) || [])[1]).filter(Boolean).filter((k) => k !== "수능"),
       rank: lines.some((l) => /18:00 충원 합격 마감 — 경성대 .*예비 7번/.test(l)), none: window.__dev.noticeText({ name: "다", apps: [] }, 400, 2) }; });
   check("일정 안내 문자: 날짜순, 결과 난 지원 빼고, 충원 시각·예비 번호", nt, { head: true, kinds: ["면접·고사", "충원 합격 마감", "논술", "합격자 발표"], rank: true, none: "" });
+  const sc = await p.evaluate(() => ({ sum: window.__dev.scoreSum({ korS: "131", korP: "96", mathS: "140", mathP: "98", inq1S: "68", inq1P: "95", inq2S: "65" }),
+    ok: [["korS", "200"], ["korS", "201"], ["inq1S", "101"], ["mathP", "100"], ["korP", "9a"], ["korP", ""]].map((x) => window.__dev.scoreOk(x[0], x[1])) }));
+  check("정시 점수: 국·수·탐2 합과 과목 수, 범위 검사", sc, { sum: { s: 404, p: 289, ns: 4, np: 3 }, ok: [true, false, false, true, false, true] });
   check("한눈에 보기: 결과 묶음·전형·지역·지원 장수", gl,
     JSON.stringify([{ ok: 1, wait: 1, go: 1, bad: 1, none: 0 }, { 학종: 1, 교과: 1, 논술: 1, 정시: 1 }, { 부산: 1, 서울: 2, 미상: 1 }, [1, 0, 0, 1, 0, 0, 0], 4]));
 
