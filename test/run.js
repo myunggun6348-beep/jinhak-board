@@ -430,6 +430,44 @@ function buildTestPage() {
   check("충원 마감 남은 시간", await fp.evaluate(() => { const t = new Date(Date.now() + 3 * 3600e3 + 20 * 60e3); const p = (n) => String(n).padStart(2, "0");
     return window.__dev.leftText(t.getFullYear() + "-" + p(t.getMonth() + 1) + "-" + p(t.getDate()) + "T" + p(t.getHours()) + ":" + p(t.getMinutes())); }), "(앞으로 3시간 19분)");
   await fctx.close();
+
+  /* ── 공유 폴더(OneDrive) ── 두 브라우저(=두 PC)가 같은 가짜 폴더를 본다 */
+  console.log("\n[공유 폴더 자동 저장·공유]");
+  const FS = {}; let fsClock = 1;
+  const pc = async (name, local) => {
+    const c = await browser.newContext({ viewport: { width: 1200, height: 900 } });
+    await c.exposeFunction("__fsList", () => Object.keys(FS));
+    await c.exposeFunction("__fsRead", (n) => FS[n] || null);
+    await c.exposeFunction("__fsWrite", (n, d) => { FS[n] = { t: ++fsClock, data: d }; });
+    await c.addInitScript(fs.readFileSync(FIX("fsmock.js"), "utf8"));
+    await c.addInitScript((a) => { if (!sessionStorage.getItem("seeded")) { sessionStorage.setItem("seeded", "1"); localStorage.setItem("jh.cls", "2"); localStorage.setItem("jh.myname", a.name);
+      if (a.local) localStorage.setItem("jh.local.students", JSON.stringify(a.local)); } }, { name, local });
+    const x = await c.newPage(); x.on("pageerror", (e) => errors.push(String(e))); x.on("dialog", (d) => d.accept());
+    await x.goto("http://localhost:" + port + "/"); await x.waitForTimeout(500);
+    return x;
+  };
+  const names = (x) => x.evaluate(() => [...document.querySelectorAll(".row .nm")].map((e) => e.textContent));
+  const A = await pc("2반 김담임", [{ id: "30201", cls: 2, no: "30201", name: "김예시", updatedAt: "2026-10-01T00:00:00Z", apps: [{ id: "a1", kind: "수시", univ: "부산대학교", major: "국어국문학과", type: "학종", status: "지원완료", c6: true }] },
+    { id: "30202", cls: 2, no: "30202", name: "이예시", updatedAt: "2026-10-01T00:00:00Z", apps: [] }]);
+  check("연결 전: 공유 폴더 연결 안내", await A.$eval("#folderBar", (e) => !e.hidden && /공유 폴더 연결/.test(e.textContent)), true);
+  await A.click("#folderBar .btn"); await A.waitForTimeout(800);
+  check("연결하면 내 파일에 저절로 저장", Object.keys(FS), ["진학현황_2반_김담임.json"]);
+  const B = await pc("5반 박담임", null);
+  await B.click("#folderBar .btn"); await B.waitForTimeout(800);
+  check("다른 PC: 폴더의 다른 선생님 파일을 읽어 합침", await names(B), ["김예시", "이예시"]);
+  await B.click(".row >> nth=0 >> .rowhead"); await B.waitForTimeout(200);
+  const bi = await B.evaluate(() => [...document.querySelectorAll(".detail select")].findIndex((x) => [...x.options].some((o) => o.value === "최초합")));
+  await (await B.$$(".detail select"))[bi].selectOption("최초합"); await B.waitForTimeout(2200);
+  check("고치면 내 파일도 저절로", Object.keys(FS).sort(), ["진학현황_2반_김담임.json", "진학현황_5반_박담임.json"]);
+  await A.click("#folderBar .ghost >> nth=0"); await A.waitForTimeout(800);
+  check("다른 선생님이 고친 결과가 이쪽에 반영", await A.evaluate(() => document.querySelector(".row .pills").textContent.includes("최초합")), true);
+  await A.click(".row >> nth=1 >> .rowhead"); await A.waitForTimeout(200);
+  await A.click(".detail .del"); await A.waitForTimeout(2200);
+  await B.click("#folderBar .ghost >> nth=0"); await B.waitForTimeout(800);
+  check("지운 학생도 다른 PC 에서 빠짐", await names(B), ["김예시"]);
+  await A.reload(); await A.waitForTimeout(900);
+  check("다시 열면 폴더에 저절로 이어 붙음", await A.$eval("#folderBar", (e) => e.classList.contains("on")), true);
+  await A.context().close(); await B.context().close();
   srv.close();
 
   check("자바스크립트 오류 없음", errors, []);
