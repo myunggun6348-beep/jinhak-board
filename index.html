@@ -1140,7 +1140,11 @@ function addRow(d,st){
     if(db) db.doc("students/"+st.id).delete().catch(function(){});
     openId=null; render();
   };
-  add.appendChild(b1); add.appendChild(b2); add.appendChild(b4); add.appendChild(b3);
+  var b5=el("button","btn sec","상담용 출력");
+  b5.title="이 학생의 지원·일정·최저·경고를 A4 한 장으로 인쇄합니다(담임 메모는 빼고)";
+  b5.hidden=!canPrint();
+  b5.onclick=function(){ printStudent(st); };
+  add.appendChild(b1); add.appendChild(b2); add.appendChild(b4); add.appendChild(b5); add.appendChild(b3);
   d.appendChild(add);
 }
 function addApp(st,kind,jc){
@@ -1668,7 +1672,10 @@ function printDoc(cls, arr){
 }
 function printClass(){
   var cls=getCls(); if(!cls) return;
-  var doc=printDoc(cls, byClass(cls)), name=YEAR+"_3학년_"+cls+"반_진학현황.html";
+  openPrint(printDoc(cls, byClass(cls)), YEAR+"_3학년_"+cls+"반_진학현황.html");
+}
+function canPrint(){ return !(window.claude&&window.top!==window&&!downloadsCap); }
+function openPrint(doc, name){
   // 아티팩트 안에서는 새 창을 못 띄우므로 파일로 준다(열면 인쇄 창이 뜬다)
   if(window.claude&&window.top!==window){
     if(!downloadsCap){ alert("이 화면에서는 인쇄용 파일을 받을 수 없습니다."); return; }
@@ -1677,6 +1684,73 @@ function printClass(){
   var w=window.open("","_blank");
   if(!w){ saveFile(name, doc); return; }
   w.document.open(); w.document.write(doc); w.document.close();
+}
+/* ── 학생 상담용 출력 ── */
+function printStudent(st){
+  var now=new Date(), g=st.csat||{}, apps=st.apps||[];
+  var su=apps.filter(function(a){ return a.kind==="수시"; }), js=apps.filter(function(a){ return a.kind==="정시"; });
+  var cnt=function(f){ return su.filter(f).length; };
+  var title=YEAR+"학년도 진학 상담 자료 — "+(st.no?st.no+" ":"")+(st.name||"");
+  var o=['<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="color-scheme" content="light"><title>'+h(title)+'</title><style>'+
+    '@page{size:A4;margin:12mm}html{background:#fff}body{background:#fff;font-family:"Malgun Gothic","Apple SD Gothic Neo",sans-serif;font-size:9.5pt;color:#111;margin:0}'+
+    'h1{font-size:14pt;margin:0 0 2px}h2{font-size:10.5pt;margin:12px 0 4px;border-left:3px solid #333;padding-left:6px}.sub{color:#555}'+
+    'table{border-collapse:collapse;width:100%;table-layout:fixed}th,td{border:1px solid #888;padding:3px 5px;text-align:left;vertical-align:top;word-break:keep-all;overflow-wrap:anywhere}th{background:#eee;font-weight:600}'+
+    '.g td,.g th{text-align:center}.sum{border:1px solid #999;padding:5px 8px;margin-top:8px}.ok{color:#060;font-weight:700}.bad{color:#b00;font-weight:700}.na{color:#666}'+
+    'ul{margin:0;padding-left:18px}li{margin:1px 0}.memo{border:1px solid #888;height:46mm;margin-top:4px}.foot{color:#666;font-size:8pt;margin-top:8px}'+
+    '@media screen{body{margin:16px}}</style></head><body>'];
+  o.push('<h1>'+h(title)+'</h1><div class="sub">3학년 '+h(st.cls||"")+'반 · 출력 '+now.getFullYear()+"-"+pad2(now.getMonth()+1)+"-"+pad2(now.getDate())+'</div>');
+  // 수능 등급
+  o.push('<h2>수능 등급</h2>');
+  if(hasCsat(st)){
+    o.push('<table class="g"><tr>'+CSAT.map(function(k){ return '<th>'+h(k[1])+'</th>'; }).join("")+'</tr><tr>'+CSAT.map(function(k){
+      var t=g[k[0]]||"-";
+      if(k[0]==="math"&&g.mathSel) t+=" ("+g.mathSel+")";
+      if(k[0]==="inq1"&&g.inq1t) t+=" ("+g.inq1t+"탐)";
+      if(k[0]==="inq2"&&g.inq2t) t+=" ("+g.inq2t+"탐)";
+      return '<td>'+h(t)+'</td>'; }).join("")+'</tr></table>');
+  } else o.push('<div class="na">아직 넣은 등급이 없습니다.</div>');
+  // 요약
+  var gunTxt=["가","나","다"].map(function(gg){ var a=js.filter(function(x){ return !x.jc&&x.group===gg; }); return gg+"군 "+(a.length?a.map(function(x){ return shortUniv(x.univ); }).join(", "):"-"); }).join(" · ");
+  var jcN=js.filter(function(x){ return x.jc; }).length;
+  o.push('<div class="sum">수시 '+su.length+'건(6장 제한 '+su.filter(function(a){ return a.c6; }).length+'/6) · 합격 '+cnt(function(a){ return PASS[a.status]; })+
+    ' · 진행 중 '+cnt(function(a){ return LIVE[a.status]; })+' · 불합격 '+cnt(function(a){ return /불/.test(a.status||""); })+
+    '<br>정시: '+h(gunTxt)+(jcN?' · 전문대 '+jcN+'건':'')+'</div>');
+  // 다가오는 일정
+  var ev=upcoming([st],9999);
+  o.push('<h2>다가오는 일정</h2>');
+  if(ev.length) o.push('<ul>'+ev.map(function(e){ var a=e.a, d=new Date(String(e.when).slice(0,10)+"T00:00:00");
+    return '<li>'+h((d.getMonth()+1)+"/"+d.getDate()+" ("+WD[d.getDay()]+") ")+'<b>'+h(e.kind==="itv"?"면접·고사":e.kind==="ann"?"발표":"충원 마감 "+fmtDue(a.due).split(" ")[1])+'</b> '+h(shortUniv(a.univ)+" "+shortMajor(a.major)+" "+(a.jh||a.type))+'</li>'; }).join("")+'</ul>');
+  else o.push('<div class="na">오늘 이후 일정이 없습니다.</div>');
+  // 수시
+  o.push('<h2>수시 지원</h2>');
+  if(su.length){
+    o.push('<table><colgroup><col style="width:15%"><col style="width:17%"><col style="width:16%"><col style="width:7%"><col style="width:7%"><col style="width:26%"><col style="width:12%"></colgroup>'+
+      '<tr><th>대학</th><th>모집단위</th><th>전형</th><th>면접·고사</th><th>발표</th><th>수능최저 · 판정</th><th>상태</th></tr>');
+    su.forEach(function(a){
+      var mn="-";
+      if(a.mreq){
+        var r=judgeMin(a.mreq,g), res=r.res||a.mmet;
+        mn=h(minShort(a.mreq)||a.mreq)+(res&&res!=="미정"&&res!=="해당없음"?' · <span class="'+(res==="충족"?"ok":"bad")+'">'+h(res)+'</span>':'')+
+          (!r.res&&hasCsat(st)&&!/없음/.test(minShort(a.mreq))?'<br><span class="na">'+h(r.why)+'</span>':'');
+      }
+      o.push('<tr><td>'+h((a.jc?"전문대 ":"")+a.univ)+'</td><td>'+h(a.major)+'</td><td>'+h(a.jh||a.type)+'</td><td>'+h(mmdd(a.itv))+'</td><td>'+h(mmdd(a.ann))+'</td><td>'+mn+'</td><td>'+
+        h((a.status||"지원완료")+(a.status==="충원대기"&&a.rank?" 예비"+a.rank:""))+'</td></tr>');
+    });
+    o.push('</table>');
+  } else o.push('<div class="na">수시 지원이 없습니다.</div>');
+  // 정시
+  if(js.length){
+    o.push('<h2>정시 지원</h2><table><colgroup><col style="width:12%"><col style="width:28%"><col style="width:35%"><col style="width:25%"></colgroup><tr><th>군</th><th>대학</th><th>모집단위</th><th>상태</th></tr>');
+    js.forEach(function(a){ o.push('<tr><td>'+h(a.jc?"전문대":(a.group?a.group+"군":"군 미입력"))+'</td><td>'+h(a.univ)+'</td><td>'+h(a.major)+'</td><td>'+h(a.status||"지원완료")+'</td></tr>'); });
+    o.push('</table>');
+  }
+  // 확인할 것
+  var w=checkStudent(st);
+  if(w.length) o.push('<h2>확인할 것</h2><ul>'+w.map(function(x){ return '<li><b class="'+(x.lv==="crit"?"bad":"")+'">'+h(x.code)+'</b> '+h(x.msg)+'</li>'; }).join("")+'</ul>');
+  o.push('<h2>상담 내용</h2><div class="memo"></div>');
+  o.push('<div class="foot">※ 수능최저 충족은 입력한 등급과 요강 문장으로 앱이 판정한 결과입니다. 최종 확인은 각 대학 모집요강으로 해 주세요.</div>');
+  o.push('<script>window.onload=function(){ setTimeout(function(){ window.print(); },300); };<\/script></body></html>');
+  openPrint(o.join(""), YEAR+"_상담자료_"+(st.no||"")+"_"+(st.name||"")+".html");
 }
 /* ── 정시 현황 ── */
 var jungsiOpen=false;
