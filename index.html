@@ -343,6 +343,13 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
 .gdaylist{margin-top:10px}
 .urow td .ubar{display:inline-block; height:7px; border-radius:2px; background:var(--accent-2); opacity:.45; margin-right:8px; vertical-align:1px}
 @media (max-width:560px){ .gday{width:38px; height:38px} .gbar{grid-template-columns:54px 1fr 58px} }
+.ncard{border-top:1px solid var(--line); padding:10px 0}
+.ncard:first-of-type{border-top:0}
+.ncard .nh{display:flex; align-items:center; gap:8px; margin-bottom:6px}
+.ncard .nh b{font-size:13px}
+.ncard .nh button{margin-left:auto}
+.ntext{white-space:pre-wrap; font-size:12.5px; line-height:1.6; background:var(--surface-2); border-radius:8px; padding:8px 11px; color:var(--ink); font-family:inherit; margin:0}
+.nnone{font-size:12px; color:var(--ink-3); margin-top:8px}
 .sempty{font-size:12.5px; color:var(--ink-3); margin-top:8px}
 .smore{margin-top:8px}
 .usearch{border:1px solid var(--line-2); background:var(--surface); color:var(--ink); border-radius:7px; padding:5px 10px; font-size:13px; width:190px}
@@ -454,6 +461,7 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
       <span class="sp">
         <button class="ghost" id="btnUndo" hidden disabled>↶ 되돌리기</button>
         <button class="ghost" id="btnJungsi" title="학생마다 수시 결과와 정시 가·나·다군 지원을 한눈에 봅니다">정시 현황</button>
+        <button class="ghost" id="btnNotice" title="학생마다 남은 면접·발표·충원 마감 일정을 문자로 보내기 좋은 글로 만들어 복사합니다">일정 안내 문자</button>
         <button class="ghost" id="btnCsat" title="반 학생 전체의 수능(가채점) 등급을 표 한 장에 넣고 최저 충족을 바로 봅니다">수능 등급 넣기</button>
         <button class="ghost" id="btnCsv">CSV 내려받기</button>
         <button class="ghost" id="btnPrint" title="이 반의 지원·결과를 A4 로 인쇄합니다">인쇄</button>
@@ -462,6 +470,7 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
     </div>
     <div class="sched" id="jungsiPanel" hidden></div>
     <div class="sched" id="csatPanel" hidden></div>
+    <div class="sched" id="noticePanel" hidden></div>
     <div class="rows" id="rows"></div>
 
     <div class="panel" id="addPanel">
@@ -978,6 +987,7 @@ function render(){
   renderRows(mine, cls);
   renderCsat(cls?mine:[]);
   renderJungsi(cls?mine:[]);
+  renderNotice(cls?mine:[], cls);
   renderUndo();
   document.getElementById("btnClearLocal").hidden=!(practice&&!demo);
   curCls=null;
@@ -1314,7 +1324,10 @@ function addRow(d,st){
   b5.title="이 학생의 지원·일정·최저·경고를 A4 한 장으로 인쇄합니다(담임 메모는 빼고)";
   b5.hidden=!canPrint();
   b5.onclick=function(){ printStudent(st); };
-  add.appendChild(b1); add.appendChild(b2); add.appendChild(b4); add.appendChild(b5); add.appendChild(b3);
+  var b6=el("button","btn sec","일정 안내 복사");
+  b6.title="이 학생의 남은 면접·발표·충원 마감 일정을 문자로 보내기 좋은 글로 복사합니다";
+  b6.onclick=function(){ var t=noticeText(st, 400, st.cls); if(!t){ alert("남은 일정이 없습니다."); return; } copyText(t, function(){ flashBtn(b6,"복사됨 ✓"); }); };
+  add.appendChild(b1); add.appendChild(b2); add.appendChild(b4); add.appendChild(b5); add.appendChild(b6); add.appendChild(b3);
   d.appendChild(add);
 }
 function addApp(st,kind,jc){
@@ -2204,8 +2217,8 @@ function renderMinCheck(all){
   block("기준 문장이 없는 지원", G.miss, false);
   block("기준은 있지만 자동 판정이 안 되는 지원", G.bad, true);
 }
-function copyText(text){
-  var done=function(){ alert("목록을 복사했습니다. Claude 대화창에 붙여넣어 주세요."); };
+function copyText(text, onDone){
+  var done=onDone||function(){ alert("목록을 복사했습니다. Claude 대화창에 붙여넣어 주세요."); };
   var fallback=function(){
     var ta=document.createElement("textarea"); ta.value=text; ta.style.position="fixed"; ta.style.opacity="0";
     document.body.appendChild(ta); ta.select();
@@ -2214,6 +2227,69 @@ function copyText(text){
     if(ok) done(); else window.prompt("아래 글을 복사해 주세요(Ctrl+C).", text);
   };
   if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, fallback); else fallback();
+}
+/* ── 학생 일정 안내 문자 ── 남은 일정만, 대학 공지 확인 문구를 붙여서 */
+var noticeOpen=false, noticeDays=400;
+function flashBtn(b,t){ var o=b.textContent; b.textContent=t; setTimeout(function(){ b.textContent=o; },1600); }
+function mdw(v){
+  var m=String(v||"").match(/^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}:\d{2}))?/); if(!m) return String(v||"");
+  var d=new Date(+m[1],+m[2]-1,+m[3]);
+  return (+m[2])+"/"+(+m[3])+"("+WD[d.getDay()]+")"+(m[4]&&m[4]!=="00:00"?" "+m[4]:"");
+}
+function noticeText(st, days, cls){
+  // 날짜순 한 줄씩: 면접·논술·실기, 수능, 발표, 충원 마감, 수시 등록
+  var L=[], add=function(when,txt){ L.push({w:String(when).slice(0,16).replace(" ","T"), t:" · "+mdw(when)+" "+txt}); };
+  var nm=function(a){ return [shortUniv(a.univ), a.major].filter(Boolean).join(" ")+(a.kind==="정시"?" (정시"+(a.group?" "+a.group+"군":"")+")":a.type?" ("+a.type+")":""); };
+  upcoming([st], days).forEach(function(e){
+    var a=e.a;
+    if(e.kind==="itv") add(e.when, (a.type==="논술"?"논술":a.type==="실기"?"실기":"면접·고사")+" — "+nm(a));
+    else if(e.kind==="ann") add(e.when, "합격자 발표 — "+nm(a));
+    else add(e.when, "충원 합격 마감 — "+nm(a)+(a.rank?" (예비 "+a.rank+"번)":""));
+  });
+  var apps=st.apps||[], kd=function(id){ return KEYDATES.filter(function(k){ return k.id===id; })[0]; };
+  var csat=kd("csat"), sreg=kd("s-reg");
+  var minN=apps.filter(function(a){ return a.kind==="수시"&&a.mreq&&!parseMin(a.mreq).none&&!/불|포기/.test(a.status||""); }).length;
+  if(csat&&daysTo(csat.s)>=0&&daysTo(csat.s)<=days&&minN) add(csat.s, "수능 — 수능최저가 있는 지원 "+minN+"곳");
+  var passN=apps.filter(function(a){ return a.kind==="수시"&&(a.status==="최초합"||a.status==="충원합"); }).length;
+  if(sreg&&daysTo(sreg.e)>=0&&daysTo(sreg.s)<=days&&passN) add(sreg.s, "~ "+mdw(sreg.e)+" 수시 합격자 등록 — 등록할 대학을 담임과 상의하세요");
+  L.sort(function(x,y){ return x.w<y.w?-1:x.w>y.w?1:0; });
+  L=L.map(function(x){ return x.t; });
+  if(!L.length) return "";
+  var today=new Date();
+  return ["[3학년"+(cls?" "+cls+"반":"")+"] "+(st.name||"")+" 학생 대입 일정 안내 ("+(today.getMonth()+1)+"/"+today.getDate()+" 기준)"]
+    .concat(L, ["※ 시간·장소·준비물은 각 대학 입학처 공지를 꼭 확인하세요."]).join("\n");
+}
+function renderNotice(mine, cls){
+  var host=document.getElementById("noticePanel");
+  host.hidden=!noticeOpen;
+  document.getElementById("btnNotice").setAttribute("aria-pressed",String(noticeOpen));
+  if(!noticeOpen) return;
+  host.innerHTML="";
+  var hd=el("div","schedhead");
+  hd.appendChild(el("h2",null,"일정 안내 문자"));
+  var seg=el("span","seg");
+  [[14,"2주"],[30,"30일"],[400,"남은 일정 전체"]].forEach(function(p){
+    var b=el("button",null,p[1]); b.setAttribute("aria-pressed",String(noticeDays===p[0]));
+    b.onclick=function(){ noticeDays=p[0]; render(); }; seg.appendChild(b);
+  });
+  hd.appendChild(seg);
+  var texts=[], none=[];
+  mine.forEach(function(st){ var t=noticeText(st, noticeDays, cls); if(t) texts.push({st:st,t:t}); else none.push(st.name); });
+  hd.appendChild(el("span","cnt",texts.length+"명"));
+  var all=el("button","ghost","모두 복사"); all.style.marginLeft="auto"; all.disabled=!texts.length;
+  all.onclick=function(){ copyText(texts.map(function(x){ return x.t; }).join("\n\n────────\n\n"), function(){ flashBtn(all,"복사됨 ✓"); }); };
+  hd.appendChild(all);
+  var x=el("button","ghost","닫기"); x.onclick=function(){ noticeOpen=false; render(); }; hd.appendChild(x);
+  host.appendChild(hd);
+  host.appendChild(el("div","shint","학생마다 '복사'를 눌러 문자·메신저에 붙여 보내세요. 결과가 난 지원(합격·불합격)의 면접·발표는 빠집니다. 날짜는 입력된 지원 현황 기준이니 보내기 전에 한 번 확인해 주세요."));
+  texts.forEach(function(x){
+    var c=el("div","ncard"), h=el("div","nh");
+    h.appendChild(el("b",null,(x.st.no?x.st.no+" ":"")+(x.st.name||"")));
+    var b=el("button","ghost","복사"); b.onclick=function(){ copyText(x.t, function(){ flashBtn(b,"복사됨 ✓"); }); }; h.appendChild(b);
+    c.appendChild(h); c.appendChild(el("pre","ntext",x.t)); host.appendChild(c);
+  });
+  if(!texts.length) host.appendChild(el("div","sempty","이 기간에 안내할 일정이 있는 학생이 없습니다."));
+  if(none.length&&texts.length) host.appendChild(el("div","nnone","안내할 일정 없음: "+none.join(", ")));
 }
 /* ── 진학 실적 ── */
 var FATES=["","재수","취업","군 입대","기타"];
@@ -2522,6 +2598,10 @@ function bindStatic(){
   document.getElementById("btnJungsi").onclick=function(){
     jungsiOpen=!jungsiOpen; render();
     if(jungsiOpen) document.getElementById("jungsiPanel").scrollIntoView({block:"start"});
+  };
+  document.getElementById("btnNotice").onclick=function(){
+    noticeOpen=!noticeOpen; render();
+    if(noticeOpen) document.getElementById("noticePanel").scrollIntoView({block:"start"});
   };
   document.getElementById("btnCsat").onclick=function(){
     csatOpen=!csatOpen; render();
@@ -3417,7 +3497,7 @@ try{ if(location.protocol==="file:"||location.hostname==="localhost"){
     parseDelimited:parseDelimited, readApps:readApps, pdfTableRows:pdfTableRows, last:function(){ return lastRead; },
     checkStudent:checkStudent, parseMin:parseMin, judgeMin:judgeMin, rowsFromPdf:rowsFromPdf,
     univFound:univFound, univRegion:univRegion, outcomeOf:outcomeOf, resultsOf:resultsOf,
-    KEYDATES:KEYDATES, minGaps:minGaps, diffLines:diffLines, logs:function(){ var o=[]; students.forEach(function(x){ (x.log||[]).forEach(function(e){ o.push(e); }); }); return o; }, glanceData:glanceData, univKey:univKey, majorKey:majorKey, upcoming:upcoming, pending:pending, icsFold:icsFold, jungsiOf:jungsiOf};
+    KEYDATES:KEYDATES, minGaps:minGaps, noticeText:noticeText, diffLines:diffLines, logs:function(){ var o=[]; students.forEach(function(x){ (x.log||[]).forEach(function(e){ o.push(e); }); }); return o; }, glanceData:glanceData, univKey:univKey, majorKey:majorKey, upcoming:upcoming, pending:pending, icsFold:icsFold, jungsiOf:jungsiOf};
 } }catch(e){}
 
 if(window.claude&&window.claude.hot&&window.claude.hot.ready){ window.claude.hot.ready(start); }

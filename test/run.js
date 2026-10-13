@@ -357,6 +357,16 @@ function buildTestPage() {
     { name: "가", cls: 2, csat: { kor: "2", mathSel: "미적" }, apps: [{ id: "a", kind: "수시", univ: "부산대학교", major: "국어국문학과", status: "최초합", itv: "2026-11-29", c6: true, note: "메모" }, { id: "c", kind: "정시", univ: "동아대학교" }] }));
   check("변경 기록: 수능·상태·날짜·메모·추가·삭제", dl, ["수능: 국어 3→2, 수학 선택 –→미적", "부산대 국어국문학 — 상태 지원완료 → 최초합, 면접·고사일 11/28 → 11/29, 메모 바뀜", "지원 추가: 동아대 (정시)", "지원 삭제: 경성대"]);
   check("변경 기록: 바뀐 것 없으면 남기지 않음", await p.evaluate(() => window.__dev.diffLines({ name: "가", apps: [{ id: "a", c6: false }] }, { name: "가", apps: [{ id: "a" }] })), []);
+  const nt = await p.evaluate(() => { const d = (n, tm) => { const x = new Date(Date.now() + n * 864e5); return x.getFullYear() + "-" + String(x.getMonth() + 1).padStart(2, "0") + "-" + String(x.getDate()).padStart(2, "0") + (tm ? "T" + tm : ""); };
+    const st = { name: "가나", apps: [
+      { kind: "수시", univ: "부산대학교", major: "국어국문학과", type: "논술", itv: d(9), status: "지원완료" },
+      { kind: "수시", univ: "동아대학교", major: "경영학과", type: "학종", itv: d(3), ann: d(20), status: "1단계합" },
+      { kind: "수시", univ: "경성대학교", major: "건축학과", type: "교과", due: d(5, "18:00"), rank: "7", status: "충원대기" },
+      { kind: "수시", univ: "신라대학교", type: "교과", itv: d(4), status: "불합격" }] };
+    const lines = window.__dev.noticeText(st, 400, 2).split("\n");
+    return { head: /^\[3학년 2반\] 가나 학생/.test(lines[0]), kinds: lines.slice(1).map((l) => (l.match(/ (면접·고사|논술|합격자 발표|충원 합격 마감|수능) —/) || [])[1]).filter(Boolean).filter((k) => k !== "수능"),
+      rank: lines.some((l) => /18:00 충원 합격 마감 — 경성대 .*예비 7번/.test(l)), none: window.__dev.noticeText({ name: "다", apps: [] }, 400, 2) }; });
+  check("일정 안내 문자: 날짜순, 결과 난 지원 빼고, 충원 시각·예비 번호", nt, { head: true, kinds: ["면접·고사", "충원 합격 마감", "논술", "합격자 발표"], rank: true, none: "" });
   check("한눈에 보기: 결과 묶음·전형·지역·지원 장수", gl,
     JSON.stringify([{ ok: 1, wait: 1, go: 1, bad: 1, none: 0 }, { 학종: 1, 교과: 1, 논술: 1, 정시: 1 }, { 부산: 1, 서울: 2, 미상: 1 }, [1, 0, 0, 1, 0, 0, 0], 4]));
 
