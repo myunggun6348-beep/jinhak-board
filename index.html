@@ -261,6 +261,8 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
 #csatPanel input.g{width:34px; text-align:center; border:1px solid var(--line-2); background:var(--surface); color:var(--ink); border-radius:6px; padding:4px 0; font-size:14px}
 #csatPanel input.g:focus{outline:2px solid var(--accent); outline-offset:0}
 #csatPanel td.mres{white-space:normal; font-size:12px; min-width:140px}
+#csatPanel td.gsel{white-space:nowrap}
+#csatPanel td.gsel select{border:1px solid var(--line-2); background:var(--surface); color:var(--ink); border-radius:6px; padding:3px 2px; font-size:12.5px; margin-right:3px}
 #csatPanel td.mres .pill{margin:1px 3px 1px 0; display:inline-block}
 .lockbar{display:flex; flex-wrap:wrap; align-items:center; gap:8px; border:1px solid var(--warn); background:var(--warn-soft); color:var(--ink); border-radius:var(--radius); padding:10px 13px; margin-bottom:14px; font-size:13px}
 .lockbar b{font-weight:700}
@@ -334,7 +336,9 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
   #csatPanel table,#csatPanel thead,#csatPanel tbody{display:block}
   #csatPanel tr{display:grid; grid-template-columns:1fr repeat(6,34px); gap:3px; align-items:center; padding:5px 8px; border-bottom:1px solid var(--line)}
   #csatPanel th,#csatPanel td{padding:0; border:0; width:auto!important}
-  #csatPanel td.mres{grid-column:1/-1; min-width:0; padding-top:2px}
+  #csatPanel td.mres,#csatPanel td.gsel{grid-column:1/-1; min-width:0; padding-top:2px}
+  #csatPanel th.gsel{display:none}
+  #csatPanel td.gsel select{font-size:16px}
   #csatPanel .tablewrap{overflow:visible}
   #viewAll .listhead .sp{flex-basis:100%}
   /* 아이폰은 16px 보다 작은 입력 칸을 누르면 화면을 확대한다 */
@@ -542,6 +546,8 @@ function appWarn(st,a){
    탐구 반영 방식(상위 1과목 / 2과목 평균 / 평균 절사)이 적혀 있지 않으면 셋 다 계산해
    결과가 모두 같을 때만 판정한다. 틀린 판정은 판정 없음보다 위험하다. */
 var CSAT=[["kor","국어"],["math","수학"],["eng","영어"],["inq1","탐구1"],["inq2","탐구2"],["his","한국사"]];
+// 최저 조건에 쓰는 선택과목: 수학 확통·미적·기하, 탐구 사·과
+var CSATSEL=[["mathSel","수학 선택",["","확통","미적","기하"]],["inq1t","탐구1 과목",["","사","과"]],["inq2t","탐구2 과목",["","사","과"]]];
 var CSATKEY={"국":"kor","수":"math","영":"eng","한":"his"};
 var CSATNAME={"국":"국어","수":"수학","영":"영어","탐":"탐구","한":"한국사"};
 function parseMin(raw){
@@ -549,6 +555,14 @@ function parseMin(raw){
   if(!s) return {err:"기준이 비어 있습니다"};
   if(/^(없음|해당없음|미적용|최저없음|무|-|—|x|X)$/.test(s)) return {none:true};
   s=s.replace(/^[*\-∙•]*(수능최저(학력)?기준|최저(학력)?기준)?:?/,"").replace(/※?선택과목과관계없이모두인정함\.?/g,"");
+  // 선택과목에 달린 조건 중 등급과 선택과목으로 판정할 수 있는 것
+  var mathDown=false, needSci=false, sciBest=false, altSub=false;
+  s=s.replace(/,?다만,?수학(영역)?["“”']?확률과통계["“”']?선택시1등급하향적용(함)?\.?/g,function(){ mathDown=true; return ""; })
+   .replace(/·?그중과학탐구1과목이상필수,?|※?탐구?2과목중과학탐구\(1과목이상\)필수응시/g,function(){ needSci=true; return ""; })
+   .replace(/※?(\d\))?제2외국어\/한문을탐구(영역)?1개?과목으로대체가능,?/g,function(){ altSub=true; return ""; })
+   .replace(/※?(\d\))?과탐1과목이상응시자(의경우|는)?,?(탐구영역적용시,?)?탐구2과목평균(등급)?과과탐상위1개?과목(등급)?중우수한등급반영/g,function(){ sciBest=true; return ""; })
+   .replace(/\d\.수학:공통\+선택\([^)]*\),?탐구:사회탐구\/과학탐구/g,"")
+   .replace(/\(직탐제외\)/g,"").replace(/과목가운데/g,"중").replace(/\d\.(?=[국수영탐한])/g,",");
   // 선택과목·대체·과탐 필수 같은 조건은 등급만으로 판정할 수 없다
   if(/(미적|기하|확통|확률|직탐|직업탐구|제2외|외국어|한문|과(학)?탐(구)?\(?1과목(이상)?\)?(이상)?(필수|응시자))/.test(s))
     return {err:"선택과목·대체 조건이 있어 직접 확인해야 합니다"};
@@ -568,7 +582,7 @@ function parseMin(raw){
   var noCut=/(버림|절사)없이/.test(s);
   s=s.replace(/,?소수점(자리|이하)?(버림|절사)없이그대로반영(함)?\.?/g,"")
      .replace(/(탐구?(영역)?(과목)?(은|는)?)?(반드시)?2과목(을)?응시(하여야하며|하여|후|하고)?,?/g,"")
-     .replace(/2과목중/g,"").replace(/높은과목/g,"1과목")
+     .replace(/2과목중/g,"").replace(/높은과목/g,"1과목").replace(/탐구?과목(은|는)?([12])개?과목(적용|반영)?/g,"$2과목")
      .replace(/\((상위)?([12])개과목/g,"($1$2과목").replace(/([12])개과목(의)?(등급)?평균/g,"$1과목평균");   // 괄호 속이거나 평균일 때만 탐구 과목 수
   s=s.replace(/(수능최저학력기준|수능최저기준|수능최저|최저학력기준|최저기준|최저|등급|이내|영역|반영|적용|:)/g,"")
      .replace(/국어/g,"국").replace(/수학/g,"수").replace(/영어/g,"영").replace(/탐구/g,"탐").replace(/한국사/g,"한");
@@ -598,23 +612,37 @@ function parseMin(raw){
     if(must&&c.n>1){ if(must.split("").some(function(x){ return c.set.indexOf(x)<0; })) return {err:"포함 과목이 영역 목록에 없습니다"}; c.must=must; }
     if(c.n>c.set.length) return {err:c.set+" 중 "+c.n+"개는 고를 수 없습니다"};
   }
-  return {conds:conds, modes:modes, eng12:eng12||undefined};
+  return {conds:conds, modes:modes, eng12:eng12||undefined, mathDown:mathDown||undefined, needSci:needSci||undefined, sciBest:sciBest||undefined, altSub:altSub||undefined};
 }
-function minEval(conds,g,mode,eng12){
+function minEval(conds,g,mode,p,optimistic){
+  p=p||{};
+  var unknown=null;   // 몰라서 나쁜 쪽으로 가정한 선택과목
   var miss=null;
   function gv(a){
     if(a==="탐"){
       var x=+g.inq1||0, y=+g.inq2||0;
+      if(p.sciBest&&mode!=="top"){
+        // 과탐 응시자: 2과목 평균과 과탐 상위 1과목 중 나은 쪽
+        if(!x||!y) return 0;
+        var av=mode==="floor"?Math.floor((x+y)/2):(x+y)/2;
+        if(!g.inq1t||!g.inq2t){ unknown=unknown||"탐구 과목(사/과)을 넣어 주세요"; return optimistic?Math.min(av,x,y):av; }
+        var sc=[g.inq1t==="과"?x:9, g.inq2t==="과"?y:9];
+        return Math.min(av, sc[0], sc[1]);
+      }
       if(mode==="top") return (x||y)?Math.min(x||9,y||9):0;
       if(!x||!y) return 0;
       return mode==="floor"?Math.floor((x+y)/2):(x+y)/2;
     }
     var v=+g[CSATKEY[a]]||0;
-    return a==="영"&&eng12&&v===2?1:v;
+    if(a==="수"&&p.mathDown&&v){
+      if(!g.mathSel){ unknown=unknown||"수학 선택과목(확통·미적·기하)을 넣어 주세요"; if(!optimistic) v=Math.min(9,v+1); }
+      else if(g.mathSel==="확통") v=Math.min(9,v+1);   // 확통 선택 시 1등급 낮춰 본다
+    }
+    return a==="영"&&p.eng12&&v===2?1:v;
   }
   var ok=true, why=[];
   conds.forEach(function(c){
-    var vals=c.set.split("").map(function(a){ var v=gv(a); if(!v) miss=miss||CSATNAME[a]; return {a:a,v:v}; });
+    var vals=c.set.split("").map(function(a){ var v=gv(a); if(!v) miss=miss||CSATNAME[a]+" 등급이 없습니다"; return {a:a,v:v}; });
     if(miss) return;
     var inMust=function(x){ return !!c.must&&c.must.indexOf(x.a)>=0; };
     var pick=vals.filter(inMust).sort(function(p,q){return p.v-q.v;}).slice(0,1);
@@ -624,16 +652,30 @@ function minEval(conds,g,mode,eng12){
     if(got>c.m) ok=false;
     why.push((c.n===1?CSATNAME[pick[0].a]:c.n+"개"+c.op)+" "+got+(got>c.m?" > ":" ≤ ")+c.m);
   });
-  return {ok:ok, why:why.join(", "), miss:miss};
+  if(!miss&&p.needSci){
+    if(!g.inq1t||!g.inq2t){ if(ok) unknown=unknown||"탐구 과목(사/과)을 넣어 주세요"; }
+    else if(g.inq1t!=="과"&&g.inq2t!=="과"){ ok=false; why.push("과탐 1과목 이상 응시 필요"); }
+  }
+  if(p.mathDown&&g.mathSel==="확통") why.push("확통 1등급 하향 반영");
+  return {ok:ok, why:why.join(", "), miss:miss, unknown:unknown};
 }
 function judgeMin(raw,g){
   var p=parseMin(raw);
   if(p.none) return {res:"해당없음", why:"수능최저 없음"};
   if(p.err) return {res:null, why:p.err};
-  var outs=p.modes.map(function(m){ return minEval(p.conds,g||{},m,p.eng12); });
-  if(outs[0].miss) return {res:null, why:outs[0].miss+" 등급이 없습니다"};
+  var outs=p.modes.map(function(m){
+    var o=minEval(p.conds,g||{},m,p);
+    if(o.unknown&&!o.miss){
+      var best=minEval(p.conds,g||{},m,p,true);
+      if(p.needSci&&o.ok) return {miss:o.unknown};          // 과탐 필수: 등급은 되지만 과탐 여부를 모름
+      if(!o.ok&&best.ok) return {miss:o.unknown};           // 선택과목에 따라 갈림
+    }
+    return o;
+  });
+  if(outs[0].miss) return {res:null, why:outs[0].miss};
   if(outs.some(function(o){return o.ok!==outs[0].ok;}))
     return {res:null, why:"탐구 반영 방식(1과목·2과목 평균)에 따라 결과가 갈립니다. 요강을 보고 기준에 적어 주세요"};
+  if(p.altSub&&!outs[0].ok) return {res:null, why:"제2외국어·한문으로 탐구를 대체하면 달라질 수 있어 직접 확인해야 합니다("+outs[0].why+")"};
   return {res:outs[0].ok?"충족":"미충족", why:outs[0].why};
 }
 function hasCsat(st){ return CSAT.some(function(k){ return st.csat&&st.csat[k[0]]; }); }
@@ -945,6 +987,11 @@ function detail(st){
   var cg=el("div","grid csat");
   CSAT.forEach(function(k){
     cg.appendChild(field(k[1], sel(["","1","2","3","4","5","6","7","8","9"],(st.csat&&st.csat[k[0]])||"",function(v){
+      st.csat=st.csat||{}; st.csat[k[0]]=v; applyMin(st); save(st); render();
+    })));
+  });
+  CSATSEL.forEach(function(k){
+    cg.appendChild(field(k[1], sel(k[2],(st.csat&&st.csat[k[0]])||"",function(v){
       st.csat=st.csat||{}; st.csat[k[0]]=v; applyMin(st); save(st); render();
     })));
   });
@@ -1357,10 +1404,10 @@ function renderCsat(mine){
   x.onclick=function(){ csatOpen=false; render(); };
   hd.appendChild(x);
   host.appendChild(hd);
-  host.appendChild(el("div","shint","숫자(1~9)를 치면 다음 칸으로 넘어갑니다. 엑셀에서 등급 칸을 복사해 첫 칸에 붙여넣어도 됩니다. 탐구는 과목별 등급, 넣는 즉시 수시 최저를 다시 판정합니다."));
+  host.appendChild(el("div","shint","숫자(1~9)를 치면 다음 칸으로 넘어갑니다. 엑셀에서 등급 칸을 복사해 첫 칸에 붙여넣어도 됩니다. 탐구는 과목별 등급, 넣는 즉시 수시 최저를 다시 판정합니다. 수학 선택(확통·미적·기하)과 탐구 과목(사·과)은 확통 하향·과탐 필수 같은 대학을 판정할 때 씁니다."));
   var tw=el("div","tablewrap"); tw.style.marginTop="8px";
   var t=document.createElement("table"), hr=t.createTHead().insertRow();
-  [["학번","no"],["이름",""]].concat(CSAT.map(function(k){ return [k[1].replace("탐구","탐"),"g"]; })).concat([["최저 판정","mres"]]).forEach(function(h){
+  [["학번","no"],["이름",""]].concat(CSAT.map(function(k){ return [k[1].replace("탐구","탐"),"g"]; })).concat([["선택과목","gsel"],["최저 판정","mres"]]).forEach(function(h){
     var th=el("th",h[1]||null,h[0]); hr.appendChild(th); });
   var tb=t.createTBody(), cells=[];
   mine.forEach(function(st,ri){
@@ -1403,6 +1450,14 @@ function renderCsat(mine){
       td.appendChild(i); row.push(i);
     });
     cells.push(row);
+    var sc=r.insertCell(); sc.className="gsel";
+    CSATSEL.forEach(function(k){
+      var se=document.createElement("select"); se.disabled=ro(); se.title=k[1];
+      se.setAttribute("aria-label",(st.name||"")+" "+k[1]);
+      k[2].forEach(function(o){ var op=document.createElement("option"); op.value=o; op.textContent=o||(k[0]==="mathSel"?"수학?":"탐?"); if(o===((st.csat&&st.csat[k[0]])||"")) op.selected=true; se.appendChild(op); });
+      se.onchange=function(){ setGrade(st,k[0],se.value); res.innerHTML=""; res.appendChild(minResult(st)); };
+      sc.appendChild(se);
+    });
     var res=r.insertCell(); res.className="mres"; res.appendChild(minResult(st));
   });
   function move(ri,ci,step){
@@ -1490,7 +1545,12 @@ function printDoc(cls, arr){
   out.push('<div class="sub">출력 '+now.getFullYear()+"-"+pad2(now.getMonth()+1)+"-"+pad2(now.getDate())+" "+pad2(now.getHours())+":"+pad2(now.getMinutes())+' · 학생 '+arr.length+'명 · 지원 '+napps+'건</div>');
   out.push('<div class="sum">수시 합격 '+pass+'명 · 충원 대기 '+wait+'명 · 최저 미충족 '+miss+'명 · 점검 경고 '+flag+'명</div>');
   arr.forEach(function(st){
-    var g=st.csat||{}, gs=CSAT.filter(function(k){ return g[k[0]]; }).map(function(k){ return k[1].replace("탐구","탐")+g[k[0]]; }).join(" ");
+    var g=st.csat||{}, gs=CSAT.filter(function(k){ return g[k[0]]; }).map(function(k){
+      var t=k[1].replace("탐구","탐")+g[k[0]];
+      if(k[0]==="math"&&g.mathSel) t+="("+g.mathSel+")";
+      if(k[0]==="inq1"&&g.inq1t) t+="("+g.inq1t+")";
+      if(k[0]==="inq2"&&g.inq2t) t+="("+g.inq2t+")";
+      return t; }).join(" ");
     out.push('<div class="stu"><h2>'+h((st.no||"")+" "+(st.name||""))+(gs?' <small>수능 '+h(gs)+'</small>':'')+'</h2>');
     var w=checkStudent(st);
     if(w.length) out.push('<div class="warn">'+w.map(function(x){ return x.code; }).filter(function(c,i,arr){ return arr.indexOf(c)===i; }).map(h).join(" · ")+'</div>');
