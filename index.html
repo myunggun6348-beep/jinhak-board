@@ -81,9 +81,13 @@ button{cursor:pointer}
 .gate h2{font-size:16px; margin:0 0 6px}
 .gate p{font-size:13px; color:var(--ink-2); margin:4px 0 12px}
 .gate .btn{font-size:14px}
-.tlist{display:flex; flex-wrap:wrap; gap:6px; margin:8px 0}
-.tlist span{display:inline-flex; align-items:center; gap:6px; border:1px solid var(--line-2); border-radius:999px; padding:3px 6px 3px 11px; font-size:12.5px}
-.tlist button{border:0; background:none; color:var(--ink-3); cursor:pointer; font-size:13px; padding:0 3px}
+.codeform{display:flex; flex-direction:column; gap:8px; max-width:420px; margin:0 auto; text-align:left}
+.codeform input:not([type]){border:1px solid var(--line-2); background:var(--surface); color:var(--ink); border-radius:8px; padding:9px 11px; font-size:14px}
+.codeform .ckrow{font-size:12.5px; color:var(--ink-2)}
+.codeform .btn{align-self:stretch}
+.codeform .ghost{align-self:center; font-size:12.5px}
+#codePanel .tadd{align-items:center}
+#codePanel .tadd b{font-size:15px; letter-spacing:.06em; margin-right:6px}
 .whochip span{max-width:9em; overflow:hidden; text-overflow:ellipsis}
 @media (max-width:560px){ .whochip span{display:none} }
 .tadd{display:flex; gap:6px; flex-wrap:wrap}
@@ -555,7 +559,7 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
     <div class="sched" id="minCheck"></div>
     <div class="listhead" style="margin-top:22px"><h2>진학 실적</h2><span class="cnt">학년 말 보고용</span><span class="sp"><button class="ghost" id="btnResults">실적 엑셀(CSV) 받기</button></span></div>
     <div class="sched" id="resultsBox"></div>
-    <div class="sched" id="teachersPanel" hidden></div>
+    <div class="sched" id="codePanel" hidden></div>
     <div class="listhead" style="margin-top:22px"><h2>지원 현황</h2>
       <span class="seg" role="group" aria-label="보기"><button id="byUniv" aria-pressed="true">대학별</button><button id="byMajor" aria-pressed="false">학과별</button></span>
       <span class="cnt" id="univCount"></span>
@@ -613,6 +617,15 @@ function locked(c){ var m=getMyCls(); return !!(m&&c&&c!==m&&!unlocked[c]&&!(dem
 function daysTo(s){ if(!s) return null; var d=new Date(s); if(isNaN(d)) return null;
   var t=new Date(); t.setHours(0,0,0,0); var x=new Date(d); x.setHours(0,0,0,0);
   return Math.round((x-t)/86400000); }
+// 오늘 마감인데 시각이 있으면 남은 시간
+function leftText(s){
+  if(!/[T ]\d{2}:\d{2}/.test(String(s||""))||/[T ]00:00/.test(String(s))) return "";
+  var ms=new Date(String(s).replace(" ","T"))-new Date();
+  if(isNaN(ms)) return "";
+  if(ms<=0) return "(시각 지남)";
+  var h=Math.floor(ms/3600000), m=Math.floor(ms%3600000/60000);
+  return "(앞으로 "+(h?h+"시간 ":"")+m+"분)";
+}
 function fmtDue(s){ if(!s) return ""; var d=new Date(s); if(isNaN(d)) return s;
   var p=function(n){return n<10?"0"+n:""+n;};
   return (d.getMonth()+1)+"/"+d.getDate()+" "+p(d.getHours())+":"+p(d.getMinutes()); }
@@ -653,7 +666,7 @@ function checkStudent(st){
     if(a.status==="충원대기"&&a.due){
       var d=daysTo(a.due);
       if(d!==null&&d>=0&&d<=3)
-        out.push({lv:"crit",code:"충원마감",msg:a.univ+" 충원 마감이 "+(d===0?"오늘":d+"일 뒤")+"입니다("+fmtDue(a.due)+"). 전화를 받을 수 있어야 합니다."});
+        out.push({lv:"crit",code:"충원마감",msg:a.univ+" 충원 마감이 "+(d===0?"오늘"+leftText(a.due):d+"일 뒤")+"입니다("+fmtDue(a.due)+"). 전화를 받을 수 있어야 합니다."});
     }
   });
   return out;
@@ -3684,11 +3697,13 @@ function startPractice(){
   b.appendChild(document.createTextNode("입니다. 파일을 넣거나 학생을 추가하면 예시는 사라지고, 넣은 자료는 이 브라우저에 저장됩니다(다른 컴퓨터·다른 선생님과는 공유되지 않습니다)."));
   fillAll(); render();
 }
-/* ── 공용 저장소(Vercel 판): Firebase ─────────────────────────
-   Firebase 콘솔의 웹 앱 설정값을 넣으면 켜진다. 이 값은 공개돼도 되는 식별자이고,
-   누가 읽고 쓸 수 있는지는 Firestore 규칙(firestore.rules)이 정한다. */
+/* ── 공용 장부(Vercel 판): 학교 공용 코드 + 암호화 + Firebase ─────────────
+   로그인 없이 같은 코드를 넣은 선생님끼리 실시간으로 함께 쓴다. 코드에서 장부 위치(room)와
+   암호 열쇠를 만들고, 학생 자료는 이 컴퓨터에서 암호화한 뒤 올린다. 저장소(구글)에는 알아볼 수 없는
+   글자만 남는다. 코드가 틀리면 다른(빈) 장부가 되므로 처음 들어갈 때 한 번 확인한다.
+   FIREBASE_CONFIG 를 넣기 전에는 지금처럼 이 브라우저에만 저장한다. 규칙은 firestore.rules. */
 var FIREBASE_CONFIG=null;
-var FBV="10.12.2", fb=null;
+var FBV="10.12.2", fb=null, CODE_KEY="jh.code", roomKeys=null, roomCode="";
 function useFirebase(){
   return !!(FIREBASE_CONFIG||window.__fbMock)&&/^https?:$/.test(location.protocol)&&
     (location.hostname!=="localhost"&&location.hostname!=="127.0.0.1"||/[?&]fb=1/.test(location.search));
@@ -3696,135 +3711,197 @@ function useFirebase(){
 function loadFirebase(){
   if(window.__fbMock) return Promise.resolve(window.__fbMock);
   var u="https://www.gstatic.com/firebasejs/"+FBV+"/";
-  return Promise.all([import(u+"firebase-app.js"),import(u+"firebase-auth.js"),import(u+"firebase-firestore.js")])
-    .then(function(m){ return {A:m[0],U:m[1],S:m[2]}; });
+  return Promise.all([import(u+"firebase-app.js"),import(u+"firebase-firestore.js")]).then(function(m){ return {A:m[0],S:m[1]}; });
 }
-function startFirebase(){
-  setSync("","공용 저장소 연결 중");
-  canWrite=false;
-  loadFirebase().then(function(m){
-    var app=m.A.initializeApp(FIREBASE_CONFIG||{});
-    var store=m.S.initializeFirestore(app,{ignoreUndefinedProperties:true});
-    fb={U:m.U,S:m.S,auth:m.U.getAuth(app),fs:store,names:{}};
-    m.U.onAuthStateChanged(fb.auth,function(user){ if(user) fbSignedIn(user); else fbGate(); });
-  }).catch(function(){
-    setSync("off","공용 저장소에 연결하지 못했습니다");
-    showGate("공용 저장소에 연결하지 못했습니다","인터넷 연결을 확인한 뒤 새로고침해 주세요. 학교 인터넷에서 막힌 경우 정보부에 www.gstatic.com·firestore.googleapis.com 허용을 부탁해 주세요.",null);
+function b64(buf){ var s="", a=new Uint8Array(buf); for(var i=0;i<a.length;i++) s+=String.fromCharCode(a[i]); return btoa(s); }
+function unb64(t){ var s=atob(t), a=new Uint8Array(s.length); for(var i=0;i<s.length;i++) a[i]=s.charCodeAt(i); return a; }
+function hexOf(buf){ return Array.from(new Uint8Array(buf)).map(function(x){ return (x<16?"0":"")+x.toString(16); }).join(""); }
+function normCode(c){ return String(c||"").toUpperCase().replace(/[^0-9A-Z]/g,""); }
+// 코드 → 장부 위치(160비트), 암호 열쇠(AES-GCM), 문서 이름용 열쇠(HMAC). 같은 코드면 어느 컴퓨터에서나 같다.
+function codeKeys(code){
+  var E=new TextEncoder(), C=crypto.subtle;
+  return C.importKey("raw",E.encode(normCode(code)),"PBKDF2",false,["deriveBits","deriveKey"]).then(function(base){
+    var p=function(salt){ return {name:"PBKDF2",salt:E.encode("jinhak-board/"+salt),iterations:150000,hash:"SHA-256"}; };
+    return Promise.all([
+      C.deriveBits(p("room"),base,160),
+      C.deriveKey(p("aes"),base,{name:"AES-GCM",length:256},false,["encrypt","decrypt"]),
+      C.deriveKey(p("id"),base,{name:"HMAC",hash:"SHA-256",length:256},false,["sign"])
+    ]).then(function(r){ return {room:hexOf(r[0]), aes:r[1], hmac:r[2], cache:{}}; });
   });
 }
-function showGate(title,text,btn){
-  var b=document.getElementById("banner"); b.hidden=false; b.className="gate"; b.innerHTML="";
-  b.appendChild(el("h2",null,title)); b.appendChild(el("p",null,text));
-  if(btn) b.appendChild(btn);
+function sealDoc(K,obj){
+  var iv=crypto.getRandomValues(new Uint8Array(12));
+  return crypto.subtle.encrypt({name:"AES-GCM",iv:iv},K.aes,new TextEncoder().encode(JSON.stringify(obj)))
+    .then(function(c){ return {v:1, iv:b64(iv), c:b64(c), t:Date.now()}; });
 }
-function fbGate(){
-  myId=null; canWrite=false; userCap=null;
-  if(unsub){ try{ unsub(); }catch(e){} unsub=null; }
-  db=null; students=new Map(DEMO.map(function(d){ return [d.id, JSON.parse(JSON.stringify(d))]; })); demo=true;
-  document.getElementById("whoChip").hidden=true;
-  document.getElementById("teachersPanel").hidden=true;
-  setSync("","로그인 전");
-  var go=el("button","btn","구글 계정으로 로그인");
-  go.onclick=function(){
-    var pv=new fb.U.GoogleAuthProvider();
-    pv.setCustomParameters({prompt:"select_account"});
-    fb.U.signInWithPopup(fb.auth,pv).catch(function(e){
-      if(e&&/popup-blocked|operation-not-supported/.test(e.code||"")) fb.U.signInWithRedirect(fb.auth,pv);
-      else if(e&&!/popup-closed|cancelled-popup/.test(e.code||"")) alert("로그인하지 못했습니다. ("+(e.code||e.message||"")+")");
-    });
-  };
-  showGate("선생님 로그인","학교에서 허락한 선생님 구글 계정으로 로그인하면 모든 반 자료를 함께 보고 고칠 수 있습니다. 아래 화면은 예시입니다.",go);
-  render();
+function openDoc(K,d){
+  if(K.cache[d.iv]) return Promise.resolve(K.cache[d.iv]);
+  return crypto.subtle.decrypt({name:"AES-GCM",iv:unb64(d.iv)},K.aes,unb64(d.c))
+    .then(function(p){ var o=JSON.parse(new TextDecoder().decode(p)); K.cache[d.iv]=o; return o; });
 }
-function fbSignedIn(user){
-  var mail=String(user.email||"").toLowerCase();
-  myId=user.uid;
-  var chip=document.getElementById("whoChip"); chip.hidden=false; chip.innerHTML="";
-  chip.appendChild(el("span",null,user.displayName||mail));
-  var out=el("button","ghost","로그아웃"); out.onclick=function(){ fb.U.signOut(fb.auth); }; chip.appendChild(out);
-  // 이름은 선생님 목록(teachers)에 두고 변경 기록에서 id 로 찾는다
-  fb.S.setDoc(fb.S.doc(fb.fs,"teachers",user.uid),{name:user.displayName||mail,email:mail},{merge:true}).catch(function(){});
-  userCap={id:function(){ return Promise.resolve(user.uid); }, profiles:function(ids){
-    var out={}, need=[];
-    ids.forEach(function(id){ if(fb.names[id]!==undefined) out[id]={name:fb.names[id],isMe:id===user.uid}; else if(need.indexOf(id)<0) need.push(id); });
-    return Promise.all(need.map(function(id){
-      return fb.S.getDoc(fb.S.doc(fb.fs,"teachers",id)).then(function(d){ fb.names[id]=(d.exists()&&d.data().name)||""; }).catch(function(){ fb.names[id]=""; });
-    })).then(function(){ ids.forEach(function(id){ out[id]={name:fb.names[id]||"",isMe:id===user.uid}; }); return out; });
-  }};
-  setSync("","자료 불러오는 중");
-  var b=document.getElementById("banner"); b.hidden=true; b.className="banner";
-  canWrite=true;
-  attachDb(fbDb(), function(e){
-    if(e&&e.code==="permission-denied"){
-      canWrite=false; db=null;
-      var o=el("button","btn sec","다른 계정으로 로그인"); o.onclick=function(){ fb.U.signOut(fb.auth); };
-      showGate("아직 허락되지 않은 계정입니다", mail+" 계정은 아직 명단에 없습니다. 관리하는 선생님께 이 이메일을 알려 주시면 추가해 드립니다.", o);
-      setSync("off","허락되지 않은 계정");
-    } else setSync("off","연결이 끊어졌습니다 — 새로고침해 주세요");
-  });
-  renderTeachers();
-  offerLocalUpload();
+// 학번 같은 문서 이름도 저장소에 드러나지 않게 바꾼다
+function docKey(K,coll,id){ return crypto.subtle.sign("HMAC",K.hmac,new TextEncoder().encode(coll+"/"+id)).then(function(s){ return hexOf(s).slice(0,40); }); }
+function newCode(){
+  var A="23456789ABCDEFGHJKMNPQRSTUVWXYZ", r=crypto.getRandomValues(new Uint8Array(16)), s="";
+  for(var i=0;i<16;i++){ if(i&&i%4===0) s+="-"; s+=A[r[i]%A.length]; }
+  return s;
 }
-// Firestore 를 아티팩트 db 와 같은 모양으로 감싼다
-function fbDb(){
+function fmtCode(c){ return normCode(c).replace(/(.{4})(?=.)/g,"$1-"); }
+// 암호화된 장부를 아티팩트 db 와 같은 모양으로 감싼다
+function encDb(K){
   var S=fb.S;
   return {
-    doc:function(path){ var p=path.split("/"), r=S.doc(fb.fs,p[0],p[1]);
-      return {set:function(v){ return S.setDoc(r,v); }, delete:function(){ return S.deleteDoc(r); }}; },
+    doc:function(path){
+      var p=path.split("/"), ref=function(){ return docKey(K,p[0],p[1]).then(function(k){ return S.doc(fb.fs,"rooms",K.room,p[0],k); }); };
+      return {set:function(v){ return Promise.all([ref(),sealDoc(K,{id:p[1],d:v})]).then(function(r){ return S.setDoc(r[0],r[1]); }); },
+              delete:function(){ return ref().then(function(r){ return S.deleteDoc(r); }); }};
+    },
     collection:function(name){ return {onSnapshot:function(cb,err){
-      var u=S.onSnapshot(S.collection(fb.fs,name),{includeMetadataChanges:true},function(snap){
-        cb({metadata:{fromCache:snap.metadata.fromCache||snap.metadata.hasPendingWrites},
-          docs:snap.docs.map(function(d){ return {id:d.id,data:function(){ return d.data(); }}; })});
+      var seq=0;
+      var u=S.onSnapshot(S.collection(fb.fs,"rooms",K.room,name),{includeMetadataChanges:true},function(snap){
+        var my=++seq, pend=snap.metadata.fromCache||snap.metadata.hasPendingWrites;
+        Promise.all(snap.docs.map(function(d){ return openDoc(K,d.data()).catch(function(){ return null; }); })).then(function(arr){
+          if(my!==seq) return;   // 더 새 스냅숏이 이미 왔다
+          cb({metadata:{fromCache:pend}, docs:arr.filter(function(x){ return x&&x.id; }).map(function(x){ return {id:x.id,data:function(){ return x.d; }}; })});
+        });
       },err);
       if(name==="students") unsub=u;
       return u; }}; }
   };
 }
-// 관리자만 허락 명단(allowed)을 읽을 수 있다. 읽히면 관리 판을 보인다.
-var teacherList=null;
-function renderTeachers(){
-  var host=document.getElementById("teachersPanel");
-  if(!fb||!myId){ host.hidden=true; return; }
-  fb.S.getDocs(fb.S.collection(fb.fs,"allowed")).then(function(q){
-    teacherList=q.docs.map(function(d){ return d.id; }).sort();
-    drawTeachers();
-  }).catch(function(){ host.hidden=true; teacherList=null; });
-}
-function drawTeachers(){
-  var host=document.getElementById("teachersPanel"); host.hidden=false; host.innerHTML="";
-  var hd=el("div","schedhead"); hd.appendChild(el("h2",null,"함께 쓰는 선생님")); hd.appendChild(el("span","cnt",teacherList.length+"명 · 관리자만 보입니다"));
-  host.appendChild(hd);
-  host.appendChild(el("div","shint","여기 있는 구글 계정만 로그인해 자료를 보고 고칠 수 있습니다. 빼면 그 선생님은 바로 볼 수 없게 됩니다."));
-  var ls=el("div","tlist");
-  teacherList.forEach(function(m){
-    var t=el("span",null,m), x=el("button",null,"✕"); x.title="빼기";
-    x.onclick=function(){ if(!window.confirm(m+" 선생님을 명단에서 뺍니다. 계속할까요?")) return;
-      fb.S.deleteDoc(fb.S.doc(fb.fs,"allowed",m)).then(renderTeachers).catch(function(e){ alert("빼지 못했습니다. ("+(e.code||"")+")"); }); };
-    t.appendChild(x); ls.appendChild(t);
+function startFirebase(){
+  setSync("","공용 장부 연결 중");
+  canWrite=false;
+  loadFirebase().then(function(m){
+    var app=m.A.initializeApp(FIREBASE_CONFIG||{}), opts={ignoreUndefinedProperties:true};
+    // 한 번 받은 자료는 이 브라우저에 남겨 다시 열 때 바뀐 것만 받는다(무료 사용량 아끼기). 남는 것도 암호문이다.
+    try{ if(m.S.persistentLocalCache) opts.localCache=m.S.persistentLocalCache({tabManager:m.S.persistentMultipleTabManager()}); }catch(e){}
+    fb={S:m.S, fs:m.S.initializeFirestore(app,opts)};
+    var saved=""; try{ saved=localStorage.getItem(CODE_KEY)||""; }catch(e){}
+    if(saved) joinCode(saved,{remember:true}); else codeGate();
+  }).catch(function(){
+    setSync("off","공용 장부에 연결하지 못했습니다");
+    showGate("공용 장부에 연결하지 못했습니다","인터넷 연결을 확인한 뒤 새로고침해 주세요. 학교 인터넷에서 막힌 경우 정보부에 www.gstatic.com·firestore.googleapis.com 허용을 부탁해 주세요.");
   });
-  if(!teacherList.length) ls.appendChild(el("span",null,"아직 없습니다"));
-  host.appendChild(ls);
-  var row=el("div","tadd"), inp=document.createElement("input"); inp.type="email"; inp.placeholder="선생님 구글 이메일 (예: teacher@gmail.com)";
-  var add=el("button","btn sec","추가");
-  add.onclick=function(){
-    var m=inp.value.trim().toLowerCase();
-    if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(m)){ alert("이메일을 확인해 주세요."); return; }
-    fb.S.setDoc(fb.S.doc(fb.fs,"allowed",m),{addedAt:new Date().toISOString(),by:myId}).then(renderTeachers).catch(function(e){ alert("추가하지 못했습니다. ("+(e.code||"")+")"); });
+}
+function showGate(title,text,nodes){
+  var b=document.getElementById("banner"); b.hidden=false; b.className="gate"; b.innerHTML="";
+  b.appendChild(el("h2",null,title)); b.appendChild(el("p",null,text));
+  (nodes||[]).forEach(function(n){ b.appendChild(n); });
+}
+function leaveRoom(){
+  if(unsub){ try{ unsub(); }catch(e){} unsub=null; }
+  db=null; roomKeys=null; roomCode=""; canWrite=false;
+  students=new Map(DEMO.map(function(d){ return [d.id, JSON.parse(JSON.stringify(d))]; })); demo=true;
+  document.getElementById("whoChip").hidden=true;
+  document.getElementById("codePanel").hidden=true;
+}
+function codeGate(err){
+  leaveRoom();
+  setSync("","코드 넣기 전");
+  var fresh=false;
+  var f=el("div","codeform");
+  var ci=document.createElement("input"); ci.placeholder="학교 공용 코드 (예: K7QM-3XPA-9RTD-HW2C)"; ci.autocomplete="off"; ci.spellcheck=false;
+  var ni=document.createElement("input"); ni.placeholder="선생님 이름 (예: 2반 김○○)"; ni.value=myName();
+  var rl=el("label","ckrow"), rc=document.createElement("input"); rc.type="checkbox"; rc.checked=true;
+  rl.appendChild(rc); rl.appendChild(document.createTextNode(" 이 컴퓨터에 코드 기억(여럿이 쓰는 컴퓨터면 끄세요)"));
+  var go=el("button","btn","들어가기");
+  var mk=el("button","ghost","처음 쓰는 학교라면: 새 코드 만들기");
+  var note=el("p","shint",""); if(err){ note.textContent=err; note.style.color="var(--bad)"; }
+  mk.onclick=function(){ ci.value=newCode(); fresh=true; note.style.color="";
+    note.textContent="새 코드를 만들었습니다. 꼭 적어 두고, 함께 쓸 선생님께 학교 메신저로 전하세요. 코드를 잃어버리면 자료를 열 수 없습니다."; };
+  ci.oninput=function(){ fresh=false; };
+  go.onclick=function(){
+    if(!ni.value.trim()){ ni.focus(); note.textContent="변경 기록에 남길 이름을 적어 주세요."; note.style.color="var(--bad)"; return; }
+    try{ localStorage.setItem("jh.myname",ni.value.trim().slice(0,20)); }catch(e){}
+    joinCode(ci.value,{fresh:fresh, remember:rc.checked});
   };
-  inp.onkeydown=function(e){ if(e.key==="Enter") add.onclick(); };
-  row.appendChild(inp); row.appendChild(add); host.appendChild(row);
+  [ci,ni].forEach(function(x){ x.onkeydown=function(e){ if(e.key==="Enter") go.onclick(); }; });
+  f.appendChild(ci); f.appendChild(ni); f.appendChild(rl); f.appendChild(go); f.appendChild(mk); f.appendChild(note);
+  showGate("학교 공용 코드 넣기","같은 코드를 넣은 선생님끼리 모든 반 자료를 실시간으로 함께 보고 고칩니다. 자료는 이 코드로 암호화되어 저장되므로 코드는 학교 메신저로만 전하세요. 아래 화면은 예시입니다.",[f]);
+  render();
+}
+function joinCode(code,o){
+  o=o||{};
+  if(normCode(code).length<12){ codeGate("코드가 너무 짧습니다. 받은 코드를 다시 확인해 주세요."); return; }
+  setSync("","코드 확인 중");
+  codeKeys(code).then(function(K){
+    var meta=fb.S.doc(fb.fs,"rooms",K.room,"meta","check");
+    return fb.S.getDoc(meta).then(function(d){
+      if(d.exists()) return openDoc(K,d.data()).then(function(){ return K; });
+      if(!o.fresh&&!window.confirm("이 코드로 만든 장부가 아직 없습니다.\n\n· 코드를 잘못 넣었다면 '취소'를 누르고 다시 확인하세요.\n· 이 코드로 새 장부를 시작하려면 '확인'을 누르세요.")) throw {code:"cancel"};
+      return sealDoc(K,{app:"jinhak-board",made:new Date().toISOString()}).then(function(x){ return fb.S.setDoc(meta,x); }).then(function(){ return K; });
+    });
+  }).then(function(K){
+    try{ if(o.remember) localStorage.setItem(CODE_KEY,normCode(code)); else localStorage.removeItem(CODE_KEY); }catch(e){}
+    enterRoom(K,code);
+  }).catch(function(e){
+    if(e&&e.code==="cancel") codeGate();
+    else codeGate("연결하지 못했습니다"+(e&&e.code?" ("+e.code+")":"")+". 인터넷 연결과 코드를 확인해 주세요.");
+  });
+}
+function enterRoom(K,code){
+  roomKeys=K; roomCode=normCode(code);
+  var chip=document.getElementById("whoChip"); chip.hidden=false; chip.innerHTML="";
+  chip.appendChild(el("span",null,"공용 장부 · "+(myName()||"선생님")));
+  var out=el("button","ghost","나가기"); out.title="이 컴퓨터에서 코드를 지우고 나갑니다";
+  out.onclick=function(){ if(!window.confirm("이 컴퓨터에서 공용 코드를 지우고 나갑니다. 다시 들어오려면 코드를 넣어야 합니다. 계속할까요?")) return;
+    try{ localStorage.removeItem(CODE_KEY); }catch(e){} codeGate(); };
+  chip.appendChild(out);
+  var b=document.getElementById("banner"); b.hidden=true; b.className="banner";
+  setSync("","자료 불러오는 중");
+  canWrite=true;
+  attachDb(encDb(K), function(e){ setSync("off","연결이 끊어졌습니다"+(e&&e.code?" ("+e.code+")":"")+" — 새로고침해 주세요"); });
+  renderCodePanel();
+  offerLocalUpload();
+}
+// 전체 현황 맨 아래: 코드 보기·복사·바꾸기
+var codeShown=false;
+function renderCodePanel(){
+  var host=document.getElementById("codePanel");
+  if(!roomKeys){ host.hidden=true; return; }
+  host.hidden=false; host.innerHTML="";
+  var hd=el("div","schedhead"); hd.appendChild(el("h2",null,"학교 공용 코드")); host.appendChild(hd);
+  var row=el("div","tadd");
+  row.appendChild(el("b","mono",codeShown?fmtCode(roomCode):"••••-••••-••••-••••"));
+  var sh=el("button","ghost",codeShown?"가리기":"보기"); sh.onclick=function(){ codeShown=!codeShown; renderCodePanel(); };
+  var cp=el("button","ghost","복사"); cp.onclick=function(){ copyText(fmtCode(roomCode),function(){ flashBtn(cp,"복사됨 ✓"); }); };
+  var ch=el("button","ghost","코드 바꾸기"); ch.onclick=rotateCode;
+  row.appendChild(sh); row.appendChild(cp); row.appendChild(ch); host.appendChild(row);
+  host.appendChild(el("div","shint","이 코드를 아는 사람은 누구나 자료를 볼 수 있습니다. 함께 쓰는 선생님께만 학교 메신저로 전하세요. 선생님이 바뀌었거나 코드가 샜다면 '코드 바꾸기'로 새 코드로 옮기세요(예전 코드로는 더 이상 열리지 않습니다)."));
+}
+// 새 코드 장부로 모두 옮기고 예전 장부는 지운다
+function rotateCode(){
+  if(!window.confirm("새 코드를 만들어 모든 자료를 옮깁니다. 다른 선생님들은 새 코드를 다시 넣어야 합니다. 계속할까요?")) return;
+  var code=newCode(), oldK=roomKeys, oldDb=db, all=Array.from(students.values()), mins=sharedMins();
+  setSync("","새 코드로 옮기는 중");
+  codeKeys(code).then(function(K){
+    var nd=encDb(K);
+    return sealDoc(K,{app:"jinhak-board",made:new Date().toISOString()}).then(function(x){ return fb.S.setDoc(fb.S.doc(fb.fs,"rooms",K.room,"meta","check"),x); })
+      .then(function(){ return Promise.all(all.map(function(st){ return nd.doc("students/"+st.id).set(JSON.parse(JSON.stringify(st))); })
+        .concat(mins.map(function(e){ return nd.doc("minreq/"+minId(minKey(e))).set(e); }))); })
+      .then(function(){ return Promise.all(all.map(function(st){ return oldDb.doc("students/"+st.id).delete(); })
+        .concat(mins.map(function(e){ return oldDb.doc("minreq/"+minId(minKey(e))).delete(); }))
+        .concat([fb.S.deleteDoc(fb.S.doc(fb.fs,"rooms",oldK.room,"meta","check"))])); })
+      .then(function(){ return K; });
+  }).then(function(K){
+    if(unsub){ try{ unsub(); }catch(e){} unsub=null; }
+    try{ if(localStorage.getItem(CODE_KEY)) localStorage.setItem(CODE_KEY,normCode(code)); }catch(e){}
+    codeShown=true; enterRoom(K,code);
+    window.prompt("새 코드입니다. 함께 쓰는 선생님께 학교 메신저로 전하세요.",fmtCode(code));
+  }).catch(function(e){ setSync("off","옮기지 못했습니다"); alert("새 코드로 옮기지 못했습니다("+((e&&e.code)||"")+"). 예전 코드는 그대로 쓸 수 있습니다."); });
 }
 // 공용 저장소를 켜기 전에 이 브라우저에만 넣어 둔 자료가 있으면 올릴지 묻는다
 function offerLocalUpload(){
   var saved=loadLocal(); if(!saved) return;
   setTimeout(function(){
     if(!db||canWrite!==true) return;
-    var fresh=saved.filter(function(x){ return x&&x.id&&!students.has(x.id); });
-    if(!fresh.length){ try{ localStorage.removeItem(LOCAL_KEY); }catch(e){} return; }
-    if(!window.confirm("이 브라우저에만 저장해 둔 학생 "+fresh.length+"명이 있습니다. 공용 저장소로 올릴까요?\n(이미 있는 학생은 건드리지 않습니다)")) return;
+    var real=saved.filter(function(x){ return x&&x.id&&!/^d\d$/.test(x.id); });
+    if(!real.length){ try{ localStorage.removeItem(LOCAL_KEY); }catch(e){} return; }
+    if(!window.confirm("이 브라우저에만 저장해 둔 학생 "+real.length+"명이 있습니다. 공용 장부로 올릴까요?\n(같은 학생은 더 최근에 고친 쪽을 남깁니다)")) return;
     remember("이 브라우저 자료 올리기");
     if(demo){ demo=false; document.getElementById("banner").hidden=true; students.clear(); }
-    fresh.forEach(function(x){ var st=JSON.parse(JSON.stringify(x)); students.set(st.id,st); save(st); });
+    mergeData([{name:"이 브라우저", b:{students:real}}]);
     try{ localStorage.removeItem(LOCAL_KEY); }catch(e){}
     render();
   },2500);
@@ -3900,9 +3977,17 @@ try{ if(location.protocol==="file:"||location.hostname==="localhost"){
     parseDelimited:parseDelimited, readApps:readApps, pdfTableRows:pdfTableRows, last:function(){ return lastRead; },
     checkStudent:checkStudent, parseMin:parseMin, judgeMin:judgeMin, rowsFromPdf:rowsFromPdf,
     univFound:univFound, univRegion:univRegion, outcomeOf:outcomeOf, resultsOf:resultsOf,
-    KEYDATES:KEYDATES, minGaps:minGaps, mergeData:function(l){ var r=mergeData(l); render(); return r; }, students:function(){ return JSON.parse(JSON.stringify(Array.from(students.values()))); }, scoreSum:scoreSum, scoreOk:scoreOk, noticeText:noticeText, diffLines:diffLines, logs:function(){ var o=[]; students.forEach(function(x){ (x.log||[]).forEach(function(e){ o.push(e); }); }); return o; }, glanceData:glanceData, univKey:univKey, majorKey:majorKey, upcoming:upcoming, pending:pending, icsFold:icsFold, jungsiOf:jungsiOf};
+    KEYDATES:KEYDATES, minGaps:minGaps, leftText:leftText, normCode:normCode, codeKeys:codeKeys, sealDoc:sealDoc, openDoc:openDoc, mergeData:function(l){ var r=mergeData(l); render(); return r; }, students:function(){ return JSON.parse(JSON.stringify(Array.from(students.values()))); }, scoreSum:scoreSum, scoreOk:scoreOk, noticeText:noticeText, diffLines:diffLines, logs:function(){ var o=[]; students.forEach(function(x){ (x.log||[]).forEach(function(e){ o.push(e); }); }); return o; }, glanceData:glanceData, univKey:univKey, majorKey:majorKey, upcoming:upcoming, pending:pending, icsFold:icsFold, jungsiOf:jungsiOf};
 } }catch(e){}
 
+/* 켜 둔 채로 시간이 흐르면 D-day·남은 시간·경고·결과 입력할 것을 1분마다 새로 그린다.
+   입력 중이거나 목록을 펼쳐 고르는 중에는 건너뛴다. 다른 창에 있다 돌아오면 바로 새로 그린다. */
+setInterval(function(){
+  var a=document.activeElement, t=a&&a.tagName;
+  if(document.hidden||pendingRender||t==="INPUT"||t==="SELECT"||t==="TEXTAREA") return;
+  render();
+},60000);
+document.addEventListener("visibilitychange",function(){ if(!document.hidden&&!pendingRender) render(); });
 if(window.claude&&window.claude.hot&&window.claude.hot.ready){ window.claude.hot.ready(start); }
 else { start(); }
 })();
