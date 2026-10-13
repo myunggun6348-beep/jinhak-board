@@ -251,6 +251,10 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
 .sk.itv{color:var(--accent); background:var(--accent-soft)}
 .sk.ann{color:var(--ok); background:var(--ok-soft)}
 .sk.due{color:var(--warn); background:var(--warn-soft)}
+.sk.late{color:var(--bad); background:var(--bad-soft)}
+.shint{font-size:12px; color:var(--ink-3); margin-top:4px}
+.sitem .late{color:var(--bad); font-size:12px}
+.sitem select{margin-left:auto; border:1px solid var(--line-2); background:var(--surface); color:var(--ink); border-radius:6px; padding:3px 6px; font-size:12.5px}
 .sempty{font-size:12.5px; color:var(--ink-3); margin-top:8px}
 .smore{margin-top:8px}
 .usearch{border:1px solid var(--line-2); background:var(--surface); color:var(--ink); border-radius:7px; padding:5px 10px; font-size:13px; width:190px}
@@ -340,6 +344,7 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
     <div class="alerts" id="alerts"></div>
     <div class="stats" id="stats"></div>
     <div class="sched" id="sched"></div>
+    <div class="sched" id="todo" hidden></div>
 
     <div class="listhead">
       <h2 id="listTitle">학생</h2>
@@ -398,6 +403,7 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
     <div class="alerts" id="allAlerts"></div>
     <div class="stats" id="allStats"></div>
     <div class="sched" id="allSched"></div>
+    <div class="sched" id="allTodo" hidden></div>
     <div class="listhead"><h2>반별 현황</h2><span class="sp"><button class="ghost" id="btnCsvAll">전체 CSV 내려받기</button></span></div>
     <div class="tablewrap"><table id="classTable"></table></div>
     <div class="listhead" style="margin-top:22px"><h2>지원 현황</h2>
@@ -694,6 +700,7 @@ function render(){
   renderStats(document.getElementById("stats"), mine);
   renderSched(document.getElementById("sched"), mine, false);
   document.getElementById("sched").hidden=!cls;
+  renderTodo(document.getElementById("todo"), cls?mine:[], false);
   renderRows(mine, cls);
   renderUndo();
   document.getElementById("btnClearLocal").hidden=!(practice&&!demo);
@@ -1013,6 +1020,7 @@ function renderAll(){
   renderAlerts(document.getElementById("allAlerts"), all, true);
   renderStats(document.getElementById("allStats"), all);
   renderSched(document.getElementById("allSched"), all, true);
+  renderTodo(document.getElementById("allTodo"), all, true);
 
   var byCls={};
   all.forEach(function(s){
@@ -1199,6 +1207,47 @@ function renderSched(host, arr, showClass){
     host.appendChild(m);
   }
 }
+/* ── 결과 입력할 것 ── 발표일이 지났는데 결과를 기다리는 지원, 충원 마감이 지났는데 충원대기인 지원 */
+var todoAll=false;
+function pending(arr){
+  var out=[], now=Date.now();
+  arr.forEach(function(s){ (s.apps||[]).forEach(function(a){
+    if(a.ann&&AWAIT[a.status||"지원완료"]&&daysTo(a.ann)<0) out.push({s:s,a:a,kind:"ann",when:a.ann,late:-daysTo(a.ann)});
+    else if(a.due&&a.status==="충원대기"&&new Date(a.due).getTime()<now) out.push({s:s,a:a,kind:"due",when:a.due,late:Math.max(0,-daysTo(a.due))});
+  }); });
+  return out.sort(function(x,y){ return String(x.when).localeCompare(String(y.when))||(x.s.cls-y.s.cls)||String(x.s.no||"").localeCompare(String(y.s.no||"")); });
+}
+function renderTodo(host, arr, showClass){
+  host.innerHTML="";
+  var list=pending(arr);
+  host.hidden=!list.length;
+  if(!list.length) return;
+  var hd=el("div","schedhead");
+  hd.appendChild(el("h2",null,"결과 입력할 것"));
+  hd.appendChild(el("span","cnt",list.length+"건"));
+  host.appendChild(hd);
+  host.appendChild(el("div","shint","발표일(충원 마감)이 지났는데 결과가 들어오지 않은 지원입니다. 오른쪽에서 결과를 고르면 목록에서 빠집니다."));
+  var LIMIT=12;
+  list.slice(0,todoAll?list.length:LIMIT).forEach(function(e){
+    var row=el("div","sitem"), s=e.s, a=e.a;
+    row.appendChild(el("span","sk late",e.kind==="ann"?"발표 "+mmdd(a.ann):"충원 마감 "+mmdd(a.due)));
+    var who=el("button","who",(showClass&&s.cls?s.cls+"반 ":"")+(s.no?s.no+" ":"")+(s.name||""));
+    who.title="이 학생 보기";
+    who.onclick=function(){ goStudent(s); };
+    row.appendChild(who);
+    row.appendChild(el("span","sub",[(a.jc?"전문대 ":"")+shortUniv(a.univ), shortMajor(a.major), a.kind==="정시"?(a.group&&!a.jc?a.group+"군":"정시"):(a.jh||a.type)].filter(Boolean).join(" · ")));
+    if(e.late) row.appendChild(el("span","late",e.late+"일 지남"));
+    var opts=e.kind==="due"?["충원대기","충원합","불합격","등록완료","등록포기"]:STATUSES;
+    row.appendChild(sel(opts,a.status||"지원완료",function(v){ a.status=v; save(st0(s)); render(); }));
+    host.appendChild(row);
+  });
+  if(list.length>LIMIT){
+    var m=el("button","ghost smore",todoAll?"접기":"나머지 "+(list.length-LIMIT)+"건 더 보기");
+    m.onclick=function(){ todoAll=!todoAll; render(); };
+    host.appendChild(m);
+  }
+}
+function st0(s){ return students.get(s.id)||s; }
 function goStudent(s){
   if(s.cls) setCls(s.cls);
   openId=s.id; editAppId=null;
