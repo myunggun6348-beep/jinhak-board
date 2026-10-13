@@ -486,6 +486,7 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
         <button class="ghost" id="btnJungsi" title="학생마다 수시 결과와 정시 가·나·다군 지원을 한눈에 봅니다">정시 현황</button>
         <button class="ghost" id="btnNotice" title="학생마다 남은 면접·발표·충원 마감 일정을 문자로 보내기 좋은 글로 만들어 복사합니다">일정 안내 문자</button>
         <button class="ghost" id="btnCsat" title="반 학생 전체의 수능(가채점) 등급을 표 한 장에 넣고 최저 충족을 바로 봅니다">수능 성적 넣기</button>
+        <button class="ghost" id="btnClassFile" title="이 반 학생·지원 자료를 파일 하나로 받습니다. 학교 메신저·공유 폴더로 다른 선생님과 주고받으세요">우리 반 파일 받기</button>
         <button class="ghost" id="btnCsv">CSV 내려받기</button>
         <button class="ghost" id="btnPrint" title="이 반의 지원·결과를 A4 로 인쇄합니다">인쇄</button>
         <button class="ghost" id="btnClearLocal" hidden title="이 브라우저에 저장된 자료만 지웁니다">이 브라우저 자료 지우기</button>
@@ -508,8 +509,8 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
         <div class="drop" id="drop">
           <b>명단이나 지원 현황 파일을 여기에 끌어다 놓으세요</b>
           <button class="btn sec" id="btnPick">파일 선택</button>
-          <input type="file" id="file" accept=".pdf,.csv,.tsv,.txt,.xlsx,.xls,.hwpx,.hwp" hidden>
-          <span class="hint">PDF · CSV · 엑셀 · 한글(.hwpx)을 읽습니다. 표를 복사해 Ctrl+V 로 붙여넣어도 됩니다.</span>
+          <input type="file" id="file" accept=".pdf,.csv,.tsv,.txt,.xlsx,.xls,.hwpx,.hwp,.json" multiple hidden>
+          <span class="hint">PDF · CSV · 엑셀 · 한글(.hwpx)을 읽습니다. 표를 복사해 Ctrl+V 로 붙여넣어도 됩니다. 다른 선생님이 보낸 반 파일(.json)은 여러 개를 한꺼번에 넣으면 합쳐집니다.</span>
           <span class="fmts" id="fmts"></span>
         </div>
       </div>
@@ -545,7 +546,7 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
     <div class="sched" id="allSched"></div>
     <div class="sched" id="allTodo" hidden></div>
     <div class="sched" id="allLog"></div>
-    <div class="listhead"><h2>반별 현황</h2><span class="sp"><button class="ghost" id="btnBackup" title="모든 반 학생·지원 자료를 파일 하나로 받습니다">전체 백업 받기</button><button class="ghost" id="btnRestore" title="백업 파일의 학생 자료로 되돌립니다">백업 되살리기</button><input type="file" id="restoreFile" accept=".json,application/json" hidden><button class="ghost" id="btnCsvAll">전체 CSV 내려받기</button></span></div>
+    <div class="listhead"><h2>반별 현황</h2><span class="sp"><button class="ghost" id="btnBackup" title="모든 반 학생·지원 자료를 파일 하나로 받습니다">전체 백업 받기</button><button class="ghost" id="btnMerge" title="여러 선생님이 받은 반 파일을 한꺼번에 골라 합칩니다">반 파일 합치기</button><input type="file" id="mergeFile" accept=".json,application/json" multiple hidden><button class="ghost" id="btnRestore" title="백업 파일의 학생 자료로 되돌립니다">백업 되살리기</button><input type="file" id="restoreFile" accept=".json,application/json" hidden><button class="ghost" id="btnCsvAll">전체 CSV 내려받기</button></span></div>
     <div class="tablewrap"><table id="classTable"></table></div>
     <div class="listhead" style="margin-top:22px"><h2>정시 현황</h2><span class="cnt">수시 합격자는 정시 지원 불가</span></div>
     <div class="tablewrap"><table id="jungsiTable"></table></div>
@@ -896,7 +897,7 @@ function diffLines(p,s){
 }
 function logEntry(lines){
   if(lines.length>4) lines=lines.slice(0,3).concat(["외 "+(lines.length-3)+"건"]);
-  var e={t:new Date().toISOString(), w:lines}; if(myId) e.by=myId; if(actLabel&&!LOGQUIET[actLabel]) e.src=actLabel;
+  var e={t:new Date().toISOString(), w:lines}; if(myId) e.by=myId; else if(myName()) e.nm=myName(); if(actLabel&&!LOGQUIET[actLabel]) e.src=actLabel;
   return e;
 }
 var LOGQUIET={"수정":1,"수능 등급":1,"수능 점수":1};   // 한 칸씩 고친 것은 묶음 이름을 달지 않는다
@@ -923,6 +924,7 @@ function save(st){
   logChange(st);
   st.updatedAt=new Date().toISOString();
   if(myId) st.updatedBy=myId; else delete st.updatedBy;
+  if(!myId&&myName()) st.updatedName=myName(); else delete st.updatedName;
   students.set(st.id, st);
   setBase(st);
   persistLocal();
@@ -1218,6 +1220,7 @@ function detail(st){
     if(st.fate) lb.appendChild(document.createTextNode("최종 진로: "+st.fate+" · "));
     lb.appendChild(document.createTextNode("마지막 수정 "+fmtWhen(st.updatedAt)));
     if(st.updatedBy){ lb.appendChild(document.createTextNode(" · ")); var who=el("span","uname"); who.dataset.uid=st.updatedBy; lb.appendChild(who); }
+    else if(st.updatedName) lb.appendChild(document.createTextNode(" · "+st.updatedName));
     d.appendChild(lb);
   }
   if(st.log&&st.log.length){
@@ -1404,6 +1407,7 @@ function addApp(st,kind,jc){
 /* ── render: overview ──────────────────────── */
 function renderAll(){
   document.getElementById("btnRestore").hidden=canWrite===false||(demo&&!practice);
+  document.getElementById("btnMerge").hidden=canWrite===false;
   var all=sorted(list());
   renderAlerts(document.getElementById("allAlerts"), all, true);
   renderStats(document.getElementById("allStats"), all);
@@ -2138,6 +2142,7 @@ function renderLockBar(cls){
 function logRow(e, st){
   var r=el("div","logrow"), t=el("span","lt",fmtWhen(e.t));
   if(e.by){ var u=el("span","uname"); u.dataset.uid=e.by; t.appendChild(u); }
+  else if(e.nm){ var u2=el("span","uname",e.nm); t.appendChild(u2); }
   r.appendChild(t);
   var w=el("div","lw");
   (e.w||[]).forEach(function(x,i){
@@ -2177,6 +2182,83 @@ function fillNames(root){
   userCap.profiles(ids).then(function(ps){
     [].forEach.call(spans,function(x){ var p=ps[x.dataset.uid]; x.textContent=(p&&(p.isMe?"나":p.name))||"선생님"; });
   }).catch(function(){});
+}
+/* ── 반 파일로 주고받기 ─────────────────────
+   로그인 없는 화면에서는 학생 자료가 이 브라우저에만 있다. 담임마다 반 파일을 받아 학교 메신저·공유 폴더로
+   모으고, 다른 선생님은 여러 파일을 한꺼번에 넣어 합친다. 같은 학생은 더 최근에 고친 쪽(updatedAt)을 남긴다. */
+function myName(){ try{ return localStorage.getItem("jh.myname")||""; }catch(e){ return ""; } }
+function askMyName(){
+  if(myId||myName()) return;
+  var n=window.prompt("파일과 변경 기록에 남길 선생님 이름을 적어 주세요(예: 2반 김○○). 이 컴퓨터에만 기억합니다.","");
+  if(n&&n.trim()){ try{ localStorage.setItem("jh.myname",n.trim().slice(0,20)); }catch(e){} }
+}
+function isBoardFile(f){ return /\.json$/i.test(f.name||"")||f.type==="application/json"; }
+function classFile(){
+  var cls=getCls(), arr=cls?byClass(cls):[];
+  if(!arr.length||(demo&&!practice)||arr.every(function(x){ return /^d\d$/.test(x.id); })){ alert("이 반에 넣은 학생이 없습니다."); return; }
+  askMyName();
+  var d=new Date();
+  saveFile("진학현황_"+cls+"반_"+d.getFullYear()+pad2(d.getMonth()+1)+pad2(d.getDate())+".json",
+    JSON.stringify({app:"jinhak-board", year:YEAR, savedAt:d.toISOString(), cls:cls, by:myName()||undefined, students:arr, minreq:sharedMins()}, null, 1));
+}
+function unionLogs(a,b){
+  var seen={}, out=[];
+  (a||[]).concat(b||[]).forEach(function(e){ var k=e.t+"|"+(e.w||[]).join("/"); if(!seen[k]){ seen[k]=1; out.push(e); } });
+  out.sort(function(x,y){ return x.t<y.t?-1:x.t>y.t?1:0; });
+  return out.length>LOGMAX?out.slice(-LOGMAX):out;
+}
+// 학생 하나 합치기: "add" 새 학생, "upd" 파일 쪽이 더 최근, "keep" 이쪽이 더 최근이거나 같음
+function mergeStudent(x){
+  var inc=JSON.parse(JSON.stringify(x)), cur=students.get(inc.id);
+  if(!cur) students.forEach(function(v){ if(!cur&&v.name&&v.name===inc.name&&v.cls===inc.cls&&(!v.no||!inc.no||v.no===inc.no)) cur=v; });
+  if(cur&&String(cur.updatedAt||"")>=String(inc.updatedAt||"")){
+    var lg=unionLogs(cur.log,inc.log);
+    if(lg.length!==(cur.log||[]).length){ cur.log=lg; storeRaw(cur); }
+    return "keep";
+  }
+  if(cur){ inc.id=cur.id; inc.log=unionLogs(cur.log,inc.log); }
+  storeRaw(inc);
+  return cur?"upd":"add";
+}
+// 받은 그대로 저장(변경 기록·마지막 수정은 파일에 있는 것을 쓴다)
+function storeRaw(st){
+  students.set(st.id, st); setBase(st); persistLocal();
+  if(!demo&&db&&canWrite!==false) db.doc("students/"+st.id).set(JSON.parse(JSON.stringify(st))).catch(function(){ setSync("off","저장 실패 — 다시 시도해 주세요"); });
+}
+function mergeData(list){
+  var R={add:0,upd:0,keep:0,mins:0,files:[]};
+  list.forEach(function(p){
+    var b=p.b, r={name:p.name,cls:{},add:0,upd:0,keep:0,by:b.by||""};
+    b.students.forEach(function(x){ if(!x||!x.id||!Array.isArray(x.apps)) return; if(x.cls) r.cls[x.cls]=1; var k=mergeStudent(x); r[k]++; R[k]++; });
+    (Array.isArray(b.minreq)?b.minreq:[]).forEach(function(e){
+      if(!e||!e.univ||!e.text) return; var k=minKey(e); if(minTable.has(k)) return;
+      minTable.set(k,e); R.mins++;
+      if(db&&canWrite!==false&&!demo) db.doc("minreq/"+minId(k)).set(e).catch(function(){});
+    });
+    R.files.push(r);
+  });
+  return R;
+}
+function mergeFiles(files){
+  if(canWrite===false){ alert("보기 권한만 있어 합칠 수 없습니다."); return; }
+  Promise.all(files.map(function(f){ return f.text().then(function(t){ return {name:f.name,t:t}; },function(){ return {name:f.name,t:""}; }); })).then(function(got){
+    var ok=[], bad=[];
+    got.forEach(function(x){ var b=null; try{ b=JSON.parse(x.t); }catch(e){}
+      if(b&&b.app==="jinhak-board"&&Array.isArray(b.students)) ok.push({name:x.name,b:b}); else bad.push(x.name); });
+    if(!ok.length){ alert("진학 현황판 파일이 아닙니다: "+bad.join(", ")); return; }
+    remember("반 파일 합치기");
+    if(demo){ demo=false; document.getElementById("banner").hidden=true; students.clear(); }
+    var R=mergeData(ok);
+    fillAll(); render();
+    var msg=["반 파일 "+ok.length+"개를 합쳤습니다.",""];
+    R.files.forEach(function(r){ var c=Object.keys(r.cls).sort(function(a,b){return a-b;}).map(function(x){ return x+"반"; }).join("·");
+      msg.push("· "+(c||r.name)+(r.by?" ("+r.by+")":"")+": 새로 "+r.add+"명, 새 내용으로 "+r.upd+"명, 그대로 "+r.keep+"명"); });
+    if(R.keep) msg.push("","'그대로'는 이 컴퓨터 쪽이 같거나 더 최근에 고친 학생입니다.");
+    if(R.mins) msg.push("최저 기준 "+R.mins+"건도 함께 넣었습니다.");
+    if(bad.length) msg.push("","읽지 못한 파일: "+bad.join(", "));
+    msg.push("","잘못 합쳤으면 '우리 반' 화면의 '↶ 반 파일 합치기 취소'(또는 Ctrl+Z)를 누르세요.");
+    alert(msg.join("\n"));
+  });
 }
 // 내장표와 다른(담임이 넣었거나 Claude 가 채운) 최저 기준만
 function sharedMins(){
@@ -2704,7 +2786,11 @@ function bindStatic(){
   });
   var fi=document.getElementById("file"), drop=document.getElementById("drop");
   document.getElementById("btnPick").onclick=function(){ fi.click(); };
-  fi.onchange=function(){ if(fi.files&&fi.files[0]) handleFile(fi.files[0]); };
+  fi.onchange=function(){
+    var fl=[].slice.call(fi.files||[]); fi.value="";
+    var js=fl.filter(isBoardFile);
+    if(js.length) mergeFiles(js); else if(fl[0]) handleFile(fl[0]);
+  };
   /* 화면 어디에 놓아도 받는다. 점선 상자 밖에 놓으면 브라우저가 그 파일을 열어버리기 때문이다. */
   ["dragenter","dragover"].forEach(function(ev){
     document.addEventListener(ev,function(e){ e.preventDefault(); drop.classList.add("over"); });
@@ -2714,7 +2800,9 @@ function bindStatic(){
   });
   document.addEventListener("drop",function(e){
     e.preventDefault(); drop.classList.remove("over");
-    var f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];
+    var all=[].slice.call((e.dataTransfer&&e.dataTransfer.files)||[]), js=all.filter(isBoardFile);
+    if(js.length){ mergeFiles(js); return; }
+    var f=all[0];
     if(!f) return;
     if(!getCls()){ showError("반을 먼저 선택해 주세요.",""); return; }
     handleFile(f);
@@ -2786,6 +2874,9 @@ function bindStatic(){
       JSON.stringify({app:"jinhak-board", year:YEAR, savedAt:d.toISOString(), students:all, minreq:sharedMins()}, null, 1));
   };
   document.getElementById("btnRestore").onclick=function(){ document.getElementById("restoreFile").click(); };
+  document.getElementById("btnMerge").onclick=function(){ document.getElementById("mergeFile").click(); };
+  document.getElementById("mergeFile").onchange=function(){ var fl=[].slice.call(this.files||[]); this.value=""; if(fl.length) mergeFiles(fl); };
+  document.getElementById("btnClassFile").onclick=classFile;
   document.getElementById("restoreFile").onchange=function(){
     var f=this.files&&this.files[0]; this.value="";
     if(!f) return;
@@ -3765,6 +3856,7 @@ function start(){
     document.getElementById("btnCsv").hidden=!d;
     document.getElementById("btnCsvAll").hidden=!d;
     document.getElementById("btnBackup").hidden=!d;
+    document.getElementById("btnClassFile").hidden=!d;
     document.getElementById("btnResults").hidden=!d;
     document.getElementById("btnMinCsv").hidden=!d;
     document.getElementById("btnPrint").hidden=!d;
@@ -3789,7 +3881,7 @@ function attachDb(x, onErr){
         next.set(d.id, {id:d.id, cls:body.cls, no:body.no, name:body.name,
           apps:Array.isArray(body.apps)?JSON.parse(JSON.stringify(body.apps)):[],
           csat:body.csat&&typeof body.csat==="object"?JSON.parse(JSON.stringify(body.csat)):undefined,
-          updatedAt:body.updatedAt, updatedBy:body.updatedBy, fate:body.fate,
+          updatedAt:body.updatedAt, updatedBy:body.updatedBy, updatedName:body.updatedName, fate:body.fate,
           log:Array.isArray(body.log)?JSON.parse(JSON.stringify(body.log)):undefined});
       });
       students=next;
@@ -3808,7 +3900,7 @@ try{ if(location.protocol==="file:"||location.hostname==="localhost"){
     parseDelimited:parseDelimited, readApps:readApps, pdfTableRows:pdfTableRows, last:function(){ return lastRead; },
     checkStudent:checkStudent, parseMin:parseMin, judgeMin:judgeMin, rowsFromPdf:rowsFromPdf,
     univFound:univFound, univRegion:univRegion, outcomeOf:outcomeOf, resultsOf:resultsOf,
-    KEYDATES:KEYDATES, minGaps:minGaps, scoreSum:scoreSum, scoreOk:scoreOk, noticeText:noticeText, diffLines:diffLines, logs:function(){ var o=[]; students.forEach(function(x){ (x.log||[]).forEach(function(e){ o.push(e); }); }); return o; }, glanceData:glanceData, univKey:univKey, majorKey:majorKey, upcoming:upcoming, pending:pending, icsFold:icsFold, jungsiOf:jungsiOf};
+    KEYDATES:KEYDATES, minGaps:minGaps, mergeData:function(l){ var r=mergeData(l); render(); return r; }, students:function(){ return JSON.parse(JSON.stringify(Array.from(students.values()))); }, scoreSum:scoreSum, scoreOk:scoreOk, noticeText:noticeText, diffLines:diffLines, logs:function(){ var o=[]; students.forEach(function(x){ (x.log||[]).forEach(function(e){ o.push(e); }); }); return o; }, glanceData:glanceData, univKey:univKey, majorKey:majorKey, upcoming:upcoming, pending:pending, icsFold:icsFold, jungsiOf:jungsiOf};
 } }catch(e){}
 
 if(window.claude&&window.claude.hot&&window.claude.hot.ready){ window.claude.hot.ready(start); }

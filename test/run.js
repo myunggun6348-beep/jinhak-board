@@ -373,6 +373,20 @@ function buildTestPage() {
   check("한눈에 보기: 결과 묶음·전형·지역·지원 장수", gl,
     JSON.stringify([{ ok: 1, wait: 1, go: 1, bad: 1, none: 0 }, { 학종: 1, 교과: 1, 논술: 1, 정시: 1 }, { 부산: 1, 서울: 2, 미상: 1 }, [1, 0, 0, 1, 0, 0, 0], 4]));
 
+  /* ── 반 파일 합치기 ── 학생마다 더 최근에 고친 쪽, 변경 기록은 합침, 학번 없으면 반·이름으로 */
+  const mg = await p.evaluate(() => {
+    const D = window.__dev, f = (st) => ({ name: "x.json", b: { app: "jinhak-board", students: st } });
+    D.mergeData([f([
+      { id: "m1", cls: 9, no: "30901", name: "가", updatedAt: "2026-10-10T00:00:00Z", apps: [{ id: "a", status: "지원완료" }], log: [{ t: "2026-10-10T00:00:00Z", w: ["처음"] }] },
+      { id: "m2", cls: 9, name: "나", updatedAt: "2026-10-10T00:00:00Z", apps: [] }])]);
+    const r = D.mergeData([f([
+      { id: "m1", cls: 9, no: "30901", name: "가", updatedAt: "2026-10-12T00:00:00Z", apps: [{ id: "a", status: "최초합" }], log: [{ t: "2026-10-12T00:00:00Z", w: ["합격"] }] },
+      { id: "zz", cls: 9, name: "나", updatedAt: "2026-10-01T00:00:00Z", apps: [{ id: "b", status: "불합격" }] }])]);
+    const S = D.students(), a = S.find((x) => x.id === "m1"), b2 = S.filter((x) => x.name === "나" && x.cls === 9);
+    return { upd: r.upd, keep: r.keep, status: a.apps[0].status, log: a.log.map((e) => e.w[0]), dup: b2.length, nAppsB: b2[0].apps.length };
+  });
+  check("반 파일 합치기: 최근 쪽 남김·기록 합침·같은 학생 중복 없음", mg, { upd: 1, keep: 1, status: "최초합", log: ["처음", "합격"], dup: 1, nAppsB: 0 });
+
   /* ── 공용 저장소(Vercel 판, Firebase) ── 가짜 Firebase 로 로그인·허락·저장·관리 흐름 */
   console.log("\n[공용 저장소 로그인]");
   const srv = require("http").createServer((q, r) => {
