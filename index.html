@@ -262,6 +262,10 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
 #csatPanel input.g:focus{outline:2px solid var(--accent); outline-offset:0}
 #csatPanel td.mres{white-space:normal; font-size:12px; min-width:140px}
 #csatPanel td.mres .pill{margin:1px 3px 1px 0; display:inline-block}
+.lockbar{display:flex; flex-wrap:wrap; align-items:center; gap:8px; border:1px solid var(--warn); background:var(--warn-soft); color:var(--ink); border-radius:var(--radius); padding:10px 13px; margin-bottom:14px; font-size:13px}
+.lockbar b{font-weight:700}
+.lockbar .sp{margin-left:auto; display:flex; gap:6px; flex-wrap:wrap}
+.lastby{font-size:11.5px; color:var(--ink-3); margin:-2px 2px 0}
 .sempty{font-size:12.5px; color:var(--ink-3); margin-top:8px}
 .smore{margin-top:8px}
 .usearch{border:1px solid var(--line-2); background:var(--surface); color:var(--ink); border-radius:7px; padding:5px 10px; font-size:13px; width:190px}
@@ -356,6 +360,7 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
 
   <div id="viewClass">
     <div class="classbar" id="classbar"></div>
+    <div class="lockbar" id="lockbar" hidden></div>
     <div class="alerts" id="alerts"></div>
     <div class="stats" id="stats"></div>
     <div class="sched" id="sched"></div>
@@ -368,6 +373,7 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
         <button class="ghost" id="btnUndo" hidden disabled>↶ 되돌리기</button>
         <button class="ghost" id="btnCsat" title="반 학생 전체의 수능(가채점) 등급을 표 한 장에 넣고 최저 충족을 바로 봅니다">수능 등급 넣기</button>
         <button class="ghost" id="btnCsv">CSV 내려받기</button>
+        <button class="ghost" id="btnPrint" title="이 반의 지원·결과를 A4 로 인쇄합니다">인쇄</button>
         <button class="ghost" id="btnClearLocal" hidden title="이 브라우저에 저장된 자료만 지웁니다">이 브라우저 자료 지우기</button>
       </span>
     </div>
@@ -421,7 +427,7 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
     <div class="stats" id="allStats"></div>
     <div class="sched" id="allSched"></div>
     <div class="sched" id="allTodo" hidden></div>
-    <div class="listhead"><h2>반별 현황</h2><span class="sp"><button class="ghost" id="btnCsvAll">전체 CSV 내려받기</button></span></div>
+    <div class="listhead"><h2>반별 현황</h2><span class="sp"><button class="ghost" id="btnBackup" title="모든 반 학생·지원 자료를 파일 하나로 받습니다">전체 백업 받기</button><button class="ghost" id="btnRestore" title="백업 파일의 학생 자료로 되돌립니다">백업 되살리기</button><input type="file" id="restoreFile" accept=".json,application/json" hidden><button class="ghost" id="btnCsvAll">전체 CSV 내려받기</button></span></div>
     <div class="tablewrap"><table id="classTable"></table></div>
     <div class="listhead" style="margin-top:22px"><h2>지원 현황</h2>
       <span class="seg" role="group" aria-label="보기"><button id="byUniv" aria-pressed="true">대학별</button><button id="byMajor" aria-pressed="false">학과별</button></span>
@@ -447,7 +453,7 @@ var MINSTATES = ["미정","충족","미충족","해당없음"];
 var LIVE = {"지원완료":1,"1단계합":1,"면접완료":1,"충원대기":1};
 var AWAIT = {"지원완료":1,"1단계합":1,"면접완료":1};   // 발표일이 지났으면 결과가 들어와 있어야 하는 상태
 
-var db=null, userCap=null, downloadsCap=null, canWrite=null, unsub=null;
+var myId=null, db=null, userCap=null, downloadsCap=null, canWrite=null, unsub=null;
 var students=new Map();          // id -> doc body
 var openId=null, editAppId=null, pendingRender=false, demo=false, practice=false;
 var writeTimers=new Map();
@@ -472,6 +478,11 @@ function uid(){return "x"+Math.random().toString(36).slice(2,9)+Date.now().toStr
 function esc(s){return String(s==null?"":s);}
 function getCls(){try{var v=localStorage.getItem("jh.cls"); return v?parseInt(v,10):null;}catch(e){return null;}}
 function setCls(v){try{localStorage.setItem("jh.cls",String(v));}catch(e){}}
+function getMyCls(){try{var v=localStorage.getItem("jh.mycls"); return v?parseInt(v,10):null;}catch(e){return null;}}
+function setMyCls(v){try{localStorage.setItem("jh.mycls",String(v));}catch(e){}}
+// 지금 그리는 칸의 반. 내 담당 반이 아니면(이번만 고치기 전까지) 입력 칸을 잠근다.
+var curCls=null, unlocked={};
+function locked(c){ var m=getMyCls(); return !!(m&&c&&c!==m&&!unlocked[c]&&!(demo&&!practice)); }
 function daysTo(s){ if(!s) return null; var d=new Date(s); if(isNaN(d)) return null;
   var t=new Date(); t.setHours(0,0,0,0); var x=new Date(d); x.setHours(0,0,0,0);
   return Math.round((x-t)/86400000); }
@@ -637,7 +648,7 @@ function applyMin(st){
 
 /* ── data access ───────────────────────────── */
 function list(){ return demo&&!practice ? DEMO.slice() : Array.from(students.values()); }
-function ro(){ return canWrite===false||(demo&&!practice); }
+function ro(){ return canWrite===false||(demo&&!practice)||locked(curCls); }
 // 학번 있는 학생을 학번순으로 먼저, 학번이 없으면 이름순
 function sorted(arr){ return arr.sort(function(a,b){
   return (a.no?0:1)-(b.no?0:1) || String(a.no||"").localeCompare(String(b.no||"")) || String(a.name||"").localeCompare(String(b.name||""),"ko"); }); }
@@ -645,6 +656,7 @@ function byClass(c){ return sorted(list().filter(function(s){return s.cls===c;})
 
 function save(st){
   st.updatedAt=new Date().toISOString();
+  if(myId) st.updatedBy=myId; else delete st.updatedBy;
   students.set(st.id, st);
   persistLocal();
   if(demo||!db||canWrite===false) return;
@@ -736,11 +748,13 @@ function render(){
   persistLocal();
   if(pendingRender) return;
   var cls=getCls();
+  curCls=cls;
   renderClassbar(cls);
+  renderLockBar(cls);
   var mine = cls?byClass(cls):[];
   document.getElementById("listTitle").textContent = cls? (cls+"반 학생") : "반을 선택하세요";
   document.getElementById("listCount").textContent = cls? (mine.length+"명") : "";
-  document.getElementById("addPanel").hidden = !cls || canWrite===false;
+  document.getElementById("addPanel").hidden = !cls || canWrite===false || locked(cls);
   renderAlerts(document.getElementById("alerts"), mine, false);
   renderStats(document.getElementById("stats"), mine);
   renderSched(document.getElementById("sched"), mine, false);
@@ -750,21 +764,26 @@ function render(){
   renderCsat(cls?mine:[]);
   renderUndo();
   document.getElementById("btnClearLocal").hidden=!(practice&&!demo);
+  curCls=null;
+  fillNames(document.getElementById("rows"));
   if(!document.getElementById("viewAll").hidden) renderAll();
 }
 function renderClassbar(cls){
   var bar=document.getElementById("classbar");
   if(bar.childElementCount) {
     Array.prototype.forEach.call(bar.querySelectorAll(".chip"),function(b){
-      b.setAttribute("aria-pressed", String(parseInt(b.dataset.c,10)===cls));
+      var c=parseInt(b.dataset.c,10);
+      b.setAttribute("aria-pressed", String(c===cls));
+      b.textContent=c+"반"+(c===getMyCls()?" ★":"");
+      b.title=c===getMyCls()?"내 담당 반":"";
     });
     return;
   }
   bar.appendChild(el("span","lab","담당 반"));
   CLASSES.forEach(function(c){
-    var b=el("button","chip",c+"반");
+    var b=el("button","chip",c+"반"+(c===getMyCls()?" ★":""));
     b.dataset.c=c; b.setAttribute("aria-pressed",String(c===cls));
-    b.onclick=function(){ setCls(c); openId=null; render(); };
+    b.onclick=function(){ if(!getMyCls()) setMyCls(c); setCls(c); openId=null; render(); };
     bar.appendChild(b);
   });
 }
@@ -915,6 +934,12 @@ function dateInput(type,value,onchange){
 }
 function detail(st){
   var d=el("div","detail");
+  if(st.updatedAt){
+    var lb=el("div","lastby");
+    lb.appendChild(document.createTextNode("마지막 수정 "+fmtWhen(st.updatedAt)));
+    if(st.updatedBy){ lb.appendChild(document.createTextNode(" · ")); var who=el("span","uname"); who.dataset.uid=st.updatedBy; lb.appendChild(who); }
+    d.appendChild(lb);
+  }
   var cs=el("div","app");
   cs.appendChild(el("div","apphead")).appendChild(el("span","kind","수능 등급"));
   var cg=el("div","grid csat");
@@ -1062,6 +1087,7 @@ function addApp(st,kind,jc){
 
 /* ── render: overview ──────────────────────── */
 function renderAll(){
+  document.getElementById("btnRestore").hidden=canWrite===false||(demo&&!practice);
   var all=sorted(list());
   renderAlerts(document.getElementById("allAlerts"), all, true);
   renderStats(document.getElementById("allStats"), all);
@@ -1264,6 +1290,10 @@ function pending(arr){
   return out.sort(function(x,y){ return String(x.when).localeCompare(String(y.when))||(x.s.cls-y.s.cls)||String(x.s.no||"").localeCompare(String(y.s.no||"")); });
 }
 function renderTodo(host, arr, showClass){
+  var keepCls=curCls;
+  try{ renderTodo0(host, arr, showClass); } finally { curCls=keepCls; }
+}
+function renderTodo0(host, arr, showClass){
   host.innerHTML="";
   var list=pending(arr);
   host.hidden=!list.length;
@@ -1284,6 +1314,7 @@ function renderTodo(host, arr, showClass){
     row.appendChild(el("span","sub",[(a.jc?"전문대 ":"")+shortUniv(a.univ), shortMajor(a.major), a.kind==="정시"?(a.group&&!a.jc?a.group+"군":"정시"):(a.jh||a.type)].filter(Boolean).join(" · ")));
     if(e.late) row.appendChild(el("span","late",e.late+"일 지남"));
     var opts=e.kind==="due"?["충원대기","충원합","불합격","등록완료","등록포기"]:STATUSES;
+    curCls=s.cls;
     row.appendChild(sel(opts,a.status||"지원완료",function(v){ a.status=v; save(st0(s)); render(); }));
     host.appendChild(row);
   });
@@ -1387,6 +1418,107 @@ function renderCsat(mine){
 function setGrade(st,k,v,quiet){
   if(!quiet) remember("수능 등급");
   st.csat=st.csat||{}; st.csat[k]=v; applyMin(st); save(st);
+}
+function renderLockBar(cls){
+  var bar=document.getElementById("lockbar"), m=getMyCls();
+  bar.hidden=!(cls&&m&&cls!==m&&!(demo&&!practice)&&canWrite!==false);
+  if(bar.hidden) return;
+  bar.innerHTML="";
+  var t=el("span");
+  t.appendChild(el("b",null,cls+"반"));
+  t.appendChild(document.createTextNode(unlocked[cls]
+    ? "은 담당 반("+m+"반)이 아니지만 지금 고칠 수 있습니다. 실수로 바꾸지 않게 조심해 주세요."
+    : "은 담당 반("+m+"반)이 아니라서 보기만 합니다."));
+  bar.appendChild(t);
+  var sp=el("span","sp");
+  if(!unlocked[cls]){
+    var u=el("button","ghost","이번만 고치기");
+    u.title="이 창을 닫거나 새로고침하면 다시 잠깁니다";
+    u.onclick=function(){ unlocked[cls]=true; render(); };
+    sp.appendChild(u);
+  }
+  var mk=el("button","ghost",cls+"반을 내 담당 반으로");
+  mk.onclick=function(){ setMyCls(cls); renderClassbar(cls); document.getElementById("classbar").innerHTML=""; render(); };
+  sp.appendChild(mk);
+  bar.appendChild(sp);
+}
+function fmtWhen(iso){
+  var d=new Date(iso); if(isNaN(d)) return "";
+  return (d.getMonth()+1)+"/"+d.getDate()+" "+pad2(d.getHours())+":"+pad2(d.getMinutes());
+}
+// 저장해 둔 사용자 id 를 그릴 때마다 이름으로 바꾼다(이름은 저장하지 않는다).
+function fillNames(root){
+  var spans=root.querySelectorAll(".uname[data-uid]");
+  if(!spans.length) return;
+  if(!userCap||!userCap.profiles){ [].forEach.call(spans,function(x){ x.textContent="선생님"; }); return; }
+  var ids=[].map.call(spans,function(x){ return x.dataset.uid; });
+  userCap.profiles(ids).then(function(ps){
+    [].forEach.call(spans,function(x){ var p=ps[x.dataset.uid]; x.textContent=(p&&(p.isMe?"나":p.name))||"선생님"; });
+  }).catch(function(){});
+}
+function restoreBackup(text){
+  var b; try{ b=JSON.parse(text); }catch(e){ b=null; }
+  var arr=b&&b.app==="jinhak-board"&&Array.isArray(b.students)?b.students.filter(function(x){ return x&&x.id&&Array.isArray(x.apps); }):null;
+  if(!arr||!arr.length){ alert("진학 현황판 백업 파일이 아닙니다."); return; }
+  var when=b.savedAt?fmtWhen(b.savedAt):"";
+  if(!window.confirm("백업"+(when?"("+when+")":"")+"의 학생 "+arr.length+"명 자료로 되돌립니다.\n같은 학생은 백업 내용으로 바뀌고, 백업에 없는 학생은 그대로 둡니다.\n계속할까요?")) return;
+  remember("백업 되살리기");
+  if(demo){ demo=false; document.getElementById("banner").hidden=true; students.clear(); }
+  arr.forEach(function(x){ var st=JSON.parse(JSON.stringify(x)); students.set(st.id, st); save(st); });
+  render();
+  alert("학생 "+arr.length+"명을 백업 내용으로 되돌렸습니다. 잘못했으면 '↶ 백업 되살리기 취소'를 누르세요.");
+}
+/* ── 인쇄 ── */
+function h(v){ return String(v==null?"":v).replace(/[&<>"]/g,function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]; }); }
+function printDoc(cls, arr){
+  var now=new Date(), napps=0, pass=0, wait=0, miss=0, flag=0;
+  arr.forEach(function(st){ var a=st.apps||[]; napps+=a.length;
+    if(a.some(function(x){ return x.kind==="수시"&&PASS[x.status]; })) pass++;
+    if(a.some(function(x){ return x.status==="충원대기"; })) wait++;
+    if(a.some(function(x){ return x.kind==="수시"&&x.mmet==="미충족"; })) miss++;
+    if(checkStudent(st).length) flag++; });
+  var out=[];
+  out.push('<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="color-scheme" content="light"><title>'+h(YEAR+"학년도 3학년 "+cls+"반 진학 현황")+'</title><style>'+
+    '@page{size:A4;margin:12mm}html{background:#fff}body{background:#fff;font-family:"Malgun Gothic","Apple SD Gothic Neo",sans-serif;font-size:9.5pt;color:#111;margin:0}'+
+    'h1{font-size:15pt;margin:0 0 2px}.sub{color:#555;margin-bottom:8px}.sum{border:1px solid #999;padding:5px 8px;margin-bottom:10px}'+
+    '.stu{break-inside:avoid;page-break-inside:avoid;margin-bottom:9px}.stu h2{font-size:10.5pt;margin:0 0 3px;display:flex;gap:10px;align-items:baseline}'+
+    '.stu h2 small{font-weight:400;color:#444;font-size:8.5pt}.warn{color:#b00;font-size:8.5pt;margin:0 0 3px}'+
+    'table{border-collapse:collapse;width:100%;table-layout:fixed}td{word-break:keep-all;overflow-wrap:anywhere}th,td{border:1px solid #888;padding:2px 4px;text-align:left;vertical-align:top}th{background:#eee;font-weight:600}'+
+    'td.st{white-space:nowrap;font-weight:600}.none{color:#777}@media screen{body{margin:16px}}'+
+    '</style></head><body>');
+  out.push('<h1>'+h(YEAR+"학년도 3학년 "+cls+"반 진학 현황")+'</h1>');
+  out.push('<div class="sub">출력 '+now.getFullYear()+"-"+pad2(now.getMonth()+1)+"-"+pad2(now.getDate())+" "+pad2(now.getHours())+":"+pad2(now.getMinutes())+' · 학생 '+arr.length+'명 · 지원 '+napps+'건</div>');
+  out.push('<div class="sum">수시 합격 '+pass+'명 · 충원 대기 '+wait+'명 · 최저 미충족 '+miss+'명 · 점검 경고 '+flag+'명</div>');
+  arr.forEach(function(st){
+    var g=st.csat||{}, gs=CSAT.filter(function(k){ return g[k[0]]; }).map(function(k){ return k[1].replace("탐구","탐")+g[k[0]]; }).join(" ");
+    out.push('<div class="stu"><h2>'+h((st.no||"")+" "+(st.name||""))+(gs?' <small>수능 '+h(gs)+'</small>':'')+'</h2>');
+    var w=checkStudent(st);
+    if(w.length) out.push('<div class="warn">'+w.map(function(x){ return x.code; }).filter(function(c,i,arr){ return arr.indexOf(c)===i; }).map(h).join(" · ")+'</div>');
+    var apps=st.apps||[];
+    if(!apps.length){ out.push('<div class="none">입력된 지원 없음</div></div>'); return; }
+    out.push('<table><colgroup><col style="width:7%"><col style="width:15%"><col style="width:21%"><col style="width:20%"><col style="width:7%"><col style="width:6%"><col style="width:14%"><col style="width:10%"></colgroup><thead><tr><th>구분</th><th>대학</th><th>모집단위</th><th>전형</th><th>면접·고사</th><th>발표</th><th>수능최저</th><th>상태</th></tr></thead><tbody>');
+    apps.forEach(function(a){
+      var kind=(a.jc?"전문대 ":"")+(a.kind==="정시"?(a.group&&!a.jc?a.group+"군":"정시"):"수시");
+      var mn=a.kind==="수시"?((minShort(a.mreq)||"")+(a.mmet&&a.mmet!=="미정"&&a.mmet!=="해당없음"?" ("+a.mmet+")":"")):"";
+      var stt=(a.status||"")+(a.status==="충원대기"&&a.rank?" 예비"+a.rank:"");
+      out.push('<tr><td>'+h(kind)+'</td><td>'+h(a.univ)+'</td><td>'+h(a.major)+'</td><td>'+h(a.jh||a.type)+'</td><td>'+h(mmdd(a.itv))+'</td><td>'+h(mmdd(a.ann))+'</td><td>'+h(mn)+'</td><td class="st">'+h(stt)+'</td></tr>');
+    });
+    out.push('</tbody></table></div>');
+  });
+  out.push('<script>window.onload=function(){ setTimeout(function(){ window.print(); },300); };<\/script></body></html>');
+  return out.join("");
+}
+function printClass(){
+  var cls=getCls(); if(!cls) return;
+  var doc=printDoc(cls, byClass(cls)), name=YEAR+"_3학년_"+cls+"반_진학현황.html";
+  // 아티팩트 안에서는 새 창을 못 띄우므로 파일로 준다(열면 인쇄 창이 뜬다)
+  if(window.claude&&window.top!==window){
+    if(!downloadsCap){ alert("이 화면에서는 인쇄용 파일을 받을 수 없습니다."); return; }
+    saveFile(name, doc); return;
+  }
+  var w=window.open("","_blank");
+  if(!w){ saveFile(name, doc); return; }
+  w.document.open(); w.document.write(doc); w.document.close();
 }
 function goStudent(s){
   if(s.cls) setCls(s.cls);
@@ -1498,6 +1630,18 @@ function bindStatic(){
     csatOpen=!csatOpen; render();
     if(csatOpen){ var p=document.getElementById("csatPanel"); p.scrollIntoView({block:"start"}); var f=p.querySelector("input.g"); if(f) f.focus(); }
   };
+  document.getElementById("btnBackup").onclick=function(){
+    var d=new Date(), all=sorted(list());
+    saveFile("진학현황_백업_"+d.getFullYear()+pad2(d.getMonth()+1)+pad2(d.getDate())+".json",
+      JSON.stringify({app:"jinhak-board", year:YEAR, savedAt:d.toISOString(), students:all}, null, 1));
+  };
+  document.getElementById("btnRestore").onclick=function(){ document.getElementById("restoreFile").click(); };
+  document.getElementById("restoreFile").onchange=function(){
+    var f=this.files&&this.files[0]; this.value="";
+    if(!f) return;
+    f.text().then(restoreBackup).catch(function(){ alert("백업 파일을 읽지 못했습니다."); });
+  };
+  document.getElementById("btnPrint").onclick=printClass;
   document.getElementById("btnCsvAll").onclick=function(){ csv(sorted(list()), "진학현황_"+YEAR+"_전체.csv"); };
   document.getElementById("yearLabel").textContent=YEAR+"학년도";
 }
@@ -1508,6 +1652,7 @@ function switchTab(isClass){
   document.getElementById("viewAll").hidden=isClass;
   if(!isClass) renderAll();
 }
+
 function addOne(){
   var cls=getCls(); if(!cls){alert("반을 먼저 선택해 주세요.");return;}
   var no=document.getElementById("newNo").value.trim();
@@ -1920,6 +2065,7 @@ function pushApp(res, no, name, f, cls){
   var kind=/정시/.test(kindRaw)?"정시":(kindRaw?"수시":((norm(f.group)||/^(정시|수능)/.test(norm(f.type)))?"정시":"수시"));
   var st=mapStatus(f.status);
   if(f.status&&!st){ res.notes.status++; res.notes.statusRaw.push((name||no)+" “"+str(f.status)+"”"); }
+  if(!str(f.itv)&&f.exam) f.itv=f.exam;   // 논술·실기·적성 일자도 면접·고사일로
   var itv=parseDate(f.itv,false), ann=parseDate(f.ann,false);
   var due=parseDate(f.due,true);
   if(due&&/T00:00$/.test(due)) res.notes.due++;
@@ -1933,7 +2079,6 @@ function pushApp(res, no, name, f, cls){
     if(/^(n|no|x|무|없음|미적용)$/i.test(fl)) f.mreq="없음";
     else if(/^(y|yes|o|유|있음|적용)$/i.test(fl)) f.mreq="최저 있음(기준 미기재)";
   }
-  if(!str(f.itv)&&f.exam) f.itv=f.exam;
   var given={status:!!st, type:!!(mapType(f.type)||mapType(f.jh)), c6:yn!==null};
   res.apps.push({no:String(no||""), name:String(name||""), cls:cls||null, given:given, app:{id:uid(), kind:kind, jc:/전문/.test(str(f.found)), univ:str(f.univ),
     major:str(f.major), jh:str(f.jh),
@@ -2106,7 +2251,7 @@ function fillMin(st){
   return changed;
 }
 function fillAll(){
-  if(ro()||!minTable.size) return;
+  if(canWrite===false||(demo&&!practice)||!minTable.size) return;
   students.forEach(function(st){ if(fillMin(st)) save(st); });
 }
 function shareMin(a){
@@ -2182,7 +2327,8 @@ function tmplApps(){
 }
 function saveFile(name,data){
   if(!downloadsCap&&!window.claude){
-    var u=URL.createObjectURL(new Blob([data],{type:"text/csv;charset=utf-8"}));
+    var type=/\.json$/.test(name)?"application/json":/\.html$/.test(name)?"text/html;charset=utf-8":"text/csv;charset=utf-8";
+    var u=URL.createObjectURL(new Blob([data],{type:type}));
     var a=document.createElement("a"); a.href=u; a.download=name;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(function(){ URL.revokeObjectURL(u); },1000);
@@ -2310,6 +2456,7 @@ function start(){
   window.claude.use("user").then(function(u){
     userCap=u;
     if(!u) return null;
+    if(typeof u.id==="function") u.id().then(function(id){ myId=id||null; }).catch(function(){});
     return u.can("data.write");
   }).then(function(v){ canWrite=(v===undefined?null:v); render(); }).catch(function(){});
 
@@ -2317,6 +2464,8 @@ function start(){
     downloadsCap=d;
     document.getElementById("btnCsv").hidden=!d;
     document.getElementById("btnCsvAll").hidden=!d;
+    document.getElementById("btnBackup").hidden=!d;
+    document.getElementById("btnPrint").hidden=!d;
   }).catch(function(){});
 
   window.claude.use("db").then(function(x){
@@ -2334,7 +2483,7 @@ function start(){
         next.set(d.id, {id:d.id, cls:body.cls, no:body.no, name:body.name,
           apps:Array.isArray(body.apps)?JSON.parse(JSON.stringify(body.apps)):[],
           csat:body.csat&&typeof body.csat==="object"?JSON.parse(JSON.stringify(body.csat)):undefined,
-          updatedAt:body.updatedAt});
+          updatedAt:body.updatedAt, updatedBy:body.updatedBy});
       });
       students=next;
       fillAll();
