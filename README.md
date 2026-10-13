@@ -75,6 +75,18 @@ Playwright 전용 브라우저를 내려받지 못하는 PC(학교망)에서도 
 { "db": {}, "user": {}, "downloads": true }
 ```
 
+## Vercel 판 공용 저장소(Firebase)
+
+Vercel 주소에서 여러 선생님이 같은 자료를 쓰려면 Firebase(Firestore + 구글 로그인)를 붙인다. `index.html`의 `FIREBASE_CONFIG`가 `null`이면 지금처럼 이 브라우저에만 저장하고, 값을 넣으면 Vercel 주소(https, localhost 제외)에서 로그인 화면이 뜬다. 아티팩트에서는 쓰지 않는다(아티팩트는 자체 db).
+
+1. https://console.firebase.google.com 에서 프로젝트를 만든다(애널리틱스는 꺼도 된다).
+2. 웹 앱(`</>`)을 추가하고 나오는 `firebaseConfig` 값을 `FIREBASE_CONFIG`에 넣는다. 공개돼도 되는 식별자다. 접근은 규칙이 막는다.
+3. Authentication > 로그인 방법 > Google 사용. 설정 > 승인된 도메인에 `jinhak-board.vercel.app` 추가.
+4. Firestore Database 만들기(위치 `asia-northeast3` 서울, 프로덕션 모드). 규칙 탭에 `firestore.rules`를 붙이고 `OWNER_EMAIL`을 관리 선생님 이메일로 바꿔 게시한다.
+5. 관리 선생님이 로그인하면 전체 현황 맨 아래 "함께 쓰는 선생님"에서 다른 선생님 구글 이메일을 추가한다. 명단에 없는 계정은 로그인해도 자료를 볼 수 없다.
+
+모음: `students/{학번 등}`, `minreq/{id}`(아티팩트와 같은 모양), `teachers/{uid}`(이름·이메일, 변경 기록 이름 표시용), `allowed/{이메일}`(허락 명단, 관리자만 읽고 씀). 이 브라우저에 넣어 둔 자료가 있으면 처음 로그인할 때 올릴지 묻는다. 아티팩트 자료는 아티팩트에서 "전체 백업 받기" → Vercel 에서 "백업 되살리기"로 옮긴다(백업에 학교 공용 최저 기준표도 들어 있다). 테스트는 `test/fixtures/fbmock.js`(가짜 Firebase)로 로그인·허락·관리 흐름을 본다.
+
 ## 알아 둘 것
 
 **구형 `.hwp`는 열 수 없다.** 이진 형식이라 브라우저 안에서 풀 방법이 없다. 앱은 이 파일을 거절하면서 한글에서 `.hwpx`로 저장하는 방법을 안내한다. `.hwpx`는 압축된 XML이라 표를 읽어낸다.

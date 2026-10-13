@@ -373,6 +373,37 @@ function buildTestPage() {
   check("한눈에 보기: 결과 묶음·전형·지역·지원 장수", gl,
     JSON.stringify([{ ok: 1, wait: 1, go: 1, bad: 1, none: 0 }, { 학종: 1, 교과: 1, 논술: 1, 정시: 1 }, { 부산: 1, 서울: 2, 미상: 1 }, [1, 0, 0, 1, 0, 0, 0], 4]));
 
+  /* ── 공용 저장소(Vercel 판, Firebase) ── 가짜 Firebase 로 로그인·허락·저장·관리 흐름 */
+  console.log("\n[공용 저장소 로그인]");
+  const srv = require("http").createServer((q, r) => {
+    const f = q.url.split("?")[0] === "/" ? page404 : path.join(ROOT, decodeURIComponent(q.url.split("?")[0]));
+    try { r.end(fs.readFileSync(f)); } catch (e) { r.statusCode = 404; r.end(); }
+  }).listen(0);
+  const port = srv.address().port, fp = await browser.newPage({ viewport: { width: 1200, height: 900 } });
+  fp.on("pageerror", (e) => errors.push(String(e)));
+  fp.on("dialog", (d) => d.accept());
+  await fp.addInitScript(fs.readFileSync(FIX("fbmock.js"), "utf8"));
+  await fp.addInitScript(() => { try { if (!sessionStorage.getItem("seeded")) { sessionStorage.setItem("seeded", "1"); localStorage.setItem("jh.cls", "2");
+    localStorage.setItem("jh.local.students", JSON.stringify([{ id: "30201", cls: 2, no: "30201", name: "김예시", apps: [{ id: "a1", kind: "수시", univ: "부산대학교", major: "국어국문학과", type: "학종", status: "지원완료", c6: true }] }])); } } catch (e) {} });
+  await fp.goto("http://localhost:" + port + "/?fb=1"); await fp.waitForTimeout(600);
+  check("로그인 전: 로그인 안내", (await fp.innerText("#banner")).split("\n")[0], "선생님 로그인");
+  await fp.click("#banner .btn"); await fp.waitForTimeout(3300);
+  const fst = () => fp.evaluate(() => JSON.parse(JSON.stringify(window.__fbMock.store)));
+  let F = await fst();
+  check("관리자 로그인: 이 브라우저 자료를 공용 저장소로 올림", Object.keys(F.students), ["30201"]);
+  check("관리자 로그인: 선생님 이름은 teachers 에", F.teachers.u_me && F.teachers.u_me.name, "관리 선생님");
+  await fp.click("#tabAll"); await fp.waitForTimeout(500);
+  await fp.fill("#teachersPanel input", "T2@X.com"); await fp.click("#teachersPanel .tadd button"); await fp.waitForTimeout(400);
+  check("관리자: 선생님 추가(소문자)", Object.keys((await fst()).allowed), ["t2@x.com"]);
+  await fp.click("#whoChip button"); await fp.waitForTimeout(400);
+  await fp.evaluate(() => { window.__fbEmail = "t2@x.com"; }); await fp.click("#banner .btn"); await fp.waitForTimeout(1200);
+  check("허락된 선생님: 자료를 보고 관리 판은 안 보임", [await fp.evaluate(() => document.querySelectorAll("#allLog .logrow").length > 0), await fp.$eval("#teachersPanel", (e) => e.hidden)], [true, true]);
+  check("변경 기록에 다른 선생님 이름", /관리 선생님/.test(await fp.innerText("#allLog")), true);
+  await fp.click("#whoChip button"); await fp.waitForTimeout(400);
+  await fp.evaluate(() => { window.__fbEmail = "bad@x.com"; }); await fp.click("#banner .btn"); await fp.waitForTimeout(1200);
+  check("허락 안 된 계정: 막고 자료 안 보임", [(await fp.innerText("#banner")).split("\n")[0], await fp.evaluate(() => [...document.querySelectorAll(".row .nm")].some((x) => x.textContent === "김예시"))], ["아직 허락되지 않은 계정입니다", false]);
+  srv.close();
+
   check("자바스크립트 오류 없음", errors, []);
   await browser.close();
   fs.unlinkSync(page404);
