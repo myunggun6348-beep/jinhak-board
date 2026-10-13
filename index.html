@@ -447,6 +447,8 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
     <div class="tablewrap"><table id="classTable"></table></div>
     <div class="listhead" style="margin-top:22px"><h2>정시 현황</h2><span class="cnt">수시 합격자는 정시 지원 불가</span></div>
     <div class="tablewrap"><table id="jungsiTable"></table></div>
+    <div class="listhead" style="margin-top:22px"><h2>진학 실적</h2><span class="cnt">학년 말 보고용</span><span class="sp"><button class="ghost" id="btnResults">실적 엑셀(CSV) 받기</button></span></div>
+    <div class="sched" id="resultsBox"></div>
     <div class="listhead" style="margin-top:22px"><h2>지원 현황</h2>
       <span class="seg" role="group" aria-label="보기"><button id="byUniv" aria-pressed="true">대학별</button><button id="byMajor" aria-pressed="false">학과별</button></span>
       <span class="cnt" id="univCount"></span>
@@ -999,6 +1001,7 @@ function detail(st){
   var d=el("div","detail");
   if(st.updatedAt){
     var lb=el("div","lastby");
+    if(st.fate) lb.appendChild(document.createTextNode("최종 진로: "+st.fate+" · "));
     lb.appendChild(document.createTextNode("마지막 수정 "+fmtWhen(st.updatedAt)));
     if(st.updatedBy){ lb.appendChild(document.createTextNode(" · ")); var who=el("span","uname"); who.dataset.uid=st.updatedBy; lb.appendChild(who); }
     d.appendChild(lb);
@@ -1018,6 +1021,10 @@ function detail(st){
   });
   cs.appendChild(cg);
   d.appendChild(cs);
+  var fc=el("div","app"), fg=el("div","grid");
+  fc.appendChild(el("div","apphead")).appendChild(el("span","kind","최종 진로"));
+  fg.appendChild(field("진학하지 않을 때(재수·취업 등)", sel(FATES,st.fate||"",function(v){ st.fate=v; save(st); render(); })));
+  fc.appendChild(fg); d.appendChild(fc);
   /* 지원 한 건을 한 줄로. 줄을 누르면 그 아래에 고치는 칸이 열린다. 상태는 줄에서 바로 바꾼다. */
   var apps=st.apps||[];
   if(apps.length){
@@ -1190,6 +1197,7 @@ function renderAll(){
   });
 
   renderJungsiAll(all);
+  renderResults(all);
   renderUniv(all);
 }
 function renderJungsiAll(all){
@@ -1752,6 +1760,124 @@ function printStudent(st){
   o.push('<script>window.onload=function(){ setTimeout(function(){ window.print(); },300); };<\/script></body></html>');
   openPrint(o.join(""), YEAR+"_상담자료_"+(st.no||"")+"_"+(st.name||"")+".html");
 }
+/* ── 진학 실적 ── */
+var FATES=["","재수","취업","군 입대","기타"];
+// 국공립 4년제·특수대(이름에 국립·도립·시립·공립이 없는 곳)
+var PUBLIC=/^(서울대|부산대|경북대|전남대|전북대|충남대|충북대|강원대|경상국립대|경상대|제주대|부경대|한국해양대|창원대|공주대|군산대|목포대|목포해양대|순천대|안동대|한국교통대|한밭대|금오공과대|금오공대|서울과학기술대|서울과기대|한경국립대|한경대|강릉원주대|한국체육대|한국교원대|한국방송통신대|서울시립대|인천대|한국예술종합학교|한국전통문화대|[가-힣]+교육대|한국과학기술원|광주과학기술원|대구경북과학기술원|울산과학기술원|경찰대|육군사관학교|해군사관학교|공군사관학교|국군간호사관학교|한국농수산대)/;
+var SIDO={서울:"서울",부산:"부산",대구:"대구",인천:"인천",광주:"광주",대전:"대전",울산:"울산",세종:"세종",경기:"경기",강원:"강원",충북:"충북",충남:"충남",전북:"전북",전남:"전남",경북:"경북",경남:"경남",제주:"제주"};
+var CITY={수원:"경기",성남:"경기",용인:"경기",안성:"경기",안산:"경기",고양:"경기",의정부:"경기",평택:"경기",화성:"경기",파주:"경기",이천:"경기",포천:"경기",부천:"경기",안양:"경기",시흥:"경기",오산:"경기",하남:"경기",ERICA:"경기",
+  춘천:"강원",원주:"강원",강릉:"강원",삼척:"강원",속초:"강원",청주:"충북",충주:"충북",제천:"충북",천안:"충남",아산:"충남",논산:"충남",홍성:"충남",예산:"충남",서산:"충남",당진:"충남",
+  전주:"전북",군산:"전북",익산:"전북",완주:"전북",남원:"전북",순천:"전남",목포:"전남",여수:"전남",나주:"전남",무안:"전남",
+  포항:"경북",경주:"경북",경산:"경북",안동:"경북",구미:"경북",영천:"경북",김천:"경북",상주:"경북",WISE:"경북",창원:"경남",김해:"경남",진주:"경남",양산:"경남",거제:"경남",통영:"경남",밀양:"경남"};
+var CAPITAL={서울:1,경기:1,인천:1};
+function univFound(a){
+  var raw=String(a.univ||""), base=shortUniv(raw).replace(/\(.*\)$/,"");
+  return /국립|도립|시립|공립/.test(raw)||PUBLIC.test(base)?"국공립":"사립";
+}
+function univRegion(a){
+  var r=String(a.region||"").replace(/특별시|광역시|특별자치시|특별자치도|도$/g,"").trim();
+  if(SIDO[r]) return SIDO[r];
+  if(/충청북/.test(r)) return "충북"; if(/충청남/.test(r)) return "충남"; if(/전라북|전북/.test(r)) return "전북"; if(/전라남/.test(r)) return "전남";
+  if(/경상북/.test(r)) return "경북"; if(/경상남/.test(r)) return "경남";
+  var m=String(a.univ||"").match(/\(([^)]*)\)\s*$/), c=m?m[1].trim():"";
+  return SIDO[c]||CITY[c]||"미상";
+}
+// 학생 한 명의 최종 결과
+function outcomeOf(st){
+  var apps=st.apps||[];
+  var reg=apps.filter(function(a){ return a.status==="등록완료"; });
+  if(reg.length) return {kind:"등록", app:reg[0]};
+  var pass=apps.filter(function(a){ return PASS[a.status]&&a.status!=="등록포기"; });
+  if(pass.length) return {kind:"합격", app:pass[0], n:pass.length};
+  if(apps.some(function(a){ return LIVE[a.status]; })) return {kind:"진행 중"};
+  if(st.fate) return {kind:st.fate};
+  return {kind:"미정"};
+}
+function resultsOf(all){
+  var R={n:all.length, reg4:0, regJ:0, pass:0, live:0, fate:{}, none:0, byCls:{}, cat:{}, uni:{}, students:[]};
+  var inc=function(o,k){ o[k]=(o[k]||0)+1; };
+  all.forEach(function(st){
+    var o=outcomeOf(st), c=st.cls||0, b=R.byCls[c]=R.byCls[c]||{n:0,reg4:0,regJ:0,pass:0,live:0,fate:0,none:0};
+    b.n++;
+    if(o.kind==="등록"){ var a=o.app;
+      if(a.jc){ R.regJ++; b.regJ++; } else { R.reg4++; b.reg4++; }
+      var ty=a.jc?"전문대":"4년제", rg=univRegion(a);
+      inc(R.cat, ty+" "+univFound(a)); inc(R.cat, CAPITAL[rg]?"수도권":(rg==="미상"?"지역 미상":"비수도권"));
+      inc(R.cat, a.kind==="정시"?"정시 등록":"수시 등록"); if(a.kind==="수시") inc(R.cat, "수시 "+(a.type||"기타"));
+    }
+    else if(o.kind==="합격"){ R.pass++; b.pass++; }
+    else if(o.kind==="진행 중"){ R.live++; b.live++; }
+    else if(o.kind==="미정"){ R.none++; b.none++; }
+    else { inc(R.fate,o.kind); b.fate++; }
+    // 대학별: 합격한 학생 수와 등록한 학생 수
+    var seen={};
+    (st.apps||[]).forEach(function(a){
+      if(!a.univ||!(PASS[a.status])) return;
+      var k=univKey(a.univ), u=R.uni[k]=R.uni[k]||{name:a.univ, type:a.jc?"전문대":"4년제", found:univFound(a), region:univRegion(a), pass:0, reg:0};
+      if(!seen[k]){ u.pass++; seen[k]=1; }
+      if(a.status==="등록완료") u.reg++;
+    });
+    R.students.push({st:st, o:o});
+  });
+  return R;
+}
+function renderResults(all){
+  var host=document.getElementById("resultsBox"); host.innerHTML="";
+  var R=resultsOf(all);
+  var sum=el("div","jsum");
+  var fateTxt=Object.keys(R.fate).map(function(k){ return k+" "+R.fate[k]; }).join(" · ");
+  [["s-ok","등록 확정 "+(R.reg4+R.regJ)+"명 (4년제 "+R.reg4+" · 전문대 "+R.regJ+")"],["s-go","합격·등록 전 "+R.pass+"명"],["","진행 중 "+R.live+"명"],
+   ["",fateTxt?"진학 안 함: "+fateTxt:""],[R.none?"s-wait":"","미정 "+R.none+"명"]].forEach(function(p){ if(p[1]) sum.appendChild(el("span","pill "+p[0],p[1])); });
+  host.appendChild(sum);
+  host.appendChild(el("div","shint","등록완료가 있으면 그 대학으로, 합격만 있으면 '등록 전'으로 셉니다. 진학하지 않는 학생은 학생 카드의 '진학하지 않을 때'에서 고르세요. 대학 구분(국공립·지역)은 대학 이름과 파일의 지역 칸으로 정합니다."));
+  // 등록 기준 구분
+  var catKeys=Object.keys(R.cat);
+  if(catKeys.length){
+    var cs=el("div","jsum");
+    ["4년제 국공립","4년제 사립","전문대 국공립","전문대 사립","수도권","비수도권","지역 미상","수시 등록","정시 등록"].concat(catKeys.filter(function(k){ return /^수시 (?!등록)/.test(k); }).sort())
+      .forEach(function(k){ if(R.cat[k]) cs.appendChild(el("span","pill",k+" "+R.cat[k])); });
+    host.appendChild(el("div","umajor","등록 기준"));
+    host.appendChild(cs);
+  }
+  // 반별
+  var t=document.createElement("table"), hr=t.createTHead().insertRow();
+  var heads=["반","학생","4년제 등록","전문대 등록","합격·등록 전","진행 중","진학 안 함","미정"];
+  heads.forEach(function(h,i){ var th=el("th",null,h); if(i>0) th.style.textAlign="right"; hr.appendChild(th); });
+  var tb=t.createTBody();
+  Object.keys(R.byCls).sort(function(a,b){return a-b;}).forEach(function(c){
+    var b=R.byCls[c], r=tb.insertRow(); r.insertCell().textContent=c+"반";
+    [b.n,b.reg4,b.regJ,b.pass,b.live,b.fate,b.none].forEach(function(v){ var td=r.insertCell(); td.className="num"; td.textContent=v; });
+  });
+  var tw=el("div","tablewrap"); tw.style.marginTop="8px"; tw.appendChild(t); host.appendChild(tw);
+  // 대학별
+  var names=Object.keys(R.uni).sort(function(a,b){ return R.uni[b].reg-R.uni[a].reg||R.uni[b].pass-R.uni[a].pass||R.uni[a].name.localeCompare(R.uni[b].name,"ko"); });
+  host.appendChild(el("div","umajor","대학별 합격·등록 ("+names.length+"개 대학)"));
+  if(names.length){
+    var ut=document.createElement("table"), uh=ut.createTHead().insertRow();
+    ["대학","구분","설립","지역","합격","등록"].forEach(function(h,i){ var th=el("th",null,h); if(i>3) th.style.textAlign="right"; uh.appendChild(th); });
+    var ub=ut.createTBody();
+    names.forEach(function(k){ var u=R.uni[k], r=ub.insertRow();
+      [u.name,u.type,u.found,u.region].forEach(function(v){ r.insertCell().textContent=v; });
+      [u.pass,u.reg].forEach(function(v){ var td=r.insertCell(); td.className="num"; td.textContent=v; }); });
+    var uw=el("div","tablewrap"); uw.appendChild(ut); host.appendChild(uw);
+  } else host.appendChild(el("div","sempty","아직 합격한 지원이 없습니다."));
+}
+function resultsCsv(){
+  var all=sorted(list()), R=resultsOf(all), rows=[];
+  rows.push([YEAR+"학년도 진학 실적"]);
+  rows.push(["학생",R.n,"4년제 등록",R.reg4,"전문대 등록",R.regJ,"합격·등록 전",R.pass,"진행 중",R.live,"미정",R.none]);
+  Object.keys(R.fate).forEach(function(k){ rows.push(["진학 안 함: "+k,R.fate[k]]); });
+  rows.push([]); rows.push(["등록 기준 구분","인원"]);
+  Object.keys(R.cat).sort().forEach(function(k){ rows.push([k,R.cat[k]]); });
+  rows.push([]); rows.push(["반","학생","4년제 등록","전문대 등록","합격·등록 전","진행 중","진학 안 함","미정"]);
+  Object.keys(R.byCls).sort(function(a,b){return a-b;}).forEach(function(c){ var b=R.byCls[c]; rows.push([c+"반",b.n,b.reg4,b.regJ,b.pass,b.live,b.fate,b.none]); });
+  rows.push([]); rows.push(["대학","구분","설립","지역","합격","등록"]);
+  Object.keys(R.uni).sort(function(a,b){ return R.uni[b].reg-R.uni[a].reg||R.uni[b].pass-R.uni[a].pass; }).forEach(function(k){ var u=R.uni[k]; rows.push([u.name,u.type,u.found,u.region,u.pass,u.reg]); });
+  rows.push([]); rows.push(["반","학번","이름","최종 결과","대학","모집단위","전형","수시/정시","구분","설립","지역"]);
+  R.students.forEach(function(x){ var st=x.st, o=x.o, a=o.app;
+    rows.push([st.cls,st.no,st.name,o.kind==="합격"?"합격(등록 전)":o.kind, a?a.univ:"", a?a.major:"", a?(a.jh||a.type):"", a?a.kind:"", a?(a.jc?"전문대":"4년제"):"", a?univFound(a):"", a?univRegion(a):""]); });
+  saveCsv(rows, YEAR+"_진학실적.csv");
+}
 /* ── 정시 현황 ── */
 var jungsiOpen=false;
 var GUN=["가","나","다"];
@@ -1946,6 +2072,7 @@ function bindStatic(){
     csatOpen=!csatOpen; render();
     if(csatOpen){ var p=document.getElementById("csatPanel"); p.scrollIntoView({block:"start"}); var f=p.querySelector("input.g"); if(f) f.focus(); }
   };
+  document.getElementById("btnResults").onclick=resultsCsv;
   document.getElementById("btnBackup").onclick=function(){
     var d=new Date(), all=sorted(list());
     saveFile("진학현황_백업_"+d.getFullYear()+pad2(d.getMonth()+1)+pad2(d.getDate())+".json",
@@ -2254,6 +2381,7 @@ var COLMAP=[
   ["num",     /^(번호|번)$/],
   ["kind",    /^(구분|전형구분|수시정시|수시\/정시|시기|모집시기)$/],
   ["found",   /^(설립구분|대학구분|학교구분|대학유형)$/],
+  ["region",  /^(지역|대학지역|소재지|시도)$/],
   ["univ",    /^(대학|대학명|지원대학|학교|학교명)$/],
   ["major",   /^(모집단위|학과|전공|학부|모집단위명)$/],
   ["jh",      /^(전형명|전형|세부유형|세부전형)$/],
@@ -2403,7 +2531,7 @@ function pushApp(res, no, name, f, cls){
     c6:(yn===null? kind==="수시" : yn),
     itv:itv, ann:ann, due:due,
     mreq:str(f.mreq), mmet:(kind==="정시"?"해당없음":(mapMin(f.mmet)||"미정")),
-    status:st||"지원완료", rank:str(f.rank), note:str(f.note)}});
+    status:st||"지원완료", rank:str(f.rank), note:str(f.note), region:str(f.region)}});
 }
 function readApps(rows){
   var res={apps:[], skipped:[], notes:{status:0, due:0, statusRaw:[], oldDate:0, oldRaw:[]}};
@@ -2603,7 +2731,7 @@ function commitApps(byStudent, cls, res, source){
           (!x.jh || !a.app.jh || sameKey(x.jh)===sameKey(a.app.jh));
       })[0];
       if(same){
-        ["jh","group","itv","ann","due","rank","note"].forEach(function(k){ if(a.app[k]) same[k]=a.app[k]; });
+        ["jh","group","itv","ann","due","rank","note","region"].forEach(function(k){ if(a.app[k]) same[k]=a.app[k]; });
         if(a.given.status) same.status=a.app.status;
         if(a.given.type) same.type=a.app.type;
         if(a.given.c6) same.c6=a.app.c6;
@@ -2781,6 +2909,7 @@ function start(){
     document.getElementById("btnCsv").hidden=!d;
     document.getElementById("btnCsvAll").hidden=!d;
     document.getElementById("btnBackup").hidden=!d;
+    document.getElementById("btnResults").hidden=!d;
     document.getElementById("btnPrint").hidden=!d;
   }).catch(function(){});
 
@@ -2799,7 +2928,7 @@ function start(){
         next.set(d.id, {id:d.id, cls:body.cls, no:body.no, name:body.name,
           apps:Array.isArray(body.apps)?JSON.parse(JSON.stringify(body.apps)):[],
           csat:body.csat&&typeof body.csat==="object"?JSON.parse(JSON.stringify(body.csat)):undefined,
-          updatedAt:body.updatedAt, updatedBy:body.updatedBy});
+          updatedAt:body.updatedAt, updatedBy:body.updatedBy, fate:body.fate});
       });
       students=next;
       fillAll();
@@ -2818,6 +2947,7 @@ try{ if(location.protocol==="file:"||location.hostname==="localhost"){
     parseDate:parseDate, parseYN:parseYN, pickStudents:pickStudents,
     parseDelimited:parseDelimited, readApps:readApps, pdfTableRows:pdfTableRows, last:function(){ return lastRead; },
     checkStudent:checkStudent, parseMin:parseMin, judgeMin:judgeMin, rowsFromPdf:rowsFromPdf,
+    univFound:univFound, univRegion:univRegion, outcomeOf:outcomeOf, resultsOf:resultsOf,
     univKey:univKey, majorKey:majorKey, upcoming:upcoming, pending:pending, icsFold:icsFold, jungsiOf:jungsiOf};
 } }catch(e){}
 

@@ -312,6 +312,29 @@ function buildTestPage() {
   check("달력 줄 75바이트 안으로 접기", misc.foldMax <= 75 && misc.foldCont, true);
   check("정시 현황: 수시 합격·가군·전문대 구분", misc.jungsi, "1,1,1");
 
+  console.log("\n[진학 실적]");
+  const res = await p.evaluate(() => {
+    const d = window.__dev;
+    const F = (u) => d.univFound({ univ: u });
+    const R = (u, r) => d.univRegion({ univ: u, region: r || "" });
+    const O = (apps, fate) => d.outcomeOf({ apps, fate }).kind;
+    return {
+      found: [F("국립부경대학교(부산)"), F("부산대학교(부산)"), F("서울시립대학교"), F("부산교육대학교"), F("동아대학교(부산)"), F("경남도립거창대학")].join(","),
+      region: [R("부산대학교(부산)"), R("인제대학교(김해)"), R("경희대학교(국제)", "경기"), R("동국대학교(WISE)"), R("동의과학대학교"), R("x", "경상남도")].join(","),
+      outcome: [
+        O([{ status: "등록완료" }, { status: "최초합" }]),
+        O([{ status: "등록포기" }, { status: "충원합" }]),
+        O([{ status: "등록포기" }]),
+        O([{ status: "충원대기" }]),
+        O([{ status: "불합격" }], "재수"),
+        O([{ status: "불합격" }]),
+      ].join(","),
+    };
+  });
+  check("국공립·사립 구분", res.found, "국공립,국공립,국공립,국공립,사립,국공립");
+  check("지역: 괄호 속 지명·파일의 지역 칸", res.region, "부산,경남,경기,경북,미상,경남");
+  check("최종 결과: 등록 > 합격(등록포기 제외) > 진행 중 > 진로", res.outcome, "등록,합격,미정,진행 중,재수,미정");
+
   check("자바스크립트 오류 없음", errors, []);
   await browser.close();
   fs.unlinkSync(page404);
