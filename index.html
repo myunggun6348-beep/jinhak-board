@@ -460,6 +460,9 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
     <div class="tablewrap"><table id="classTable"></table></div>
     <div class="listhead" style="margin-top:22px"><h2>정시 현황</h2><span class="cnt">수시 합격자는 정시 지원 불가</span></div>
     <div class="tablewrap"><table id="jungsiTable"></table></div>
+    <div class="listhead" style="margin-top:22px"><h2>수능최저 기준 점검</h2><span class="cnt" id="minCheckCnt"></span>
+      <span class="sp"><button class="ghost" id="btnMinCopy">목록 복사</button><button class="ghost" id="btnMinCsv">목록 CSV 받기</button></span></div>
+    <div class="sched" id="minCheck"></div>
     <div class="listhead" style="margin-top:22px"><h2>진학 실적</h2><span class="cnt">학년 말 보고용</span><span class="sp"><button class="ghost" id="btnResults">실적 엑셀(CSV) 받기</button></span></div>
     <div class="sched" id="resultsBox"></div>
     <div class="listhead" style="margin-top:22px"><h2>지원 현황</h2>
@@ -607,6 +610,7 @@ function parseMin(raw){
   // 탐구 이름들 → 탐
   s=s.replace(/사회\/과학탐구|사탐\/과탐|사\/과탐|사회혹은과학탐구|사회·과학|사회\/과학|사\/과/g,"탐")
      .replace(/\(탐구?:탐\)/g,"").replace(/\(탐\)/g,"").replace(/\(탐(?=\d|중)/g,"(");
+  if(/또는|혹은/.test(s)) return {err:"선택과목·대체 조건이 있어 직접 확인해야 합니다"};
   // 판정과 상관없는 말
   s=s.replace(/\(필수응시:[^)]*\)/g,"")
      .replace(/,?한국사(는|를)?(필수)?응시(필수)?(\((등급미반영|반영영역제외)\))?/g,"")
@@ -1211,6 +1215,7 @@ function renderAll(){
   });
 
   renderJungsiAll(all);
+  renderMinCheck(all);
   renderResults(all);
   renderUniv(all);
 }
@@ -1831,6 +1836,61 @@ function printStudent(st){
   o.push('<script>window.onload=function(){ setTimeout(function(){ window.print(); },300); };<\/script></body></html>');
   openPrint(o.join(""), YEAR+"_상담자료_"+(st.no||"")+"_"+(st.name||"")+".html");
 }
+/* ── 수능최저 기준 점검 ── */
+function minGaps(all){
+  var miss={}, bad={};
+  all.forEach(function(st){ (st.apps||[]).forEach(function(a){
+    if(a.kind!=="수시"||!a.univ) return;
+    var k=minKey(a), add=function(o,extra){ var e=o[k]=o[k]||{univ:a.univ, major:a.major||"", jh:a.jh||a.type||"", n:0, cls:{}, who:[], why:extra, text:a.mreq};
+      e.n++; if(st.cls) e.cls[st.cls]=1; e.who.push(st); };
+    if(/^최저 있음/.test(a.mreq||"")) add(miss);
+    else if(a.mreq){ var p=parseMin(a.mreq); if(p.err) add(bad,p.err); }
+  }); });
+  var sortf=function(o){ return Object.keys(o).map(function(k){ return o[k]; }).sort(function(x,y){ return y.n-x.n||x.univ.localeCompare(y.univ,"ko"); }); };
+  return {miss:sortf(miss), bad:sortf(bad)};
+}
+function minGapText(G){
+  var line=function(e){ return [e.univ, e.major, e.jh].join(" | ")+" ("+e.n+"명, "+Object.keys(e.cls).sort(function(a,b){return a-b;}).map(function(c){return c+"반";}).join("·")+")"; };
+  var t=[YEAR+"학년도 수능최저 기준 점검 ("+new Date().toLocaleDateString("ko-KR")+")"];
+  if(G.miss.length){ t.push("","[기준 문장이 없는 지원 — 요강에서 찾아 넣어 주세요]"); G.miss.forEach(function(e){ t.push("- "+line(e)); }); }
+  if(G.bad.length){ t.push("","[기준은 있지만 자동 판정이 안 되는 지원]"); G.bad.forEach(function(e){ t.push("- "+line(e)+" — "+e.why, "  기준: "+String(e.text).replace(/\s+/g," ")); }); }
+  if(!G.miss.length&&!G.bad.length) t.push("","빠진 기준이 없습니다.");
+  return t.join("\n");
+}
+function renderMinCheck(all){
+  var host=document.getElementById("minCheck"); host.innerHTML="";
+  var G=minGaps(all);
+  document.getElementById("minCheckCnt").textContent=G.miss.length||G.bad.length?"기준 없음 "+G.miss.length+" · 판정 안 됨 "+G.bad.length:"모두 채워짐";
+  host.appendChild(el("div","shint","파일에 '최저 있음'만 있고 기준 문장이 없는 지원과, 문장은 있지만 앱이 읽지 못하는 지원입니다. '목록 복사'로 Claude 에게 붙여 주시면 2027 모집요강에서 찾아 학교 기준표에 넣습니다. 학생 카드에서 직접 기준을 적어도 됩니다(적은 기준은 다른 반의 같은 지원에도 쓰입니다)."));
+  var block=function(title,list,showWhy){
+    host.appendChild(el("div","umajor",title+" ("+list.length+")"));
+    if(!list.length){ host.appendChild(el("div","sempty","없습니다.")); return; }
+    list.forEach(function(e){
+      var row=el("div","uitem");
+      row.appendChild(el("b",null,shortUniv(e.univ)));
+      row.appendChild(el("span","sub",[shortMajor(e.major), e.jh].filter(Boolean).join(" · ")));
+      row.appendChild(el("span","pill",e.n+"명 · "+Object.keys(e.cls).sort(function(a,b){return a-b;}).map(function(c){return c+"반";}).join("·")));
+      var who=e.who[0], go=el("button","who","학생 보기");
+      go.onclick=function(){ goStudent(who); };
+      row.appendChild(go);
+      if(showWhy){ var m=el("div","meta",e.why+" — "+String(e.text).replace(/\s+/g," ").slice(0,140)); row.appendChild(m); }
+      host.appendChild(row);
+    });
+  };
+  block("기준 문장이 없는 지원", G.miss, false);
+  block("기준은 있지만 자동 판정이 안 되는 지원", G.bad, true);
+}
+function copyText(text){
+  var done=function(){ alert("목록을 복사했습니다. Claude 대화창에 붙여넣어 주세요."); };
+  var fallback=function(){
+    var ta=document.createElement("textarea"); ta.value=text; ta.style.position="fixed"; ta.style.opacity="0";
+    document.body.appendChild(ta); ta.select();
+    var ok=false; try{ ok=document.execCommand("copy"); }catch(e){}
+    ta.remove();
+    if(ok) done(); else window.prompt("아래 글을 복사해 주세요(Ctrl+C).", text);
+  };
+  if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, fallback); else fallback();
+}
 /* ── 진학 실적 ── */
 var FATES=["","재수","취업","군 입대","기타"];
 // 국공립 4년제·특수대(이름에 국립·도립·시립·공립이 없는 곳)
@@ -2144,6 +2204,13 @@ function bindStatic(){
     if(csatOpen){ var p=document.getElementById("csatPanel"); p.scrollIntoView({block:"start"}); var f=p.querySelector("input.g"); if(f) f.focus(); }
   };
   document.getElementById("btnResults").onclick=resultsCsv;
+  document.getElementById("btnMinCopy").onclick=function(){ copyText(minGapText(minGaps(sorted(list())))); };
+  document.getElementById("btnMinCsv").onclick=function(){
+    var G=minGaps(sorted(list())), rows=[["구분","대학","모집단위","전형","지원 학생 수","반","이유","기준 문장"]];
+    G.miss.forEach(function(e){ rows.push(["기준 없음",e.univ,e.major,e.jh,e.n,Object.keys(e.cls).join(" "),"",""]); });
+    G.bad.forEach(function(e){ rows.push(["판정 안 됨",e.univ,e.major,e.jh,e.n,Object.keys(e.cls).join(" "),e.why,e.text]); });
+    saveCsv(rows, YEAR+"_수능최저_점검.csv");
+  };
   document.getElementById("btnBackup").onclick=function(){
     var d=new Date(), all=sorted(list());
     saveFile("진학현황_백업_"+d.getFullYear()+pad2(d.getMonth()+1)+pad2(d.getDate())+".json",
@@ -2981,6 +3048,7 @@ function start(){
     document.getElementById("btnCsvAll").hidden=!d;
     document.getElementById("btnBackup").hidden=!d;
     document.getElementById("btnResults").hidden=!d;
+    document.getElementById("btnMinCsv").hidden=!d;
     document.getElementById("btnPrint").hidden=!d;
   }).catch(function(){});
 
@@ -3019,7 +3087,7 @@ try{ if(location.protocol==="file:"||location.hostname==="localhost"){
     parseDelimited:parseDelimited, readApps:readApps, pdfTableRows:pdfTableRows, last:function(){ return lastRead; },
     checkStudent:checkStudent, parseMin:parseMin, judgeMin:judgeMin, rowsFromPdf:rowsFromPdf,
     univFound:univFound, univRegion:univRegion, outcomeOf:outcomeOf, resultsOf:resultsOf,
-    KEYDATES:KEYDATES, univKey:univKey, majorKey:majorKey, upcoming:upcoming, pending:pending, icsFold:icsFold, jungsiOf:jungsiOf};
+    KEYDATES:KEYDATES, minGaps:minGaps, univKey:univKey, majorKey:majorKey, upcoming:upcoming, pending:pending, icsFold:icsFold, jungsiOf:jungsiOf};
 } }catch(e){}
 
 if(window.claude&&window.claude.hot&&window.claude.hot.ready){ window.claude.hot.ready(start); }

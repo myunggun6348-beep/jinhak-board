@@ -338,6 +338,12 @@ function buildTestPage() {
   const kd = await p.evaluate(() => { const K = window.__dev.KEYDATES;
     return { sorted: K.every((k, i) => !i || K[i - 1].s <= k.s) && K.every((k) => !k.e || k.e >= k.s), csat: K.find((k) => k.id === "csat").s, jApp: K.find((k) => k.id === "j-app").s }; });
   check("입시 공통 일정: 날짜순", kd.sorted, true);
+
+  const gaps = await p.evaluate(() => { const G = window.__dev.minGaps([
+    { cls: 2, apps: [{ kind: "수시", univ: "A대학교", major: "가학과", jh: "교과", mreq: "최저 있음(기준 미기재)" }, { kind: "수시", univ: "B대학교", mreq: "2개합 5 또는 영어 1" }, { kind: "수시", univ: "C대학교", mreq: "국수영탐 중 2개합 5" }, { kind: "수시", univ: "D대학교", mreq: "없음" }] },
+    { cls: 5, apps: [{ kind: "수시", univ: "A대학교", major: "가학과", jh: "교과", mreq: "최저 있음(기준 미기재)" }] },
+  ]); return G.miss.map((e) => e.univ + e.n + Object.keys(e.cls).join("")).join() + "/" + G.bad.map((e) => e.univ).join(); });
+  check("최저 점검: 기준 없음은 모아 세고, 못 읽는 기준만 따로", gaps, "A대학교225/B대학교");
   check("2027 수능 2026-11-19 · 정시 접수 2027-01-04", kd.csat + " " + kd.jApp, "2026-11-19 2027-01-04");
 
   check("자바스크립트 오류 없음", errors, []);
