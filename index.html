@@ -1274,15 +1274,61 @@ function univDetail(list,byM){
 var schedDays=14, schedAll=false;
 try{ schedDays=parseInt(localStorage.getItem("jh.sched"),10)||14; }catch(e){}
 var WD=["일","월","화","수","목","금","토"];
-function upcoming(arr){
-  var ev=[];
+function upcoming(arr,days){
+  var ev=[], lim=days==null?schedDays:days;
   arr.forEach(function(s){ (s.apps||[]).forEach(function(a){
-    var add=function(when,kind){ var d=daysTo(when); if(d!==null&&d>=0&&d<=schedDays) ev.push({s:s,a:a,kind:kind,when:when,d:d}); };
+    var add=function(when,kind){ var d=daysTo(when); if(d!==null&&d>=0&&d<=lim) ev.push({s:s,a:a,kind:kind,when:when,d:d}); };
     if(a.itv&&!PASS[a.status]&&!/불/.test(a.status||"")) add(a.itv,"itv");
     if(a.ann&&AWAIT[a.status||"지원완료"]) add(a.ann,"ann");
     if(a.due&&a.status==="충원대기") add(a.due,"due");
   }); });
   return ev.sort(function(x,y){ return String(x.when).localeCompare(String(y.when))||(x.s.cls-y.s.cls)||String(x.s.no||"").localeCompare(String(y.s.no||"")); });
+}
+var icsHint=false;
+function icsText(v){ return String(v==null?"":v).replace(/\\/g,"\\\\").replace(/;/g,"\\;").replace(/,/g,"\\,").replace(/\r?\n/g,"\\n"); }
+// 한 줄 75바이트 넘으면 접는다(한글은 3바이트)
+function icsFold(line){
+  var out="", n=0;
+  Array.from(line).forEach(function(ch){
+    var b=unescape(encodeURIComponent(ch)).length;
+    if(n+b>73){ out+="\r\n "; n=1; }
+    out+=ch; n+=b;
+  });
+  return out;
+}
+function icsDate(d){ return d.getUTCFullYear()+pad2(d.getUTCMonth()+1)+pad2(d.getUTCDate())+"T"+pad2(d.getUTCHours())+pad2(d.getUTCMinutes())+"00Z"; }
+function saveIcs(ev, label){
+  var now=icsDate(new Date()), L=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//jinhak-board//KO","CALSCALE:GREGORIAN","METHOD:PUBLISH","X-WR-CALNAME:"+icsText(YEAR+" 진학 일정 "+label),"X-WR-TIMEZONE:Asia/Seoul"];
+  var allDay=function(day){ var d0=new Date(day+"T00:00:00"), d1=new Date(d0.getTime()+86400000);
+    return ["DTSTART;VALUE=DATE:"+day.replace(/-/g,""),"DTEND;VALUE=DATE:"+d1.getFullYear()+pad2(d1.getMonth()+1)+pad2(d1.getDate()),"TRANSP:TRANSPARENT"]; };
+  var alarm=function(title,trig){ return ["BEGIN:VALARM","ACTION:DISPLAY","DESCRIPTION:"+icsText(title),"TRIGGER:"+trig,"END:VALARM"]; };
+  // 발표: 날짜별로 하나
+  var anns={};
+  ev.filter(function(e){ return e.kind==="ann"; }).forEach(function(e){ var d=String(e.when).slice(0,10); (anns[d]=anns[d]||[]).push(e); });
+  Object.keys(anns).sort().forEach(function(day){
+    var list=anns[day];
+    var who=list.map(function(e){ return e.s.name; }).filter(function(n,i,arr){ return arr.indexOf(n)===i; });
+    var title="[발표] "+label+" "+list.length+"건 · "+who.slice(0,3).join(", ")+(who.length>3?" 외 "+(who.length-3)+"명":"");
+    var desc=list.map(function(e){ var a=e.a; return (e.s.cls?e.s.cls+"반 ":"")+(e.s.name||"")+" - "+[shortUniv(a.univ), shortMajor(a.major), a.jh||a.type].filter(Boolean).join(" "); }).join("\n");
+    L.push.apply(L,["BEGIN:VEVENT","UID:ann-"+day+"-"+encodeURIComponent(label).replace(/%/g,"")+"@jinhak-board","DTSTAMP:"+now]
+      .concat(allDay(day),["SUMMARY:"+icsText(title),"DESCRIPTION:"+icsText(desc)],alarm(title,"-PT15H"),["END:VEVENT"]));
+  });
+  ev.filter(function(e){ return e.kind!=="ann"; }).forEach(function(e){
+    var s=e.s, a=e.a, kind=e.kind==="itv"?"면접·고사":"충원 마감";
+    var title="["+kind+"] "+(s.cls?s.cls+"반 ":"")+(s.name||"")+" · "+[(a.jc?"전문대 ":"")+shortUniv(a.univ), shortMajor(a.major)].filter(Boolean).join(" ");
+    var desc=[a.univ, a.major, a.jh||a.type, "상태: "+(a.status||"지원완료")+(a.rank?" (예비 "+a.rank+")":""),
+      a.kind==="수시"&&a.mreq?"수능최저: "+(minShort(a.mreq)||a.mreq)+(a.mmet&&a.mmet!=="미정"&&a.mmet!=="해당없음"?" ("+a.mmet+")":""):""].filter(Boolean).join("\n");
+    L.push("BEGIN:VEVENT","UID:"+a.id+"-"+e.kind+"@jinhak-board","DTSTAMP:"+now);
+    if(e.kind==="due"&&/T\d/.test(a.due)){
+      var t=new Date(a.due);
+      L.push("DTSTART:"+icsDate(t),"DTEND:"+icsDate(new Date(t.getTime()+30*60000)));
+    } else L.push.apply(L, allDay(String(e.when).slice(0,10)));
+    L.push("SUMMARY:"+icsText(title),"DESCRIPTION:"+icsText(desc),
+      "BEGIN:VALARM","ACTION:DISPLAY","DESCRIPTION:"+icsText(title),"TRIGGER:"+(e.kind==="due"&&/T\d/.test(a.due)?"-PT3H":"-PT15H"),"END:VALARM",
+      "END:VEVENT");
+  });
+  L.push("END:VCALENDAR");
+  saveFile(YEAR+"_진학일정_"+label+".ics", L.map(icsFold).join("\r\n")+"\r\n");
 }
 function renderSched(host, arr, showClass){
   host.innerHTML="";
@@ -1297,7 +1343,16 @@ function renderSched(host, arr, showClass){
   });
   hd.appendChild(seg);
   hd.appendChild(el("span","cnt",ev.length?ev.length+"건":""));
+  var all=upcoming(arr,9999);
+  if(all.length&&(downloadsCap||!window.claude)){
+    var ib=el("button","ghost","달력에 넣기");
+    ib.style.marginLeft="auto";
+    ib.title="오늘 이후 면접·고사, 발표(날짜별로 묶음), 충원 마감을 달력 파일(.ics)로 받습니다. 핸드폰에서 열거나 구글 캘린더에서 가져오면 한 번에 들어갑니다.";
+    ib.onclick=function(){ saveIcs(all, showClass?"전체":getCls()+"반"); icsHint=true; render(); };
+    hd.appendChild(ib);
+  }
   host.appendChild(hd);
+  if(icsHint) host.appendChild(el("div","shint","받은 달력 파일(.ics)을 핸드폰에서 열면 달력에 들어갑니다. 구글 캘린더는 컴퓨터에서 설정 → 가져오기·내보내기 → 가져오기로 넣습니다. 일정이 바뀌면 다시 받아 넣으세요(같은 일정은 덮어씁니다)."));
   if(!ev.length){ host.appendChild(el("div","sempty","앞으로 "+schedDays+"일 안에 면접·발표·충원 마감 일정이 없습니다.")); return; }
   var LIMIT=12, cur=null;
   ev.slice(0,schedAll?ev.length:LIMIT).forEach(function(e){
@@ -2387,7 +2442,7 @@ function tmplApps(){
 }
 function saveFile(name,data){
   if(!downloadsCap&&!window.claude){
-    var type=/\.json$/.test(name)?"application/json":/\.html$/.test(name)?"text/html;charset=utf-8":"text/csv;charset=utf-8";
+    var type=/\.json$/.test(name)?"application/json":/\.html$/.test(name)?"text/html;charset=utf-8":/\.ics$/.test(name)?"text/calendar;charset=utf-8":"text/csv;charset=utf-8";
     var u=URL.createObjectURL(new Blob([data],{type:type}));
     var a=document.createElement("a"); a.href=u; a.download=name;
     document.body.appendChild(a); a.click(); a.remove();
