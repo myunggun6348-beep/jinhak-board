@@ -268,6 +268,15 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
 .lockbar b{font-weight:700}
 .lockbar .sp{margin-left:auto; display:flex; gap:6px; flex-wrap:wrap}
 .lastby{font-size:11.5px; color:var(--ink-3); margin:-2px 2px 0}
+#jungsiPanel table,#jungsiTable{min-width:560px}
+#jungsiPanel td{white-space:normal; vertical-align:top; font-size:12.5px}
+#jungsiPanel td.gun{min-width:96px}
+#jungsiPanel .japp{display:block; background:none; border:0; padding:0; text-align:left; color:var(--ink); font-size:12.5px; cursor:pointer}
+#jungsiPanel .japp:hover{text-decoration:underline}
+#jungsiPanel .japp.bad{color:var(--bad); font-weight:700}
+#jungsiPanel .jadd{font-size:12px; padding:2px 8px}
+#jungsiPanel .jno{color:var(--ink-3)}
+.jsum{display:flex; flex-wrap:wrap; gap:6px; margin:8px 0}
 .sempty{font-size:12.5px; color:var(--ink-3); margin-top:8px}
 .smore{margin-top:8px}
 .usearch{border:1px solid var(--line-2); background:var(--surface); color:var(--ink); border-radius:7px; padding:5px 10px; font-size:13px; width:190px}
@@ -329,6 +338,7 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
   #viewAll table{min-width:0; font-size:12.5px}
   #viewAll th,#viewAll td{padding:8px 7px; white-space:normal}
   #viewAll th{white-space:nowrap}
+  #jungsiTable{min-width:0}
   .usearch{width:100%; font-size:16px}
   #csatPanel input.g{font-size:16px; width:30px}
   #csatPanel th.no,#csatPanel td.no,#csatPanel th.mres{display:none}
@@ -375,12 +385,14 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
       <span class="cnt" id="listCount"></span>
       <span class="sp">
         <button class="ghost" id="btnUndo" hidden disabled>↶ 되돌리기</button>
+        <button class="ghost" id="btnJungsi" title="학생마다 수시 결과와 정시 가·나·다군 지원을 한눈에 봅니다">정시 현황</button>
         <button class="ghost" id="btnCsat" title="반 학생 전체의 수능(가채점) 등급을 표 한 장에 넣고 최저 충족을 바로 봅니다">수능 등급 넣기</button>
         <button class="ghost" id="btnCsv">CSV 내려받기</button>
         <button class="ghost" id="btnPrint" title="이 반의 지원·결과를 A4 로 인쇄합니다">인쇄</button>
         <button class="ghost" id="btnClearLocal" hidden title="이 브라우저에 저장된 자료만 지웁니다">이 브라우저 자료 지우기</button>
       </span>
     </div>
+    <div class="sched" id="jungsiPanel" hidden></div>
     <div class="sched" id="csatPanel" hidden></div>
     <div class="rows" id="rows"></div>
 
@@ -433,6 +445,8 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
     <div class="sched" id="allTodo" hidden></div>
     <div class="listhead"><h2>반별 현황</h2><span class="sp"><button class="ghost" id="btnBackup" title="모든 반 학생·지원 자료를 파일 하나로 받습니다">전체 백업 받기</button><button class="ghost" id="btnRestore" title="백업 파일의 학생 자료로 되돌립니다">백업 되살리기</button><input type="file" id="restoreFile" accept=".json,application/json" hidden><button class="ghost" id="btnCsvAll">전체 CSV 내려받기</button></span></div>
     <div class="tablewrap"><table id="classTable"></table></div>
+    <div class="listhead" style="margin-top:22px"><h2>정시 현황</h2><span class="cnt">수시 합격자는 정시 지원 불가</span></div>
+    <div class="tablewrap"><table id="jungsiTable"></table></div>
     <div class="listhead" style="margin-top:22px"><h2>지원 현황</h2>
       <span class="seg" role="group" aria-label="보기"><button id="byUniv" aria-pressed="true">대학별</button><button id="byMajor" aria-pressed="false">학과별</button></span>
       <span class="cnt" id="univCount"></span>
@@ -515,6 +529,11 @@ function checkStudent(st){
   Object.keys(itv).forEach(function(d){ var u=Object.keys(itv[d]); if(u.length>1)
     out.push({lv:"warn",code:"면접중복",msg:d+" 면접·고사일이 "+u.length+"곳 같은 날입니다("+u.map(shortUniv).join(", ")+"). 시간이 겹치는지 확인하세요."}); });
   if(passed>0&&jungsi>0) out.push({lv:"crit",code:"정시지원불가",msg:"수시에 합격했습니다. 등록을 포기해도 정시 지원이 불가합니다."});
+  var gun={}, noGun=0;
+  apps.forEach(function(a){ if(a.kind==="정시"&&!a.jc){ if(a.group) (gun[a.group]=gun[a.group]||[]).push(a); else noGun++; } });
+  Object.keys(gun).forEach(function(g){ if(gun[g].length>1)
+    out.push({lv:"crit",code:"군중복",msg:"정시 "+g+"군에 "+gun[g].length+"곳 지원했습니다("+gun[g].map(function(a){return shortUniv(a.univ);}).join(", ")+"). 4년제 정시는 군마다 한 곳만 지원할 수 있습니다."}); });
+  if(noGun) out.push({lv:"warn",code:"군 미입력",msg:"4년제 정시 지원 "+noGun+"건에 가·나·다군이 없습니다. 군을 넣어야 중복을 확인할 수 있습니다."});
   if(reg>1) out.push({lv:"crit",code:"이중등록",msg:"등록완료가 "+reg+"건입니다. 이중등록은 입학 취소 사유입니다."});
   apps.forEach(function(a){
     if(a.kind==="수시"&&a.mmet==="미충족"&&LIVE[a.status])
@@ -534,6 +553,7 @@ function appWarn(st,a){
   var apps=st.apps||[];
   if(a.kind==="수시"&&a.mmet==="미충족"&&LIVE[a.status]) return "수능최저 미충족";
   if(a.kind==="정시"&&apps.some(function(x){return x.kind==="수시"&&PASS[x.status];})) return "수시 합격자는 정시 지원 불가";
+  if(a.kind==="정시"&&!a.jc&&a.group&&apps.filter(function(x){return x.kind==="정시"&&!x.jc&&x.group===a.group;}).length>1) return a.group+"군 중복";
   if(a.itv&&apps.some(function(x){return x.itv===a.itv&&x.univ!==a.univ;})) return "면접·고사일 중복";
   if(a.status==="등록완료"&&apps.filter(function(x){return x.status==="등록완료";}).length>1) return "이중등록";
   if(a.status==="충원대기"&&a.due){var d=daysTo(a.due); if(d!==null&&d>=0&&d<=3) return "충원 마감 임박";}
@@ -804,6 +824,7 @@ function render(){
   renderTodo(document.getElementById("todo"), cls?mine:[], false);
   renderRows(mine, cls);
   renderCsat(cls?mine:[]);
+  renderJungsi(cls?mine:[]);
   renderUndo();
   document.getElementById("btnClearLocal").hidden=!(practice&&!demo);
   curCls=null;
@@ -1164,7 +1185,29 @@ function renderAll(){
     });
   });
 
+  renderJungsiAll(all);
   renderUniv(all);
+}
+function renderJungsiAll(all){
+  var by={};
+  all.forEach(function(st){ var c=st.cls||0, o=jungsiOf(st);
+    var b=by[c]=by[c]||{n:0,pass:0,any:0,가:0,나:0,다:0,jc:0,plan:0,dup:0};
+    b.n++; if(o.pass.length) b.pass++; if(o.any) b.any++;
+    GUN.forEach(function(g){ b[g]+=o.gun[g].length; }); b.jc+=o.jc.length;
+    if(!o.pass.length&&!o.any) b.plan++;
+    if(checkStudent(st).some(function(x){ return /군중복|정시지원불가/.test(x.code); })) b.dup++; });
+  var t=document.getElementById("jungsiTable"); t.innerHTML="";
+  var heads=["반","학생","수시 합격","정시 지원","가군","나군","다군","전문대","계획 없음","경고"];
+  var hr=t.createTHead().insertRow(); heads.forEach(function(h,i){ var th=el("th",null,h); if(i>0) th.style.textAlign="right"; hr.appendChild(th); });
+  var tb=t.createTBody();
+  Object.keys(by).sort(function(a,b){return a-b;}).forEach(function(c){
+    var b=by[c], r=tb.insertRow(); r.insertCell().textContent=c+"반";
+    [b.n,b.pass,b.any,b.가,b.나,b.다,b.jc,b.plan,b.dup].forEach(function(v,i){
+      var td=r.insertCell(); td.className="num"; td.textContent=v;
+      if(i===7&&v) td.style.color="var(--warn)", td.style.fontWeight="700";
+      if(i===8&&v) td.style.color="var(--bad)", td.style.fontWeight="700";
+    });
+  });
 }
 
 /* ── 전체 현황: 대학별 ──
@@ -1635,6 +1678,86 @@ function printClass(){
   if(!w){ saveFile(name, doc); return; }
   w.document.open(); w.document.write(doc); w.document.close();
 }
+/* ── 정시 현황 ── */
+var jungsiOpen=false;
+var GUN=["가","나","다"];
+function jungsiOf(st){
+  var apps=st.apps||[], o={st:st, pass:apps.filter(function(a){ return a.kind==="수시"&&PASS[a.status]; }),
+    live:apps.filter(function(a){ return a.kind==="수시"&&LIVE[a.status]; }).length,
+    gun:{가:[],나:[],다:[]}, none:[], jc:[]};
+  apps.forEach(function(a){ if(a.kind!=="정시") return;
+    if(a.jc) o.jc.push(a); else if(o.gun[a.group]) o.gun[a.group].push(a); else o.none.push(a); });
+  o.any=GUN.some(function(g){ return o.gun[g].length; })||o.jc.length||o.none.length;
+  return o;
+}
+function openApp(st,a){ openId=st.id; editAppId=a?a.id:null; render();
+  setTimeout(function(){ var h=document.querySelector("#rows [aria-expanded=true]"); if(h) h.scrollIntoView({block:"start"}); },0); }
+function addJungsi(st,g,jc){
+  addApp(st,"정시",!!jc);
+  var a=st.apps[st.apps.length-1];
+  if(g){ a.group=g; save(st); }
+  openApp(st,a);
+}
+function renderJungsi(mine){
+  var host=document.getElementById("jungsiPanel");
+  host.hidden=!jungsiOpen;
+  document.getElementById("btnJungsi").setAttribute("aria-pressed",String(jungsiOpen));
+  if(!jungsiOpen) return;
+  host.innerHTML="";
+  var hd=el("div","schedhead");
+  hd.appendChild(el("h2",null,"정시 현황"));
+  var x=el("button","ghost","닫기"); x.style.marginLeft="auto";
+  x.onclick=function(){ jungsiOpen=false; render(); };
+  hd.appendChild(x);
+  host.appendChild(hd);
+  var rows=mine.map(jungsiOf);
+  var cnt={pass:0,any:0,가:0,나:0,다:0,jc:0,plan:0};
+  rows.forEach(function(o){ if(o.pass.length) cnt.pass++; if(o.any) cnt.any++;
+    GUN.forEach(function(g){ if(o.gun[g].length) cnt[g]++; }); if(o.jc.length) cnt.jc++;
+    if(!o.pass.length&&!o.any) cnt.plan++; });
+  var sum=el("div","jsum");
+  [["s-ok","수시 합격 "+cnt.pass+"명(정시 불가)"],["s-go","정시 지원 "+cnt.any+"명"],["","가군 "+cnt.가+" · 나군 "+cnt.나+" · 다군 "+cnt.다+" · 전문대 "+cnt.jc],
+   [cnt.plan?"s-wait":"","정시 계획 없음 "+cnt.plan+"명"]].forEach(function(p){ sum.appendChild(el("span","pill "+p[0],p[1])); });
+  host.appendChild(sum);
+  host.appendChild(el("div","shint","수시에 합격한 학생은(등록을 포기해도) 정시에 지원할 수 없습니다. 4년제 정시는 가·나·다군마다 한 곳, 전문대 정시는 군 제한이 없습니다. 칸을 누르면 그 지원을 고칩니다."));
+  var tw=el("div","tablewrap"); tw.style.marginTop="8px";
+  var t=document.createElement("table"), hr=t.createTHead().insertRow();
+  ["학번","이름","수시","가군","나군","다군","전문대","확인할 것"].forEach(function(h){ hr.appendChild(el("th",null,h)); });
+  var tb=t.createTBody(), lock=ro();
+  rows.forEach(function(o){
+    var st=o.st, r=tb.insertRow();
+    r.insertCell().textContent=st.no||"";
+    var nc=r.insertCell(); var nb=el("button","japp",st.name||""); nb.style.fontWeight="700"; nb.onclick=function(){ openApp(st,null); }; nc.appendChild(nb);
+    var sc=r.insertCell();
+    if(o.pass.length) sc.appendChild(el("span","pill s-ok","합격: "+o.pass.map(function(a){ return shortUniv(a.univ); }).join(", ")));
+    else if(o.live) sc.appendChild(el("span","pill s-go","결과 대기 "+o.live));
+    else sc.appendChild(el("span","jno",(st.apps||[]).some(function(a){return a.kind==="수시";})?"모두 불합격":"수시 없음"));
+    var cell=function(list,g,jc){
+      var c=r.insertCell(); c.className="gun";
+      list.forEach(function(a){
+        var w=appWarn(st,a);
+        var b=el("button","japp"+(w?" bad":""),(a.jc?"":"")+shortUniv(a.univ||"미입력")+" "+shortMajor(a.major)+(a.status&&a.status!=="지원완료"?" · "+a.status:""));
+        if(w) b.title=w;
+        b.onclick=function(){ openApp(st,a); };
+        c.appendChild(b);
+      });
+      if(o.pass.length){ if(!list.length) c.appendChild(el("span","jno","—")); return; }
+      if((!list.length||jc)&&!lock){
+        var ad=el("button","ghost jadd",list.length?"+ 더":"+ 추가");
+        ad.onclick=function(){ addJungsi(st,g,jc); };
+        c.appendChild(ad);
+      } else if(!list.length) c.appendChild(el("span","jno","—"));
+    };
+    GUN.forEach(function(g){ cell(o.gun[g],g,false); });
+    cell(o.jc,"",true);
+    var wc=r.insertCell();
+    var w=checkStudent(st).filter(function(x){ return /정시지원불가|군중복|군 미입력/.test(x.code); });
+    if(o.none.length) o.none.forEach(function(a){ var b=el("button","japp bad",shortUniv(a.univ||"미입력")+" (군 없음)"); b.onclick=function(){ openApp(st,a); }; wc.appendChild(b); });
+    w.forEach(function(x){ if(x.code!=="군 미입력"){ var p=el("span","pill s-bad",x.code); p.title=x.msg; wc.appendChild(p); } });
+    if(!o.pass.length&&!o.any) wc.appendChild(el("span","pill s-wait","정시 계획 없음"));
+  });
+  tw.appendChild(t); host.appendChild(tw);
+}
 function goStudent(s){
   if(s.cls) setCls(s.cls);
   openId=s.id; editAppId=null;
@@ -1741,6 +1864,10 @@ function bindStatic(){
       renderUniv(sorted(list()));
     };
   });
+  document.getElementById("btnJungsi").onclick=function(){
+    jungsiOpen=!jungsiOpen; render();
+    if(jungsiOpen) document.getElementById("jungsiPanel").scrollIntoView({block:"start"});
+  };
   document.getElementById("btnCsat").onclick=function(){
     csatOpen=!csatOpen; render();
     if(csatOpen){ var p=document.getElementById("csatPanel"); p.scrollIntoView({block:"start"}); var f=p.querySelector("input.g"); if(f) f.focus(); }

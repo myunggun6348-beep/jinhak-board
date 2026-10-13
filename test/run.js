@@ -209,6 +209,9 @@ function buildTestPage() {
       jungsi: c(mk([{ kind: "수시", univ: "A", status: "최초합" }, { kind: "정시", univ: "B", status: "지원완료" }])).map((w) => w.code),
       jungsiGaveUp: c(mk([{ kind: "수시", univ: "A", status: "등록포기" }, { kind: "정시", univ: "B", status: "지원완료" }])).map((w) => w.code),
       jungsiPass: c(mk([{ kind: "정시", univ: "A", group: "가", status: "최초합" }, { kind: "정시", univ: "B", group: "나", status: "지원완료" }])).map((w) => w.code),
+      gunDup: c(mk([{ kind: "정시", univ: "A", group: "가" }, { kind: "정시", univ: "B", group: "가" }])).map((w) => w.code),
+      gunJc: c(mk([{ kind: "정시", univ: "A", group: "가" }, { kind: "정시", univ: "B", jc: true }, { kind: "정시", univ: "C", jc: true }])).map((w) => w.code),
+      gunNone: c(mk([{ kind: "정시", univ: "A" }])).map((w) => w.code),
       annPast: c(mk([{ kind: "수시", univ: "A", status: "면접완료", ann: "2020-01-01" }])).map((w) => w.code),
       annDone: c(mk([{ kind: "수시", univ: "A", status: "불합격", ann: "2020-01-01" }])).map((w) => w.code),
       dual: c(mk([{ kind: "수시", univ: "A", status: "등록완료" }, { kind: "수시", univ: "B", status: "등록완료" }])).map((w) => w.code),
@@ -223,6 +226,9 @@ function buildTestPage() {
   check("③ 수시 합격자의 정시 지원", rules.jungsi, ["정시지원불가"]);
   check("③ 등록을 포기해도 정시 지원 불가", rules.jungsiGaveUp, ["정시지원불가"]);
   check("정시 합격은 수시 합격으로 치지 않음", rules.jungsiPass, []);
+  check("⑧ 정시 같은 군 두 곳", rules.gunDup, ["군중복"]);
+  check("전문대 정시는 군 제한 없음", rules.gunJc, []);
+  check("4년제 정시에 군이 없으면 알림", rules.gunNone, ["군 미입력"]);
   check("④ 이중등록", rules.dual, ["이중등록"]);
   check("⑤ 충원 마감 임박", rules.due, ["충원마감"]);
   check("⑥ 수능최저 미충족", rules.minreq, ["최저 미충족"]);
