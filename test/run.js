@@ -43,9 +43,12 @@ function buildTestPage() {
 
 (async () => {
   const page404 = buildTestPage();
-  const browser = await chromium.launch(
-    process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {}
-  );
+  // Playwright 전용 브라우저를 못 받는 PC(학교망)도 있어, 설치된 크롬·엣지로도 띄운다.
+  const tries = process.env.CHROME_PATH ? [{ executablePath: process.env.CHROME_PATH }] : [{}, { channel: "chrome" }, { channel: "msedge" }];
+  let browser = null;
+  for (const opt of tries) {
+    try { browser = await chromium.launch(opt); break; } catch (e) { if (opt === tries[tries.length - 1]) throw e; }
+  }
   const p = await browser.newPage({ viewport: { width: 1200, height: 1200 } });
   const errors = [];
   p.on("pageerror", (e) => errors.push(String(e)));
@@ -206,8 +209,8 @@ function buildTestPage() {
       six: c(mk(six)).map((w) => w.code),
       itv: c(mk([{ kind: "수시", univ: "A", status: "1단계합", itv: "2026-11-28" }, { kind: "수시", univ: "B", status: "1단계합", itv: "2026-11-28" }])).map((w) => w.code),
       itvSameUniv: c(mk([{ kind: "수시", univ: "A", jh: "교과", status: "지원완료", itv: "2026-10-17" }, { kind: "수시", univ: "A", jh: "종합", status: "지원완료", itv: "2026-10-17" }])).map((w) => w.code),
-      jungsi: c(mk([{ kind: "수시", univ: "A", status: "최초합" }, { kind: "정시", univ: "B", status: "지원완료" }])).map((w) => w.code),
-      jungsiGaveUp: c(mk([{ kind: "수시", univ: "A", status: "등록포기" }, { kind: "정시", univ: "B", status: "지원완료" }])).map((w) => w.code),
+      jungsi: c(mk([{ kind: "수시", univ: "A", status: "최초합" }, { kind: "정시", univ: "B", group: "가", status: "지원완료" }])).map((w) => w.code),
+      jungsiGaveUp: c(mk([{ kind: "수시", univ: "A", status: "등록포기" }, { kind: "정시", univ: "B", group: "가", status: "지원완료" }])).map((w) => w.code),
       jungsiPass: c(mk([{ kind: "정시", univ: "A", group: "가", status: "최초합" }, { kind: "정시", univ: "B", group: "나", status: "지원완료" }])).map((w) => w.code),
       gunDup: c(mk([{ kind: "정시", univ: "A", group: "가" }, { kind: "정시", univ: "B", group: "가" }])).map((w) => w.code),
       gunJc: c(mk([{ kind: "정시", univ: "A", group: "가" }, { kind: "정시", univ: "B", jc: true }, { kind: "정시", univ: "C", jc: true }])).map((w) => w.code),
@@ -276,6 +279,38 @@ function buildTestPage() {
   ];
   const judged = await p.evaluate((cs) => cs.map((c) => window.__dev.judgeMin(c[0], c[1]).res), minCasesJ);
   minCasesJ.forEach((c, i) => check("‘" + c[0] + "’", judged[i], c[2]));
+
+  console.log("\n[전체 현황 · 일정 · 정시]");
+  const misc = await p.evaluate(() => {
+    const d = window.__dev;
+    const day = (n) => { const x = new Date(); x.setDate(x.getDate() + n); return x.getFullYear() + "-" + String(x.getMonth() + 1).padStart(2, "0") + "-" + String(x.getDate()).padStart(2, "0"); };
+    const st = { id: "t", cls: 2, no: "30299", name: "테스트", apps: [
+      { id: "a", kind: "수시", univ: "A", itv: day(3), ann: day(20), status: "지원완료" },
+      { id: "b", kind: "수시", univ: "B", ann: day(-2), status: "1단계합" },
+      { id: "c", kind: "수시", univ: "C", itv: day(5), status: "불합격" },
+      { id: "e", kind: "수시", univ: "E", due: day(-1) + "T18:00", status: "충원대기" },
+    ] };
+    const enc = new TextEncoder();
+    const folded = d.icsFold("SUMMARY:" + "가".repeat(80)).split("\r\n");
+    const j = d.jungsiOf({ apps: [{ kind: "정시", group: "가" }, { kind: "정시", jc: true }, { kind: "수시", status: "최초합" }] });
+    return {
+      univSame: d.univKey("부경대") === d.univKey("국립부경대학교(부산)") && d.univKey("부산외대") === d.univKey("부산외국어대학교(부산)"),
+      campusApart: d.univKey("경희대학교(서울)") !== d.univKey("경희대학교(국제)"),
+      majorSame: d.majorKey("컴퓨터공학과") === d.majorKey("컴퓨터공학부") && d.majorKey("스마트헬스케어학부(바이오메디컬공학전공)") === d.majorKey("스마트헬스케어학부"),
+      upcoming: d.upcoming([st], 14).map((e) => e.a.id + e.kind),
+      pending: d.pending([st]).map((e) => e.a.id + e.kind),
+      foldMax: Math.max(...folded.map((l) => enc.encode(l).length)),
+      foldCont: folded.slice(1).every((l) => l[0] === " "),
+      jungsi: [j.pass.length, j.gun["가"].length, j.jc.length].join(","),
+    };
+  });
+  check("대학 표기 묶기(국립·줄임말)", misc.univSame, true);
+  check("캠퍼스가 다르면 따로", misc.campusApart, true);
+  check("학과 끝말·괄호 무시하고 묶기", misc.majorSame, true);
+  check("다가오는 일정: 불합격 면접은 빼고", misc.upcoming, ["aitv"]);
+  check("결과 입력할 것: 지난 발표·지난 충원 마감", misc.pending, ["bann", "edue"]);
+  check("달력 줄 75바이트 안으로 접기", misc.foldMax <= 75 && misc.foldCont, true);
+  check("정시 현황: 수시 합격·가군·전문대 구분", misc.jungsi, "1,1,1");
 
   check("자바스크립트 오류 없음", errors, []);
   await browser.close();

@@ -2817,7 +2817,8 @@ try{ if(location.protocol==="file:"||location.hostname==="localhost"){
   window.__dev={mapStatus:mapStatus, mapMin:mapMin, mapType:mapType,
     parseDate:parseDate, parseYN:parseYN, pickStudents:pickStudents,
     parseDelimited:parseDelimited, readApps:readApps, pdfTableRows:pdfTableRows, last:function(){ return lastRead; },
-    checkStudent:checkStudent, parseMin:parseMin, judgeMin:judgeMin, rowsFromPdf:rowsFromPdf};
+    checkStudent:checkStudent, parseMin:parseMin, judgeMin:judgeMin, rowsFromPdf:rowsFromPdf,
+    univKey:univKey, majorKey:majorKey, upcoming:upcoming, pending:pending, icsFold:icsFold, jungsiOf:jungsiOf};
 } }catch(e){}
 
 if(window.claude&&window.claude.hot&&window.claude.hot.ready){ window.claude.hot.ready(start); }
