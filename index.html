@@ -289,6 +289,50 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
 .kdlist .kdrow.past{color:var(--ink-3); text-decoration:line-through}
 .kdlist .kdd{min-width:150px; font-variant-numeric:tabular-nums}
 .kdlist .src{font-size:11px; color:var(--ink-3); margin-top:6px}
+.tdot{display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:5px; vertical-align:1px; background:var(--ink-3)}
+.t-hj,.gbar .gt .t-hj{background:#4C7BD9} .t-gk,.gbar .gt .t-gk{background:#1E9E8A} .t-ns,.gbar .gt .t-ns{background:#8A5CD6} .t-sg,.gbar .gt .t-sg{background:#D6577F} .t-js,.gbar .gt .t-js{background:#C9862B}
+.glance{border:1px solid var(--line); border-radius:var(--radius); background:var(--surface); padding:12px 14px; margin-bottom:18px}
+.glance .gh{display:flex; align-items:center; gap:8px; flex-wrap:wrap}
+.glance .gh h2{font-size:14px; font-weight:700; margin:0}
+.glance .gh .sp{margin-left:auto}
+.ggrid{display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:12px 22px; margin-top:10px}
+.gcard h3{font-size:12.5px; font-weight:700; margin:0 0 8px; color:var(--ink-2)}
+.gstack{display:flex; height:16px; border-radius:5px; overflow:hidden; background:var(--surface-2)}
+.gstack span{display:block; height:100%}
+.glegend{display:flex; flex-wrap:wrap; gap:4px 12px; margin-top:8px; font-size:12px; color:var(--ink-2)}
+.glegend i{display:inline-block; width:9px; height:9px; border-radius:2px; margin-right:5px; vertical-align:-1px}
+.glegend b{color:var(--ink); margin-left:3px}
+.c-ok{background:var(--ok)} .c-wait{background:var(--warn)} .c-go{background:var(--accent-2)} .c-bad{background:var(--bad)} .c-none{background:var(--line-2)}
+.gbar{display:grid; grid-template-columns:62px 1fr 64px; align-items:center; gap:8px; font-size:12px; padding:2.5px 0}
+.gbar .gl{color:var(--ink-2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.gbar .gt{height:10px; border-radius:3px; background:var(--surface-2); overflow:hidden}
+.gbar .gt span{display:block; height:100%; border-radius:3px; background:var(--accent-2)}
+.gbar .gv{text-align:right; font-variant-numeric:tabular-nums; color:var(--ink)}
+.gbar .gv small{color:var(--ink-3); margin-left:3px}
+.ghist{display:flex; align-items:flex-end; gap:6px; height:84px; padding-top:14px}
+.ghist .hc{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; font-size:11px; color:var(--ink-2)}
+.ghist .hb{width:100%; max-width:34px; border-radius:4px 4px 0 0; background:var(--accent-2); min-height:2px}
+.ghist .hb.low{background:var(--warn)}
+.ghist .hn{font-weight:700; color:var(--ink); font-size:11.5px; margin-bottom:2px}
+.ghist .hx{margin-top:4px; color:var(--ink-3)}
+.gcal{display:flex; flex-wrap:wrap; gap:14px 22px; margin-top:12px}
+.gmon h3{font-size:12.5px; font-weight:700; margin:0 0 6px}
+.gmon table{border-collapse:collapse; min-width:0; width:auto}
+.gmon th{font-size:10.5px; font-weight:400; color:var(--ink-3); padding:0 0 3px; text-align:center; background:none; border:0}
+.gmon td{padding:1px; border:0; text-align:center}
+.gday{width:34px; height:34px; border:1px solid transparent; border-radius:7px; background:none; color:var(--ink-2); font-size:11.5px; padding:2px 0 0; display:flex; flex-direction:column; align-items:center; gap:1px; cursor:default; font-family:inherit}
+.gday.past{color:var(--ink-3); opacity:.55}
+.gday.today{border-color:var(--accent)}
+.gday.has{cursor:pointer; background:var(--surface-2); color:var(--ink); font-weight:700}
+.gday.has:hover,.gday.sel{background:var(--accent-soft); border-color:var(--accent-2)}
+.gday.key{color:var(--bad)}
+.gday .gd{display:flex; gap:2px; height:6px}
+.gday .gd i{width:5px; height:5px; border-radius:50%}
+.gday .gd .itv{background:var(--accent-2)} .gday .gd .ann{background:var(--ok)} .gday .gd .due{background:var(--warn)}
+.gday .gn{font-size:9.5px; font-weight:700; line-height:1}
+.gdaylist{margin-top:10px}
+.urow td .ubar{display:inline-block; height:7px; border-radius:2px; background:var(--accent-2); opacity:.45; margin-right:8px; vertical-align:1px}
+@media (max-width:560px){ .gday{width:38px; height:38px} .gbar{grid-template-columns:54px 1fr 58px} }
 .sempty{font-size:12.5px; color:var(--ink-3); margin-top:8px}
 .smore{margin-top:8px}
 .usearch{border:1px solid var(--line-2); background:var(--surface); color:var(--ink); border-radius:7px; padding:5px 10px; font-size:13px; width:190px}
@@ -390,6 +434,7 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
     <div class="lockbar" id="lockbar" hidden></div>
     <div class="alerts" id="alerts"></div>
     <div class="stats" id="stats"></div>
+    <div class="glance" id="glance"></div>
     <div class="sched" id="sched"></div>
     <div class="sched" id="todo" hidden></div>
 
@@ -454,6 +499,7 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
   <div id="viewAll" hidden>
     <div class="alerts" id="allAlerts"></div>
     <div class="stats" id="allStats"></div>
+    <div class="glance" id="allGlance"></div>
     <div class="sched" id="allSched"></div>
     <div class="sched" id="allTodo" hidden></div>
     <div class="listhead"><h2>반별 현황</h2><span class="sp"><button class="ghost" id="btnBackup" title="모든 반 학생·지원 자료를 파일 하나로 받습니다">전체 백업 받기</button><button class="ghost" id="btnRestore" title="백업 파일의 학생 자료로 되돌립니다">백업 되살리기</button><input type="file" id="restoreFile" accept=".json,application/json" hidden><button class="ghost" id="btnCsvAll">전체 CSV 내려받기</button></span></div>
@@ -839,6 +885,8 @@ function render(){
   document.getElementById("addPanel").hidden = !cls || canWrite===false || locked(cls);
   renderAlerts(document.getElementById("alerts"), mine, false);
   renderStats(document.getElementById("stats"), mine);
+  renderGlance(document.getElementById("glance"), mine, false);
+  document.getElementById("glance").hidden=!cls||!mine.length;
   renderSched(document.getElementById("sched"), mine, false);
   document.getElementById("sched").hidden=!cls;
   renderTodo(document.getElementById("todo"), cls?mine:[], false);
@@ -959,7 +1007,8 @@ function renderRows(arr, cls){
     var apps=st.apps||[];
     if(!apps.length) pills.appendChild(el("span","pill empty","지원 없음"));
     apps.slice(0,7).forEach(function(a){
-      var p=el("span","pill "+statusClass(a.status), appLabel(a));
+      var p=el("span","pill "+((a.status||"지원완료")==="지원완료"?"":statusClass(a.status)));   // 결과가 난 지원만 색으로
+      p.appendChild(el("i","tdot "+typeDot(a))); p.appendChild(document.createTextNode(appLabel(a)));
       p.title=[a.univ,a.major,a.jh||a.type,a.status].filter(Boolean).join(" · ");
       pills.appendChild(p);
     });
@@ -1188,6 +1237,8 @@ function renderAll(){
   var all=sorted(list());
   renderAlerts(document.getElementById("allAlerts"), all, true);
   renderStats(document.getElementById("allStats"), all);
+  renderGlance(document.getElementById("allGlance"), all, true);
+  document.getElementById("allGlance").hidden=!all.length;
   renderSched(document.getElementById("allSched"), all, true);
   renderTodo(document.getElementById("allTodo"), all, true);
 
@@ -1298,13 +1349,15 @@ function renderUniv(all){
   var uh=ut.createTHead().insertRow(); heads.forEach(function(h,i){
     var th=document.createElement("th"); th.textContent=h; if(i>0)th.style.textAlign="right"; uh.appendChild(th);
   });
-  var ub=ut.createTBody();
+  var ub=ut.createTBody(), umax=1;
+  names.forEach(function(u){ umax=Math.max(umax,uni[u].n); });
   names.forEach(function(u){
     var o=uni[u], open=(openUniv===u)||(!!q&&names.length===1);
     var r=ub.insertRow(); r.className="urow"+(open?" open":"");
     var c0=r.insertCell(); c0.textContent=o.label; c0.appendChild(el("span","ucaret",open?"▲":"▼"));
     [o.n,Object.keys(byM?o.unis:o.stu).length,o.pass,o.wait,o.fail].forEach(function(v,i){
       var td=r.insertCell(); td.className="num"; td.textContent=v;
+      if(i===0){ var bar=el("span","ubar"); bar.style.width=Math.max(3,Math.round(v/umax*(narrow?28:70)))+"px"; td.insertBefore(bar,td.firstChild); }
       if(i===2&&v) td.style.color="var(--ok)", td.style.fontWeight="700";
       if(i===3&&v) td.style.color="var(--warn)", td.style.fontWeight="700";
     });
@@ -1460,6 +1513,151 @@ function renderKeydates(){
   });
   box.appendChild(el("div","src","2027학년도 대학입학전형기본사항 기준 공통 일정입니다(서강대·성균관대 2027 모집요강으로 확인). 대학별 세부 일정과 시각은 각 대학 모집요강이 우선입니다."));
   host.appendChild(box);
+}
+/* ── 한눈에 보기 ── 파일을 넣은 뒤 숫자 대신 막대와 달력으로 */
+var TYPEDOT={학종:"t-hj",교과:"t-gk",논술:"t-ns",실기:"t-sg",정시:"t-js"};
+function typeDot(a){ return a.kind==="정시"?"t-js":(TYPEDOT[a.type]||""); }
+var glanceOpen=(function(){ try{ return localStorage.getItem("jh.glance")!=="0"; }catch(e){ return true; } })();
+var calSel=null;
+function glanceData(arr){
+  var R={ok:0,wait:0,go:0,bad:0,none:0}, T={}, G={}, H=[0,0,0,0,0,0,0], n=0;
+  arr.forEach(function(st){
+    var six=0;
+    (st.apps||[]).forEach(function(a){
+      n++;
+      var s=a.status||"지원완료";
+      if(PASS[s]&&s!=="등록포기") R.ok++;
+      else if(s==="충원대기") R.wait++;
+      else if(s==="1단계합"||s==="면접완료") R.go++;
+      else if(s==="불합격"||s==="1단계불"||s==="등록포기") R.bad++;
+      else R.none++;
+      var t=a.kind==="정시"?"정시":(a.type||"기타"); T[t]=(T[t]||0)+1;
+      var g=univRegion(a); G[g]=(G[g]||0)+1;
+      if(a.kind==="수시") six++;
+    });
+    H[Math.min(six,6)]++;
+  });
+  return {R:R, T:T, G:G, H:H, n:n};
+}
+function gBars(box, obj, order, color){
+  var keys=Object.keys(obj).sort(function(a,b){ return (order?order.indexOf(a)-order.indexOf(b):0)||obj[b]-obj[a]||a.localeCompare(b,"ko"); });
+  if(order) keys=keys.filter(function(k){ return order.indexOf(k)>=0; }).concat(keys.filter(function(k){ return order.indexOf(k)<0; }));
+  var tot=0, max=1; keys.forEach(function(k){ tot+=obj[k]; max=Math.max(max,obj[k]); });
+  var rest=0;
+  if(!order&&keys.length>7){ keys.slice(6).forEach(function(k){ rest+=obj[k]; }); keys=keys.slice(0,6); }
+  var row=function(k,v,cls){
+    var r=el("div","gbar"); r.appendChild(el("span","gl",k));
+    var t=el("span","gt"), f=el("span",cls||""); f.style.width=Math.round(v/max*100)+"%"; t.appendChild(f); r.appendChild(t);
+    var val=el("span","gv",String(v)); val.appendChild(el("small",null,Math.round(v/(tot||1)*100)+"%")); r.appendChild(val);
+    box.appendChild(r);
+  };
+  keys.forEach(function(k){ row(k,obj[k],color&&color(k)); });
+  if(rest) row("그 밖",rest);
+}
+function renderGlance(host, arr, showClass){
+  host.innerHTML="";
+  var hd=el("div","gh"); hd.appendChild(el("h2",null,"한눈에 보기"));
+  var D=glanceData(arr);
+  hd.appendChild(el("span","cnt",arr.length+"명 · 지원 "+D.n+"건"));
+  var tg=el("button","ghost sp",glanceOpen?"접기":"펼치기");
+  tg.onclick=function(){ glanceOpen=!glanceOpen; try{ localStorage.setItem("jh.glance",glanceOpen?"1":"0"); }catch(e){} render(); };
+  hd.appendChild(tg); host.appendChild(hd);
+  if(!glanceOpen) return;
+  if(!D.n){ host.appendChild(el("div","sempty","지원 현황 파일을 넣으면 결과·전형·지역 그래프와 일정 달력이 나옵니다.")); return; }
+  var grid=el("div","ggrid");
+
+  // 결과 진행
+  var c1=el("div","gcard"); c1.appendChild(el("h3",null,"결과 진행 (지원 "+D.n+"건)"));
+  var parts=[["ok","합격"],["wait","충원 대기"],["go","1단계 합격·면접 완료"],["bad","불합격"],["none","결과 기다림"]];
+  var st=el("div","gstack");
+  parts.forEach(function(p){ if(!D.R[p[0]]) return; var s=el("span","c-"+p[0]); s.style.width=(D.R[p[0]]/D.n*100)+"%"; s.title=p[1]+" "+D.R[p[0]]+"건"; st.appendChild(s); });
+  c1.appendChild(st);
+  var lg=el("div","glegend");
+  parts.forEach(function(p){ var x=el("span"); x.appendChild(el("i","c-"+p[0])); x.appendChild(document.createTextNode(p[1])); x.appendChild(el("b",null,String(D.R[p[0]]))); lg.appendChild(x); });
+  c1.appendChild(lg);
+  // 지원 장수
+  c1.appendChild(el("h3",null,"학생별 수시 지원 장수")).style.marginTop="14px";
+  var hs=el("div","ghist"), hmax=Math.max.apply(null,D.H.concat([1]));
+  D.H.forEach(function(v,i){
+    var c=el("div","hc"); c.title=i+(i===6?"장 이상":"장")+" 지원: "+v+"명";
+    c.appendChild(el("span","hn",v?String(v):""));
+    var b=el("span","hb"+(i<6&&v?" low":"")); b.style.height=Math.round(v/hmax*56)+"px"; c.appendChild(b);
+    c.appendChild(el("span","hx",i+"장")); hs.appendChild(c);
+  });
+  c1.appendChild(hs);
+  var low=D.H.slice(0,6).reduce(function(x,y){ return x+y; },0);
+  if(low) c1.appendChild(el("div","shint","6장을 다 쓰지 않은 학생 "+low+"명 (주황 막대)"));
+  grid.appendChild(c1);
+
+  // 전형별
+  var c2=el("div","gcard"); c2.appendChild(el("h3",null,"전형별"));
+  gBars(c2, D.T, ["학종","교과","논술","실기","정시"], function(k){ return TYPEDOT[k]||""; });
+  // 지역별
+  c2.appendChild(el("h3",null,"지역별")).style.marginTop="14px";
+  gBars(c2, D.G, null);
+  grid.appendChild(c2);
+  host.appendChild(grid);
+
+  // 달력
+  renderCal(host, arr, showClass);
+}
+function renderCal(host, arr, showClass){
+  var ev=upcoming(arr,400), by={};
+  ev.forEach(function(e){ var k=String(e.when).slice(0,10); (by[k]=by[k]||[]).push(e); });
+  var keyd={}; KEYDATES.forEach(function(k){ if(!k.e) keyd[k.s]=k.t; });
+  var today=new Date(); today.setHours(0,0,0,0);
+  var last=ev.length?new Date(String(ev[ev.length-1].when).slice(0,10)+"T00:00:00"):today;
+  var months=[], m=new Date(today.getFullYear(),today.getMonth(),1);
+  while(m<=last&&months.length<3){ months.push(new Date(m)); m=new Date(m.getFullYear(),m.getMonth()+1,1); }
+  if(!months.length) months.push(new Date(today.getFullYear(),today.getMonth(),1));
+  var wrap=el("div","gcard"); wrap.style.marginTop="14px";
+  var h=el("h3",null,"면접·고사·발표 달력"); wrap.appendChild(h);
+  var lg=el("div","glegend"); lg.style.marginTop="0";
+  [["c-go","면접·고사"],["c-ok","발표"],["c-wait","충원 마감"]].forEach(function(p){ var x=el("span"); x.appendChild(el("i",p[0])); x.appendChild(document.createTextNode(p[1])); lg.appendChild(x); });
+  var kx=el("span"); kx.style.color="var(--bad)"; kx.textContent="빨간 날짜: 입시 공통 일정"; lg.appendChild(kx);
+  wrap.appendChild(lg);
+  var cal=el("div","gcal");
+  months.forEach(function(m0){
+    var box=el("div","gmon"); box.appendChild(el("h3",null,m0.getFullYear()+"년 "+(m0.getMonth()+1)+"월"));
+    var t=document.createElement("table"), hr=t.createTHead().insertRow();
+    WD.forEach(function(w){ var th=document.createElement("th"); th.textContent=w; hr.appendChild(th); });
+    var tb=t.createTBody(), r=tb.insertRow(), d=new Date(m0);
+    for(var i=0;i<d.getDay();i++) r.insertCell();
+    while(d.getMonth()===m0.getMonth()){
+      if(d.getDay()===0&&d.getDate()>1) r=tb.insertRow();
+      var k=d.getFullYear()+"-"+pad2(d.getMonth()+1)+"-"+pad2(d.getDate()), list=by[k]||[];
+      var b=el("button","gday"+(d<today?" past":"")+(+d===+today?" today":"")+(list.length?" has":"")+(keyd[k]?" key":"")+(calSel===k?" sel":""));
+      b.appendChild(el("span",null,String(d.getDate())));
+      var dots=el("span","gd"), kinds={};
+      list.forEach(function(e){ kinds[e.kind]=(kinds[e.kind]||0)+1; });
+      ["itv","ann","due"].forEach(function(x){ if(kinds[x]) dots.appendChild(el("i",x)); });
+      b.appendChild(dots);
+      if(list.length>1) b.appendChild(el("span","gn",list.length+"건"));
+      var tip=[]; if(keyd[k]) tip.push("[입시] "+keyd[k]);
+      list.forEach(function(e){ tip.push((e.kind==="itv"?"면접·고사":e.kind==="ann"?"발표":"충원 마감")+" · "+(showClass&&e.s.cls?e.s.cls+"반 ":"")+(e.s.name||"")+" "+shortUniv(e.a.univ)); });
+      if(tip.length) b.title=tip.join("\n");
+      if(list.length){ (function(k){ b.onclick=function(){ calSel=(calSel===k?null:k); render(); }; })(k); }
+      else b.disabled=true;
+      r.insertCell().appendChild(b);
+      d=new Date(d.getFullYear(),d.getMonth(),d.getDate()+1);
+    }
+    box.appendChild(t); cal.appendChild(box);
+  });
+  wrap.appendChild(cal);
+  if(calSel&&by[calSel]){
+    var dl=el("div","gdaylist"), dd=new Date(calSel+"T00:00:00");
+    dl.appendChild(el("div","sday",(dd.getMonth()+1)+"/"+dd.getDate()+" ("+WD[dd.getDay()]+") — "+by[calSel].length+"건"));
+    by[calSel].forEach(function(e){
+      var it=el("div","sitem");
+      it.appendChild(el("span","sk "+e.kind,e.kind==="itv"?"면접·고사":e.kind==="ann"?"발표":"충원 마감"));
+      var who=el("button","who",(showClass&&e.s.cls?e.s.cls+"반 ":"")+(e.s.name||""));
+      who.onclick=function(){ goStudent(e.s); }; it.appendChild(who);
+      it.appendChild(el("span","sub",[shortUniv(e.a.univ),shortMajor(e.a.major),e.a.type].filter(Boolean).join(" · ")));
+      dl.appendChild(it);
+    });
+    wrap.appendChild(dl);
+  }
+  host.appendChild(wrap);
 }
 function renderSched(host, arr, showClass){
   host.innerHTML="";
@@ -3087,7 +3285,7 @@ try{ if(location.protocol==="file:"||location.hostname==="localhost"){
     parseDelimited:parseDelimited, readApps:readApps, pdfTableRows:pdfTableRows, last:function(){ return lastRead; },
     checkStudent:checkStudent, parseMin:parseMin, judgeMin:judgeMin, rowsFromPdf:rowsFromPdf,
     univFound:univFound, univRegion:univRegion, outcomeOf:outcomeOf, resultsOf:resultsOf,
-    KEYDATES:KEYDATES, minGaps:minGaps, univKey:univKey, majorKey:majorKey, upcoming:upcoming, pending:pending, icsFold:icsFold, jungsiOf:jungsiOf};
+    KEYDATES:KEYDATES, minGaps:minGaps, glanceData:glanceData, univKey:univKey, majorKey:majorKey, upcoming:upcoming, pending:pending, icsFold:icsFold, jungsiOf:jungsiOf};
 } }catch(e){}
 
 if(window.claude&&window.claude.hot&&window.claude.hot.ready){ window.claude.hot.ready(start); }

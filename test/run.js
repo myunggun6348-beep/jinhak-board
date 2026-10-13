@@ -346,6 +346,14 @@ function buildTestPage() {
   check("최저 점검: 기준 없음은 모아 세고, 못 읽는 기준만 따로", gaps, "A대학교225/B대학교");
   check("2027 수능 2026-11-19 · 정시 접수 2027-01-04", kd.csat + " " + kd.jApp, "2026-11-19 2027-01-04");
 
+  const gl = await p.evaluate(() => { const D = window.__dev.glanceData([
+    { apps: [{ kind: "수시", type: "학종", univ: "부산대학교(부산)", status: "최초합" }, { kind: "수시", type: "교과", univ: "연세대학교(서울)", status: "충원대기" },
+             { kind: "수시", type: "논술", univ: "A대학교", status: "등록포기" }, { kind: "정시", univ: "B대학교(서울)", status: "1단계합" }] },
+    { apps: [] },
+  ]); return JSON.stringify([D.R, D.T, D.G, D.H, D.n]); });
+  check("한눈에 보기: 결과 묶음·전형·지역·지원 장수", gl,
+    JSON.stringify([{ ok: 1, wait: 1, go: 1, bad: 1, none: 0 }, { 학종: 1, 교과: 1, 논술: 1, 정시: 1 }, { 부산: 1, 서울: 2, 미상: 1 }, [1, 0, 0, 1, 0, 0, 0], 4]));
+
   check("자바스크립트 오류 없음", errors, []);
   await browser.close();
   fs.unlinkSync(page404);
