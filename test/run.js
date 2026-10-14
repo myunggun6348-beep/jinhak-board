@@ -373,6 +373,20 @@ function buildTestPage() {
   check("한눈에 보기: 결과 묶음·전형·지역·지원 장수", gl,
     JSON.stringify([{ ok: 1, wait: 1, go: 1, bad: 1, none: 0 }, { 학종: 1, 교과: 1, 논술: 1, 정시: 1 }, { 부산: 1, 서울: 2, 미상: 1 }, [1, 0, 0, 1, 0, 0, 0], 4]));
 
+  /* ── 자료 지키기(백업 알림) ── */
+  const bb = () => p.evaluate(() => { const b = document.getElementById("backupBar"); return [!b.hidden, b.classList.contains("due"), b.textContent]; });
+  let B1 = await bb();
+  check("백업 알림: 받아 둔 적 없으면 주황 경고", [B1[0], B1[1], /한 번도/.test(B1[2])], [true, true, true]);
+  await p.evaluate(() => document.querySelector("#backupBar .btn").click()); await p.waitForTimeout(300);
+  B1 = await bb();
+  check("백업 받으면 경고가 사라지고 날짜 표시", [B1[1], /마지막 백업 \d/.test(B1[2])], [false, true]);
+  await p.evaluate(() => { localStorage.setItem("jh.lastBackup", new Date(Date.now() - 8 * 864e5).toISOString()); });
+  await p.evaluate(() => window.__dev.render()); B1 = await bb();
+  check("백업 7일 지나면 다시 경고", [B1[1], /8일이 지났습니다/.test(B1[2])], [true, true]);
+  await p.evaluate(() => { localStorage.setItem("jh.lastBackup", new Date().toISOString()); localStorage.setItem("jh.chgRes", "1"); window.__dev.render(); }); B1 = await bb();
+  check("백업 뒤 결과가 바뀌면 경고", [B1[1], /결과가 바뀌었습니다/.test(B1[2])], [true, true]);
+  await p.evaluate(() => { localStorage.removeItem("jh.chgRes"); window.__dev.render(); });
+
   /* ── 반 파일 합치기 ── 학생마다 더 최근에 고친 쪽, 변경 기록은 합침, 학번 없으면 반·이름으로 */
   const mg = await p.evaluate(() => {
     const D = window.__dev, f = (st) => ({ name: "x.json", b: { app: "jinhak-board", students: st } });

@@ -93,6 +93,9 @@ button{cursor:pointer}
 #schoolPanel .uitem{gap:8px}
 .codeshow{margin:12px 0}
 .codetext{font-size:22px; letter-spacing:.08em}
+.backupbar{display:flex; flex-wrap:wrap; align-items:center; gap:6px 10px; border:1px solid var(--line); background:var(--surface); border-radius:var(--radius); padding:7px 12px; margin-bottom:14px; font-size:12.5px; color:var(--ink-2)}
+.backupbar.due{border-color:var(--warn); background:var(--warn-soft); color:var(--warn); font-weight:600}
+.backupbar .sp{margin-left:auto; display:flex; gap:6px}
 .helpbtn{font-size:12px; padding:4px 10px}
 .helpdlg{max-width:560px; width:calc(100% - 32px); border:1px solid var(--line); border-radius:var(--radius); background:var(--surface); color:var(--ink); padding:18px 20px; font-size:13.5px; line-height:1.6}
 .helpdlg::backdrop{background:rgba(0,0,0,.35)}
@@ -512,7 +515,7 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
   <h3>혼자 쓰기</h3>
   <ul>
     <li>첫 화면에서 <b>혼자 쓰기</b>를 고르면 로그인 없이 그 컴퓨터(브라우저)에만 저장합니다. 다음부터는 바로 열립니다.</li>
-    <li>브라우저 기록을 지우면 자료도 지워지니 <b>우리 반 파일 받기</b>로 가끔 받아 두세요.</li>
+    <li>브라우저 기록을 지우면 자료도 지워집니다. 위쪽 막대가 주황색이 되면 <b>지금 백업 받기</b>를 누르세요(7일이 지났거나, 결과가 바뀌었거나, 많이 고쳤을 때). 받은 파일을 화면에 끌어다 놓으면 되살아납니다.</li>
     <li>나중에 위쪽 <b>학교 장부로</b>를 누르고 학교에 들어가면, 이 브라우저 자료를 올릴지 묻습니다.</li>
   </ul>
   <h3>알아 둘 것</h3>
@@ -526,6 +529,7 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
 </dialog>
 <div class="wrap">
   <div id="banner" class="banner" hidden></div>
+  <div id="backupBar" class="backupbar" hidden></div>
 
   <div class="keydates" id="keydates"></div>
   <div id="viewClass">
@@ -985,7 +989,7 @@ function logChange(st){
   var lines=diffLines(p,st);
   // 되돌리기·백업처럼 학생 자료를 통째로 바꿔도 그동안 쌓인 기록은 이어 간다
   var log=p&&Array.isArray(p.log)?p.log:st.log;
-  if(lines.length) log=pushLog(log, logEntry(lines));
+  if(lines.length){ log=pushLog(log, logEntry(lines)); noteChange(lines); }
   if(log&&log.length) st.log=log; else delete st.log;
 }
 function save(st){
@@ -1093,6 +1097,7 @@ function render(){
   persistLocal();
   if(pendingRender) return;
   renderKeydates();
+  renderBackupBar();
   if(school&&!school.admin&&school.cls&&getCls()!==school.cls) setCls(school.cls);
   document.getElementById("classbar").hidden=!!(school&&!school.admin);
   var cls=getCls();
@@ -2255,6 +2260,43 @@ function fillNames(root){
     [].forEach.call(spans,function(x){ var p=ps[x.dataset.uid]; x.textContent=(p&&(p.isMe?"나":p.name))||"선생님"; });
   }).catch(function(){});
 }
+/* ── 자료 지키기 ── 이 브라우저에만 저장할 때(혼자 쓰기·Vercel) 백업을 잊지 않게 */
+function lsGet(k){ try{ return localStorage.getItem(k)||""; }catch(e){ return ""; } }
+function lsSet(k,v){ try{ if(v==null) localStorage.removeItem(k); else localStorage.setItem(k,String(v)); }catch(e){} }
+function doBackup(){
+  var d=new Date(), all=sorted(list());
+  saveFile("진학현황_백업_"+d.getFullYear()+pad2(d.getMonth()+1)+pad2(d.getDate())+".json",
+    JSON.stringify({app:"jinhak-board", year:YEAR, savedAt:d.toISOString(), students:all, minreq:sharedMins()}, null, 1));
+  markBackup();
+}
+function markBackup(){ lsSet("jh.lastBackup",new Date().toISOString()); lsSet("jh.chg",null); lsSet("jh.chgRes",null); renderBackupBar(); }
+function noteChange(lines){
+  if(!practice||demo) return;
+  lsSet("jh.chg",(+lsGet("jh.chg")||0)+1);
+  if(lines.some(function(l){ return /상태 /.test(l); })) lsSet("jh.chgRes",1);
+}
+// 받아 두라고 할 까닭. 없으면 ""
+function backupDue(){
+  var last=lsGet("jh.lastBackup"), chg=+lsGet("jh.chg")||0;
+  if(!last) return "아직 한 번도 파일로 받아 두지 않았습니다";
+  if(lsGet("jh.chgRes")) return "백업한 뒤 합격·불합격 같은 결과가 바뀌었습니다";
+  if(chg>=20) return "백업한 뒤 "+chg+"번 고쳤습니다";
+  var days=Math.floor((Date.now()-Date.parse(last))/86400000);
+  if(days>=7) return "마지막 백업 뒤 "+days+"일이 지났습니다";
+  return "";
+}
+function renderBackupBar(){
+  var bar=document.getElementById("backupBar");
+  if(!practice||demo||!list().some(function(x){ return !/^d\d$/.test(x.id); })){ bar.hidden=true; return; }
+  var due=backupDue(), warn=due&&lsGet("jh.snooze")!==new Date().toDateString(), last=lsGet("jh.lastBackup");
+  bar.hidden=false; bar.innerHTML=""; bar.className="backupbar"+(warn?" due":"");
+  bar.appendChild(el("span",null,warn
+    ? "자료가 이 브라우저에만 있습니다. "+due+". 파일로 받아 두세요(브라우저 기록을 지우면 사라집니다)."
+    : "이 브라우저에만 저장 중 · 마지막 백업 "+(last?fmtWhen(last):"없음")));
+  var sp=el("span","sp"), b=el("button",warn?"btn":"ghost","지금 백업 받기"); b.onclick=doBackup; sp.appendChild(b);
+  if(warn){ var z=el("button","ghost","오늘은 그만"); z.onclick=function(){ lsSet("jh.snooze",new Date().toDateString()); renderBackupBar(); }; sp.appendChild(z); }
+  bar.appendChild(sp);
+}
 /* ── 반 파일로 주고받기 ─────────────────────
    로그인 없는 화면에서는 학생 자료가 이 브라우저에만 있다. 담임마다 반 파일을 받아 학교 메신저·공유 폴더로
    모으고, 다른 선생님은 여러 파일을 한꺼번에 넣어 합친다. 같은 학생은 더 최근에 고친 쪽(updatedAt)을 남긴다. */
@@ -2270,6 +2312,7 @@ function classFile(){
   if(!arr.length||(demo&&!practice)||arr.every(function(x){ return /^d\d$/.test(x.id); })){ alert("이 반에 넣은 학생이 없습니다."); return; }
   askMyName();
   var d=new Date();
+  if(practice&&cls&&CLASSES.every(function(c){ return c===cls||!byClass(c).length; })) setTimeout(markBackup,0);   // 이 브라우저에 이 반만 있으면 반 파일도 백업이다
   saveFile("진학현황_"+cls+"반_"+d.getFullYear()+pad2(d.getMonth()+1)+pad2(d.getDate())+".json",
     JSON.stringify({app:"jinhak-board", year:YEAR, savedAt:d.toISOString(), cls:cls, by:myName()||undefined, students:arr, minreq:sharedMins()}, null, 1));
 }
@@ -2941,11 +2984,7 @@ function bindStatic(){
     G.bad.forEach(function(e){ rows.push(["판정 안 됨",e.univ,e.major,e.jh,e.n,Object.keys(e.cls).join(" "),e.why,e.text]); });
     saveCsv(rows, YEAR+"_수능최저_점검.csv");
   };
-  document.getElementById("btnBackup").onclick=function(){
-    var d=new Date(), all=sorted(list());
-    saveFile("진학현황_백업_"+d.getFullYear()+pad2(d.getMonth()+1)+pad2(d.getDate())+".json",
-      JSON.stringify({app:"jinhak-board", year:YEAR, savedAt:d.toISOString(), students:all, minreq:sharedMins()}, null, 1));
-  };
+  document.getElementById("btnBackup").onclick=doBackup;
   document.getElementById("btnRestore").onclick=function(){ document.getElementById("restoreFile").click(); };
   document.getElementById("btnMerge").onclick=function(){ document.getElementById("mergeFile").click(); };
   document.getElementById("mergeFile").onchange=function(){ var fl=[].slice.call(this.files||[]); this.value=""; if(fl.length) mergeFiles(fl); };
@@ -3769,7 +3808,7 @@ function startPractice(){
   resetBase();
   b.appendChild(document.createTextNode("이 화면은 "));
   b.appendChild(el("b",null,"이 브라우저에만 저장되는 화면"));
-  b.appendChild(document.createTextNode("입니다. 파일을 넣거나 학생을 추가하면 예시는 사라지고, 넣은 자료는 이 브라우저에 저장됩니다(다른 컴퓨터·다른 선생님과는 공유되지 않습니다)."));
+  b.appendChild(document.createTextNode("입니다. 파일을 넣거나 학생을 추가하면 예시는 사라지고, 넣은 자료는 이 브라우저에 저장됩니다(다른 컴퓨터·다른 선생님과는 공유되지 않습니다). 받아 둔 백업 파일(.json)이 있으면 화면에 끌어다 놓으면 그대로 돌아옵니다."));
   showLocalChip();
   fillAll(); render();
 }
@@ -4278,7 +4317,7 @@ try{ if(location.protocol==="file:"||location.hostname==="localhost"){
     parseDelimited:parseDelimited, readApps:readApps, pdfTableRows:pdfTableRows, last:function(){ return lastRead; },
     checkStudent:checkStudent, parseMin:parseMin, judgeMin:judgeMin, rowsFromPdf:rowsFromPdf,
     univFound:univFound, univRegion:univRegion, outcomeOf:outcomeOf, resultsOf:resultsOf,
-    KEYDATES:KEYDATES, minGaps:minGaps, leftText:leftText, normCode:normCode, codeKeys:codeKeys, sealDoc:sealDoc, openDoc:openDoc, mergeData:function(l){ var r=mergeData(l); render(); return r; }, students:function(){ return JSON.parse(JSON.stringify(Array.from(students.values()))); }, scoreSum:scoreSum, scoreOk:scoreOk, noticeText:noticeText, diffLines:diffLines, logs:function(){ var o=[]; students.forEach(function(x){ (x.log||[]).forEach(function(e){ o.push(e); }); }); return o; }, glanceData:glanceData, univKey:univKey, majorKey:majorKey, upcoming:upcoming, pending:pending, icsFold:icsFold, jungsiOf:jungsiOf};
+    KEYDATES:KEYDATES, minGaps:minGaps, render:function(){ render(); }, leftText:leftText, normCode:normCode, codeKeys:codeKeys, sealDoc:sealDoc, openDoc:openDoc, mergeData:function(l){ var r=mergeData(l); render(); return r; }, students:function(){ return JSON.parse(JSON.stringify(Array.from(students.values()))); }, scoreSum:scoreSum, scoreOk:scoreOk, noticeText:noticeText, diffLines:diffLines, logs:function(){ var o=[]; students.forEach(function(x){ (x.log||[]).forEach(function(e){ o.push(e); }); }); return o; }, glanceData:glanceData, univKey:univKey, majorKey:majorKey, upcoming:upcoming, pending:pending, icsFold:icsFold, jungsiOf:jungsiOf};
 } }catch(e){}
 
 /* 켜 둔 채로 시간이 흐르면 D-day·남은 시간·경고·결과 입력할 것을 1분마다 새로 그린다.
