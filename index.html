@@ -89,6 +89,9 @@ button{cursor:pointer}
 #schoolPanel .tadd{align-items:center; margin:6px 0}
 #schoolPanel .tadd b{font-size:15px; letter-spacing:.06em; margin-right:6px}
 #schoolPanel .uitem{gap:8px}
+.adminrow .schoolname{border:1px solid var(--line-2); background:var(--surface); color:var(--ink); border-radius:8px; padding:6px 9px; font-size:12.5px; min-width:220px}
+.codeshow{margin:12px 0}
+.codetext{font-size:22px; letter-spacing:.08em}
 .adminrow{display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:6px; margin-top:10px; padding-top:10px; border-top:1px solid var(--line); font-size:12px; color:var(--ink-3)}
 .whochip span{max-width:9em; overflow:hidden; text-overflow:ellipsis}
 @media (max-width:560px){ .whochip span{display:none} }
@@ -3822,8 +3825,12 @@ function leaveSchool(){
 function googleIn(){
   var pv=new fb.U.GoogleAuthProvider(); pv.setCustomParameters({prompt:"select_account"});
   return fb.U.signInWithPopup(fb.auth,pv).catch(function(e){
-    if(e&&/popup-closed|cancelled-popup/.test(e.code||"")) throw {code:"cancel"};
-    alert("구글 로그인을 하지 못했습니다. ("+((e&&e.code)||"")+")"); throw {code:"cancel"};
+    var c=(e&&e.code)||"";
+    if(/popup-closed|cancelled-popup/.test(c)) throw {code:"cancel"};
+    throw {code:"google", msg:"구글 로그인을 하지 못했습니다 ("+c+")."+
+      (/popup-blocked|operation-not-supported/.test(c)?" 이 창이 로그인 팝업을 막고 있습니다. 크롬·엣지 같은 일반 브라우저로 열어 주세요(주소창 오른쪽에서 팝업 허용).":
+       /unauthorized-domain/.test(c)?" Firebase 콘솔 > Authentication > 설정 > 승인된 도메인에 이 주소를 추가해야 합니다.":
+       /operation-not-allowed/.test(c)?" Firebase 콘솔 > Authentication > 로그인 방법에서 Google 을 사용 설정해야 합니다.":"")};
   });
 }
 function codeGate(err){
@@ -3850,28 +3857,43 @@ function codeGate(err){
     adm.appendChild(el("span",null,"관리자 "+mail+" 로그인됨"));
     var lo=el("button","ghost","로그아웃"); lo.onclick=function(){ fb.U.signOut(fb.auth).then(function(){ codeGate(); }); }; adm.appendChild(lo);
   } else {
-    var gi=el("button","ghost","관리자: 구글로 로그인"); gi.onclick=function(){ googleIn().then(function(){ codeGate(); },function(){}); }; adm.appendChild(gi);
+    var gi=el("button","ghost","관리자: 구글로 로그인");
+    gi.onclick=function(){ googleIn().then(function(){ codeGate(); },function(e){ if(e&&e.msg){ note.textContent=e.msg; note.style.color="var(--bad)"; } }); };
+    adm.appendChild(gi);
   }
-  var mk=el("button","ghost","새 학교 만들기(관리자)"); mk.onclick=createSchool; adm.appendChild(mk);
+  var sn=document.createElement("input"); sn.placeholder="새 학교 이름 (예: 성지고등학교 3학년)"; sn.className="schoolname";
+  var mk=el("button","ghost","새 학교 만들기(관리자)"); mk.onclick=function(){ createSchool(sn.value,note); };
+  sn.onkeydown=function(e){ if(e.key==="Enter") mk.onclick(); };
+  adm.appendChild(sn); adm.appendChild(mk);
   f.appendChild(adm);
   showGate("학교 코드 넣기","학교 코드를 넣으면 관리자 승인 뒤 그 학교 모든 반 자료를 실시간으로 함께 보고 고칩니다. 자료는 학교 코드로 암호화되어 저장되므로 코드는 학교 메신저로만 전하세요. 아래 화면은 예시입니다.",[f]);
   render();
 }
-// 관리자가 새 학교를 만든다: 구글 로그인 → 학교 이름 → 새 코드
-function createSchool(){
+// 관리자가 새 학교를 만든다: 구글 로그인 → 학교 이름 → 새 코드(화면에 보여 줌)
+function createSchool(name,note){
+  var say=function(t){ if(note){ note.textContent=t; note.style.color="var(--bad)"; } };
+  name=String(name||"").trim();
+  if(!name){ say("새 학교 이름을 먼저 적어 주세요(예: 성지고등학교 3학년)."); return; }
   (myMail()?Promise.resolve():googleIn()).then(function(){
-    var name=window.prompt("학교 이름을 적어 주세요(예: ○○고등학교 3학년).","");
-    if(!name||!name.trim()) return;
     var code=newCode();
     setSync("","학교 만드는 중");
     return codeKeys(code).then(function(K){
-      return fb.S.setDoc(sRef(K.room),{name:name.trim().slice(0,40),admins:[myMail()],created:new Date().toISOString()}).then(function(){
+      return fb.S.setDoc(sRef(K.room),{name:name.slice(0,40),admins:[myMail()],created:new Date().toISOString()}).then(function(){
         try{ localStorage.setItem(CODE_KEY,normCode(code)); }catch(e){}
-        window.prompt("학교를 만들었습니다. 아래 학교 코드를 꼭 적어 두고, 함께 쓸 선생님께 학교 메신저로 전하세요. 코드를 잃어버리면 자료를 열 수 없습니다.",fmtCode(code));
-        enterCode(code,{remember:true});
+        showNewCode(code,name);
       });
     });
-  }).catch(function(e){ if(!(e&&e.code==="cancel")) codeGate("학교를 만들지 못했습니다"+(e&&e.code?" ("+e.code+")":"")+"."); });
+  }).catch(function(e){
+    if(e&&e.code==="cancel"){ codeGate(); return; }
+    codeGate(e&&e.msg?e.msg:"학교를 만들지 못했습니다"+(e&&e.code?" ("+e.code+")":"")+".");
+  });
+}
+function showNewCode(code,name){
+  setSync("","학교를 만들었습니다");
+  var box=el("div","codeshow"); box.appendChild(el("b","mono codetext",fmtCode(code)));
+  var cp=el("button","ghost","복사"); cp.onclick=function(){ copyText(fmtCode(code),function(){ flashBtn(cp,"복사됨 ✓"); }); };
+  var go=el("button","btn","들어가기"); go.onclick=function(){ enterCode(code,{remember:true}); };
+  showGate("'"+name+"' 학교를 만들었습니다","아래 학교 코드를 꼭 적어 두고 함께 쓸 선생님께 학교 메신저로 전하세요. 코드를 잃어버리면 자료를 열 수 없습니다. 이 코드는 다시 보여 드릴 수 있습니다(전체 현황 맨 아래).",[box,cp,go]);
 }
 function enterCode(code,o){
   o=o||{};
