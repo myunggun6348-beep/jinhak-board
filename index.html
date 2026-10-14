@@ -3806,9 +3806,10 @@ function openDoc(K,d){
 }
 // 학번 같은 문서 이름도 저장소에 드러나지 않게 바꾼다
 function docKey(K,coll,id){ return crypto.subtle.sign("HMAC",K.hmac,new TextEncoder().encode(coll+"/"+id)).then(function(s){ return hexOf(s).slice(0,40); }); }
+// ponytail: 8자리(약 40비트). 들어오는 길은 가입 암호·관리자 승인·규칙이 막으므로 코드는 찾기 어렵기만 하면 된다.
 function newCode(){
-  var A="23456789ABCDEFGHJKMNPQRSTUVWXYZ", r=crypto.getRandomValues(new Uint8Array(16)), s="";
-  for(var i=0;i<16;i++){ if(i&&i%4===0) s+="-"; s+=A[r[i]%A.length]; }
+  var A="23456789ABCDEFGHJKMNPQRSTUVWXYZ", r=crypto.getRandomValues(new Uint8Array(8)), s="";
+  for(var i=0;i<8;i++){ if(i&&i%4===0) s+="-"; s+=A[r[i]%A.length]; }
   return s;
 }
 function fmtCode(c){ return normCode(c).replace(/(.{4})(?=.)/g,"$1-"); }
@@ -3853,7 +3854,7 @@ function startFirebase(){
       if(!first) return; first=false;   // 처음 한 번만 길을 정한다. 그 뒤 로그인·로그아웃은 각 단추가 처리한다.
       var saved=""; try{ saved=localStorage.getItem(CODE_KEY)||""; }catch(e){}
       // 초대 링크(#join=코드)로 열었으면 코드를 채운 가입 화면으로. # 뒤는 서버로 가지 않는다. 주소창에서는 바로 지운다.
-      var inv=location.hash.match(/join=([0-9A-Za-z-]{12,})/);
+      var inv=location.hash.match(/join=([0-9A-Za-z-]{8,})/);
       if(inv){ try{ history.replaceState(null,"",location.pathname+location.search); }catch(e){} codeGate("","teacher",inv[1]); }
       else if(saved) enterCode(saved,{remember:true}); else codeGate();
     });
@@ -3889,7 +3890,11 @@ function googleIn(){
        /operation-not-allowed/.test(c)?" Firebase 콘솔 > Authentication > 로그인 방법에서 Google 을 사용 설정해야 합니다.":"")};
   });
 }
-function inp(name,ph,val){ var i=document.createElement("input"); i.name=name; i.placeholder=ph; if(val) i.value=val; i.autocomplete="off"; i.spellcheck=false; return i; }
+function inp(name,ph,val){
+  var i=document.createElement("input"); i.name=name; i.placeholder=ph; if(val) i.value=val; i.autocomplete="off"; i.spellcheck=false;
+  if(name==="code") i.oninput=function(){ var v=fmtCode(normCode(i.value).slice(0,16)); if(v!==i.value) i.value=v; };
+  return i;
+}
 function clsSelect(val){
   var s=document.createElement("select"); s.name="cls";
   [["","담당 반 고르기"]].concat(CLASSES.map(function(c){ return [String(c),c+"반"]; }),[["0","담임 아님"]]).forEach(function(o){
@@ -3916,14 +3921,14 @@ function codeGate(err,mode,preset){
     render(); return;
   }
   if(mode==="teacher"){
-    var ci=inp("code","학교 코드 (예: K7QM-3XPA-9RTD-HW2C)",preset?fmtCode(preset):""), ni=inp("name","선생님 이름 (예: 김○○)",myName()), ks=clsSelect(getMyCls()||"");
+    var ci=inp("code","학교 코드 (예: K7QM-3XPA)",preset?fmtCode(preset):""), ni=inp("name","선생님 이름 (예: 김○○)",myName()), ks=clsSelect(getMyCls()||"");
     if(preset) ci.hidden=true;
     var pi=inp("pw","가입 암호 (관리자에게 따로 받은 것)"); pi.type="password";
     var rl=el("label","ckrow"), rc=document.createElement("input"); rc.type="checkbox"; rc.checked=true;
     rl.appendChild(rc); rl.appendChild(document.createTextNode(" 이 컴퓨터에 코드 기억(여럿이 쓰는 컴퓨터면 끄세요)"));
     var go=el("button","btn","가입 요청 · 들어가기");
     go.onclick=function(){
-      if(normCode(ci.value).length<12){ ci.focus(); say("관리자에게 받은 학교 코드를 넣어 주세요."); return; }
+      if(normCode(ci.value).length<8){ ci.focus(); say("관리자에게 받은 학교 코드를 넣어 주세요."); return; }
       if(!ni.value.trim()){ ni.focus(); say("이름을 적어 주세요. 관리자가 승인할 때 봅니다."); return; }
       if(ks.value===""){ ks.focus(); say("담당 반을 골라 주세요. 그 반 학생만 보입니다."); return; }
       if(!pi.value.trim()){ pi.focus(); say("가입 암호를 넣어 주세요. 관리자에게 따로 받습니다."); return; }
@@ -3957,8 +3962,8 @@ function codeGate(err,mode,preset){
   [sn,sp].forEach(function(x){ x.onkeydown=function(e){ if(e.key==="Enter") mk.onclick(); }; });
   s2.appendChild(sn); s2.appendChild(sp); s2.appendChild(mk);
   var s3=el("div","step"+(mail?"":" off")); s3.appendChild(el("b",null,"또는: 이미 만든 학교 들어가기"));
-  var ac=inp("code","학교 코드"), ag=el("button","btn sec","들어가기"); ac.disabled=ag.disabled=!mail;
-  ag.onclick=function(){ if(normCode(ac.value).length<12){ say("학교 코드를 넣어 주세요."); return; } enterCode(ac.value,{remember:true}); };
+  var ac=inp("code","학교 코드 (예: K7QM-3XPA)"), ag=el("button","btn sec","들어가기"); ac.disabled=ag.disabled=!mail;
+  ag.onclick=function(){ if(normCode(ac.value).length<8){ say("학교 코드를 넣어 주세요."); return; } enterCode(ac.value,{remember:true}); };
   ac.onkeydown=function(e){ if(e.key==="Enter") ag.onclick(); };
   s3.appendChild(ac); s3.appendChild(ag);
   [s1,s2,s3,note,back].forEach(function(x){ f.appendChild(x); });
@@ -4000,7 +4005,7 @@ function showNewCode(code,name){
 }
 function enterCode(code,o){
   o=o||{};
-  if(normCode(code).length<12){ codeGate("코드가 너무 짧습니다. 받은 코드를 다시 확인해 주세요.","teacher"); return; }
+  if(normCode(code).length<8){ codeGate("코드가 너무 짧습니다. 받은 코드를 다시 확인해 주세요.","teacher"); return; }
   setSync("","코드 확인 중");
   var K;
   (fb.auth.currentUser?Promise.resolve():fb.U.signInAnonymously(fb.auth)).then(function(){ return codeKeys(code); }).then(function(k){

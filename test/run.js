@@ -428,8 +428,9 @@ function buildTestPage() {
   const sdocs = Object.keys(KV).filter((k) => /\/students\//.test(k));
   check("관리자: 이 브라우저 자료를 학교 장부로(반 번호만 드러남)", sdocs.map((k) => KV[k].cls).sort(), [2, 5]);
   check("저장소엔 암호문만(이름·학번·대학 안 보임)", /김예시|30201|부산대/.test(JSON.stringify(KV)), false);
+  check("새 학교 코드는 8자리", /^[2-9A-HJKMNP-Z]{4}-[2-9A-HJKMNP-Z]{4}$/.test(lastCode), true);
   const t2 = await who({ hash: "#join=" + lastCode });
-  check("초대 링크: 코드가 채워지고 칸은 숨김, 주소에서 코드 지움", [await gateTitle(t2), await t2.$eval("#banner input[name=code]", (e) => e.hidden && e.value.length > 12), t2.url().includes("join=")], ["선생님: 초대 링크로 가입하기", true, false]);
+  check("초대 링크: 코드가 채워지고 칸은 숨김, 주소에서 코드 지움", [await gateTitle(t2), await t2.$eval("#banner input[name=code]", (e) => e.hidden && /^[0-9A-Z]{4}-[0-9A-Z]{4}$/.test(e.value)), t2.url().includes("join=")], ["선생님: 초대 링크로 가입하기", true, false]);
   await t2.fill("#banner input[name=name]", "박담임"); await t2.selectOption("#banner select[name=cls]", "2");
   await t2.fill("#banner input[name=pw]", "틀린암호"); await t2.click("#banner .codeform .btn"); await t2.waitForTimeout(1500);
   check("가입 암호가 틀리면 요청이 안 됨(코드는 그대로)", [/가입 암호가 맞지 않습니다/.test(await t2.innerText("#banner")), Object.keys(KV).filter((k) => k.includes("/members/")).length], [true, 0]);
