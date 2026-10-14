@@ -1,22 +1,25 @@
 rules_version = '2';
-// 진학 현황판(Vercel 판) Firestore 규칙 — 학교별 장부 + 관리자 승인.
+// 진학 현황판(Vercel 판) Firestore 규칙 — 학교별 장부, 관리자 승인, 담임은 자기 반만.
 // schools/{sid}: 학교 이름·관리자 이메일. sid 는 학교 코드에서 만든 40자라 코드를 모르면 찾을 수 없다.
-// schools/{sid}/members/{uid}: 선생님 가입(익명 로그인). ok=true 는 관리자만 바꾼다.
-// schools/{sid}/students|minreq/{id}: 학교 코드로 암호화된 {v, iv, c, t} 만. 승인된 선생님과 관리자만 읽고 쓴다.
+// schools/{sid}/members/{uid}: 선생님 가입(익명 로그인). ok·cls(담당 반)는 관리자만 바꾼다.
+// schools/{sid}/students/{id}: 학교 코드로 암호화된 {v, iv, c, t} + 반 번호 cls. 담임은 자기 반만, 관리자는 전부.
+// schools/{sid}/minreq/{id}: 학교 공용 최저 기준표(암호화). 승인된 선생님 모두.
 // Firebase 콘솔 > Firestore Database > 규칙에 그대로 붙여넣고 게시한다.
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
+    function google() { return signedIn() && ('email' in request.auth.token) && request.auth.token.email_verified == true; }
     function mail() { return request.auth.token.email.lower(); }
-    function google() { return signedIn() && request.auth.token.email != null && request.auth.token.email_verified == true; }
-    function schoolOf(sid) { return get(/databases/$(database)/documents/schools/$(sid)).data; }
-    function isAdmin(sid) { return google() && mail() in schoolOf(sid).admins; }
-    function isMember(sid) {
-      let m = /databases/$(database)/documents/schools/$(sid)/members/$(request.auth.uid);
-      return signedIn() && exists(m) && get(m).data.ok == true;
-    }
+    function isAdmin(sid) { return google() && mail() in get(/databases/$(database)/documents/schools/$(sid)).data.admins; }
+    function memberPath(sid) { return /databases/$(database)/documents/schools/$(sid)/members/$(request.auth.uid); }
+    function isMember(sid) { return signedIn() && exists(memberPath(sid)) && get(memberPath(sid)).data.ok == true; }
+    function myCls(sid) { return get(memberPath(sid)).data.cls; }
     function okSchool(d) { return d.keys().hasOnly(['name', 'admins', 'created']) && d.name is string && d.name.size() <= 40
       && d.admins is list && d.admins.size() >= 1 && d.admins.size() <= 10; }
+    function okData(d, withCls) {
+      return d.keys().hasOnly(withCls ? ['v', 'iv', 'c', 't', 'cls'] : ['v', 'iv', 'c', 't'])
+        && d.c is string && d.c.size() < 1000000 && d.iv is string && d.iv.size() < 40;
+    }
 
     match /schools/{sid} {
       allow get: if signedIn() && sid.size() == 40;
@@ -27,20 +30,25 @@ service cloud.firestore {
         allow get: if signedIn() && (request.auth.uid == uid || isAdmin(sid));
         allow list: if isAdmin(sid);
         allow create: if signedIn() && request.auth.uid == uid && request.resource.data.ok == false
-          && request.resource.data.keys().hasOnly(['name', 'cls', 'at', 'ok']) && request.resource.data.name.size() <= 20;
-        allow update: if isAdmin(sid);
+          && request.resource.data.keys().hasOnly(['name', 'cls', 'at', 'ok']) && request.resource.data.name.size() <= 20
+          && request.resource.data.cls is int;
+        allow update: if isAdmin(sid) && request.resource.data.cls is int;
         allow delete: if isAdmin(sid) || request.auth.uid == uid;
       }
 
-      match /{coll}/{id} {
-        function okColl() { return coll == 'students' || coll == 'minreq'; }
-        function okData() {
-          let d = request.resource.data;
-          return d.keys().hasOnly(['v', 'iv', 'c', 't']) && d.c is string && d.c.size() < 1000000 && d.iv is string && d.iv.size() < 40;
-        }
-        allow read: if okColl() && (isMember(sid) || isAdmin(sid));
-        allow create, update: if okColl() && (isMember(sid) || isAdmin(sid)) && okData();
-        allow delete: if okColl() && (isMember(sid) || isAdmin(sid));
+      match /students/{id} {
+        allow read: if isAdmin(sid) || (isMember(sid) && resource.data.cls == myCls(sid));
+        allow create: if okData(request.resource.data, true) && request.resource.data.cls is int
+          && (isAdmin(sid) || (isMember(sid) && request.resource.data.cls == myCls(sid)));
+        allow update: if okData(request.resource.data, true) && request.resource.data.cls is int
+          && (isAdmin(sid) || (isMember(sid) && resource.data.cls == myCls(sid) && request.resource.data.cls == myCls(sid)));
+        allow delete: if isAdmin(sid) || (isMember(sid) && resource.data.cls == myCls(sid));
+      }
+
+      match /minreq/{id} {
+        allow read: if isMember(sid) || isAdmin(sid);
+        allow create, update: if okData(request.resource.data, false) && (isMember(sid) || isAdmin(sid));
+        allow delete: if isMember(sid) || isAdmin(sid);
       }
     }
   }

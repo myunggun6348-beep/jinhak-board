@@ -387,7 +387,7 @@ function buildTestPage() {
   });
   check("반 파일 합치기: 최근 쪽 남김·기록 합침·같은 학생 중복 없음", mg, { upd: 1, keep: 1, status: "최초합", log: ["처음", "합격"], dup: 1, nAppsB: 0 });
 
-  /* ── 학교별 공용 장부(Vercel 판) ── 가짜 Firebase 로 학교 만들기·가입 승인·암호화·실시간·빼기·학교끼리 막힘 */
+  /* ── 학교별 공용 장부(Vercel 판) ── 가짜 Firebase 로 학교 만들기·가입 승인·담임은 자기 반만·관리자는 전부·학교끼리 막힘 */
   console.log("\n[학교별 공용 장부]");
   const srv = require("http").createServer((q, r) => {
     const f = q.url.split("?")[0] === "/" ? page404 : path.join(ROOT, decodeURIComponent(q.url.split("?")[0]));
@@ -403,39 +403,45 @@ function buildTestPage() {
     await c.addInitScript(fs.readFileSync(FIX("fbmock.js"), "utf8"));
     await c.addInitScript((a) => { if (!sessionStorage.getItem("seeded")) { sessionStorage.setItem("seeded", "1"); localStorage.setItem("jh.cls", "2");
       if (a.local) localStorage.setItem("jh.local.students", JSON.stringify(a.local)); } if (a.email) window.__fbEmail = a.email; }, o);
-    const x = await c.newPage(); x.on("pageerror", (e) => errors.push(String(e)));
-    x.on("dialog", (d) => d.accept());
-    x.makeSchool = async () => { await x.fill("#banner .adminrow .schoolname", o.school || "테스트고");
-      await x.click("#banner .adminrow .ghost >> text=새 학교 만들기(관리자)"); await x.waitForTimeout(3500);
-      lastCode = (await x.innerText("#banner .codetext")).trim(); await x.click("#banner .codeshow ~ .btn"); await x.waitForTimeout(1500); };
+    const x = await c.newPage(); x.on("pageerror", (e) => errors.push(String(e))); x.on("dialog", (d) => d.accept());
     await x.goto("http://localhost:" + port + "/?fb=1"); await x.waitForTimeout(500);
+    x.makeSchool = async () => {
+      await x.click("#banner .choice >> text=관리자입니다"); await x.click("#banner .btn >> text=구글로 로그인"); await x.waitForTimeout(300);
+      await x.fill("#banner input[name=school]", o.school || "테스트고"); await x.click("#banner .btn >> text=학교 만들기"); await x.waitForTimeout(3500);
+      lastCode = (await x.innerText("#banner .codetext")).trim(); await x.click("#banner .btn >> text=들어가기"); await x.waitForTimeout(1500); };
     return x;
   };
   const rowNames = (x) => x.evaluate(() => [...document.querySelectorAll(".row .nm")].map((e) => e.textContent));
   const gateTitle = (x) => x.evaluate(() => { const b = document.getElementById("banner"); return b.hidden ? "" : b.querySelector("h2").textContent; });
   const join = async (x, code, name, cls) => {
-    await x.fill("#banner .codeform input >> nth=0", code); await x.fill("#banner .codeform input >> nth=1", name); await x.fill("#banner .codeform input >> nth=2", String(cls));
+    await x.click("#banner .choice >> text=선생님입니다");
+    await x.fill("#banner input[name=code]", code); await x.fill("#banner input[name=name]", name); await x.selectOption("#banner select[name=cls]", String(cls));
     await x.click("#banner .codeform .btn"); await x.waitForTimeout(1500);
   };
-  const adm = await who({ email: "admin@x.com", local: [{ id: "30201", cls: 2, no: "30201", name: "김예시", updatedAt: "2026-10-01T00:00:00Z", apps: [{ id: "a1", kind: "수시", univ: "부산대학교", major: "국어국문학과", type: "학종", status: "지원완료", c6: true }] }] });
-  check("처음: 학교 코드 화면", await gateTitle(adm), "학교 코드 넣기");
+  const stu = (id, cls, name) => ({ id, cls, no: id, name, updatedAt: "2026-10-01T00:00:00Z", apps: [{ id: "a" + id, kind: "수시", univ: "부산대학교", major: "국어국문학과", type: "학종", status: "지원완료", c6: true }] });
+  const adm = await who({ email: "admin@x.com", local: [stu("30201", 2, "김예시"), stu("30501", 5, "박예시")] });
+  check("처음: 선생님/관리자 고르기", await gateTitle(adm), "진학 현황판 시작하기");
   await adm.makeSchool(); await adm.waitForTimeout(1500);
   const sids = Object.keys(KV).filter((k) => /^schools\/[0-9a-f]{40}$/.test(k));
   check("관리자: 학교 만들기(이름·관리자 이메일)", sids.length === 1 && KV[sids[0]].name + "/" + KV[sids[0]].admins.join(), "테스트고/admin@x.com");
-  check("관리자: 이 브라우저 자료를 학교 장부로", Object.keys(KV).filter((k) => /\/students\//.test(k)).length, 1);
+  const sdocs = Object.keys(KV).filter((k) => /\/students\//.test(k));
+  check("관리자: 이 브라우저 자료를 학교 장부로(반 번호만 드러남)", sdocs.map((k) => KV[k].cls).sort(), [2, 5]);
   check("저장소엔 암호문만(이름·학번·대학 안 보임)", /김예시|30201|부산대/.test(JSON.stringify(KV)), false);
-  const t5 = await who({});
-  await join(t5, lastCode, "박담임", 2);
-  check("선생님: 코드 넣으면 승인 대기, 자료 안 보임", [await gateTitle(t5), (await rowNames(t5)).includes("김예시")], ["관리자 승인을 기다리는 중입니다", false]);
+  const t2 = await who({});
+  await join(t2, lastCode, "박담임", 2);
+  check("선생님: 가입 요청하면 승인 대기, 자료 안 보임", [await gateTitle(t2), (await rowNames(t2)).includes("김예시")], ["관리자 승인을 기다리는 중입니다", false]);
   await adm.click("#tabAll"); await adm.waitForTimeout(800);
-  check("관리자: 승인 기다리는 선생님 보임", /박담임 \(2반\)/.test(await adm.innerText("#schoolPanel")), true);
-  await adm.click("#schoolPanel button >> text=승인"); await t5.waitForTimeout(2500);
-  check("승인되면 선생님 화면이 저절로 열림", [await gateTitle(t5), await rowNames(t5)], ["", ["김예시"]]);
-  await t5.click(".row >> nth=0 >> .rowhead"); await t5.waitForTimeout(200);
-  const ti = await t5.evaluate(() => [...document.querySelectorAll(".detail select")].findIndex((x) => [...x.options].some((o) => o.value === "최초합")));
-  await (await t5.$$(".detail select"))[ti].selectOption("최초합"); await adm.waitForTimeout(2500);
+  check("관리자: 승인 기다리는 선생님(반 포함) 보임", /박담임/.test(await adm.innerText("#schoolPanel")) && await adm.$eval("#schoolPanel .uitem select", (e) => e.value), "2");
+  await adm.click("#schoolPanel button >> text=승인"); await t2.waitForTimeout(2500);
+  check("승인되면 담임 화면이 열리고 자기 반만", [await gateTitle(t2), await rowNames(t2), await t2.$eval("#classbar", (e) => e.hidden)], ["", ["김예시"], true]);
+  await t2.click("#tabAll"); await t2.waitForTimeout(500);
+  check("담임은 다른 반(5반) 학생이 안 보임", /박예시/.test(await t2.innerText("#viewAll")), false);
+  check("관리자는 모든 반", /2반[\s\S]*5반/.test(await adm.innerText("#classTable")), true);
+  await t2.click("#tabClass"); await t2.click(".row >> nth=0 >> .rowhead"); await t2.waitForTimeout(200);
+  const ti = await t2.evaluate(() => [...document.querySelectorAll(".detail select")].findIndex((x) => [...x.options].some((o) => o.value === "최초합")));
+  await (await t2.$$(".detail select"))[ti].selectOption("최초합"); await adm.waitForTimeout(2500);
   await adm.click("#tabClass"); await adm.waitForTimeout(300);
-  check("선생님이 고친 결과가 관리자 화면에 실시간", await adm.evaluate(() => document.querySelector(".row .pills").textContent.includes("최초합")), true);
+  check("담임이 고친 결과가 관리자 화면에 실시간", await adm.evaluate(() => document.querySelector(".row .pills").textContent.includes("최초합")), true);
   const other = await who({ email: "other@x.com", school: "다른고" });
   await other.makeSchool(); await other.waitForTimeout(500);
   check("다른 학교는 서로 안 보임", [Object.keys(KV).filter((k) => /^schools\/[0-9a-f]{40}$/.test(k)).length, (await rowNames(other)).includes("김예시")], [2, false]);
@@ -443,9 +449,9 @@ function buildTestPage() {
   await join(wrong, "AAAA-BBBB-CCCC-DDDD", "누구", 1);
   check("틀린 코드: 학교 없음", /이 코드의 학교가 없습니다/.test(await wrong.innerText("#banner")), true);
   await adm.click("#tabAll"); await adm.waitForTimeout(500);
-  await adm.click("#schoolPanel button >> text=빼기"); await t5.waitForTimeout(2500);
-  check("관리자가 빼면 선생님 화면이 막힘", [await gateTitle(t5), (await rowNames(t5)).includes("김예시")], ["학교 코드 넣기", false]);
-  for (const x of [adm, t5, other, wrong]) await x.context().close();
+  await adm.click("#schoolPanel button >> text=빼기"); await t2.waitForTimeout(2500);
+  check("관리자가 빼면 담임 화면이 막힘", [await gateTitle(t2), (await rowNames(t2)).includes("김예시")], ["진학 현황판 시작하기", false]);
+  for (const x of [adm, t2, other, wrong]) await x.context().close();
   srv.close();
 
   check("자바스크립트 오류 없음", errors, []);
