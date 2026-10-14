@@ -407,15 +407,15 @@ function buildTestPage() {
     await x.goto("http://localhost:" + port + "/?fb=1" + (o.hash || "")); await x.waitForTimeout(600);
     x.makeSchool = async () => {
       await x.click("#banner .choice >> text=관리자입니다"); await x.click("#banner .btn >> text=구글로 로그인"); await x.waitForTimeout(300);
-      await x.fill("#banner input[name=school]", o.school || "테스트고"); await x.click("#banner .btn >> text=학교 만들기"); await x.waitForTimeout(3500);
+      await x.fill("#banner input[name=school]", o.school || "테스트고"); await x.fill("#banner input[name=joinpw]", "1234"); await x.click("#banner .btn >> text=학교 만들기"); await x.waitForTimeout(3500);
       lastCode = (await x.innerText("#banner .codetext")).trim(); await x.click("#banner .btn >> text=들어가기"); await x.waitForTimeout(1500); };
     return x;
   };
   const rowNames = (x) => x.evaluate(() => [...document.querySelectorAll(".row .nm")].map((e) => e.textContent));
   const gateTitle = (x) => x.evaluate(() => { const b = document.getElementById("banner"); return b.hidden ? "" : b.querySelector("h2").textContent; });
-  const join = async (x, code, name, cls) => {
+  const join = async (x, code, name, cls, pw) => {
     await x.click("#banner .choice >> text=선생님입니다");
-    await x.fill("#banner input[name=code]", code); await x.fill("#banner input[name=name]", name); await x.selectOption("#banner select[name=cls]", String(cls));
+    await x.fill("#banner input[name=code]", code); await x.fill("#banner input[name=name]", name); await x.selectOption("#banner select[name=cls]", String(cls)); await x.fill("#banner input[name=pw]", pw || "1234");
     await x.click("#banner .codeform .btn"); await x.waitForTimeout(1500);
   };
   const stu = (id, cls, name) => ({ id, cls, no: id, name, updatedAt: "2026-10-01T00:00:00Z", apps: [{ id: "a" + id, kind: "수시", univ: "부산대학교", major: "국어국문학과", type: "학종", status: "지원완료", c6: true }] });
@@ -423,6 +423,7 @@ function buildTestPage() {
   check("처음: 선생님/관리자 고르기", await gateTitle(adm), "진학 현황판 시작하기");
   await adm.makeSchool(); await adm.waitForTimeout(1500);
   const sids = Object.keys(KV).filter((k) => /^schools\/[0-9a-f]{40}$/.test(k));
+  check("가입 암호는 해시로만(관리자 전용 자리)", Object.keys(KV).some((k) => k.endsWith("/private/join")) && !/1234/.test(JSON.stringify(KV)), true);
   check("관리자: 학교 만들기(이름·관리자 이메일)", sids.length === 1 && KV[sids[0]].name + "/" + KV[sids[0]].admins.join(), "테스트고/admin@x.com");
   const sdocs = Object.keys(KV).filter((k) => /\/students\//.test(k));
   check("관리자: 이 브라우저 자료를 학교 장부로(반 번호만 드러남)", sdocs.map((k) => KV[k].cls).sort(), [2, 5]);
@@ -430,7 +431,10 @@ function buildTestPage() {
   const t2 = await who({ hash: "#join=" + lastCode });
   check("초대 링크: 코드가 채워지고 칸은 숨김, 주소에서 코드 지움", [await gateTitle(t2), await t2.$eval("#banner input[name=code]", (e) => e.hidden && e.value.length > 12), t2.url().includes("join=")], ["선생님: 초대 링크로 가입하기", true, false]);
   await t2.fill("#banner input[name=name]", "박담임"); await t2.selectOption("#banner select[name=cls]", "2");
-  await t2.click("#banner .codeform .btn"); await t2.waitForTimeout(1500);
+  await t2.fill("#banner input[name=pw]", "틀린암호"); await t2.click("#banner .codeform .btn"); await t2.waitForTimeout(1500);
+  check("가입 암호가 틀리면 요청이 안 됨(코드는 그대로)", [/가입 암호가 맞지 않습니다/.test(await t2.innerText("#banner")), Object.keys(KV).filter((k) => k.includes("/members/")).length], [true, 0]);
+  await t2.fill("#banner input[name=name]", "박담임"); await t2.selectOption("#banner select[name=cls]", "2");
+  await t2.fill("#banner input[name=pw]", "1234"); await t2.click("#banner .codeform .btn"); await t2.waitForTimeout(1500);
   check("선생님: 가입 요청하면 승인 대기, 자료 안 보임", [await gateTitle(t2), (await rowNames(t2)).includes("김예시")], ["관리자 승인을 기다리는 중입니다", false]);
   await adm.click("#tabAll"); await adm.waitForTimeout(800);
   check("관리자: 승인 기다리는 선생님(반 포함) 보임", /박담임/.test(await adm.innerText("#schoolPanel")) && await adm.$eval("#schoolPanel .uitem select", (e) => e.value), "2");

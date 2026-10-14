@@ -1,6 +1,7 @@
 rules_version = '2';
 // 진학 현황판(Vercel 판) Firestore 규칙 — 학교별 장부, 관리자 승인, 담임은 자기 반만.
 // schools/{sid}: 학교 이름·관리자 이메일. sid 는 학교 코드에서 만든 40자라 코드를 모르면 찾을 수 없다.
+// schools/{sid}/private/join: 가입 암호 해시. 관리자만 읽고 쓴다. 가입 요청(members 생성)은 이 해시와 같은 pw 를 가져와야 한다.
 // schools/{sid}/members/{uid}: 선생님 가입(익명 로그인). ok·cls(담당 반)는 관리자만 바꾼다.
 // schools/{sid}/students/{id}: 학교 코드로 암호화된 {v, iv, c, t} + 반 번호 cls. 담임은 자기 반만, 관리자는 전부.
 // schools/{sid}/minreq/{id}: 학교 공용 최저 기준표(암호화). 승인된 선생님 모두.
@@ -26,12 +27,17 @@ service cloud.firestore {
       allow create: if google() && sid.size() == 40 && okSchool(request.resource.data) && request.resource.data.admins == [mail()];
       allow update: if isAdmin(sid) && okSchool(request.resource.data);
 
+      match /private/{doc} {
+        allow read, write: if isAdmin(sid);
+      }
+
       match /members/{uid} {
         allow get: if signedIn() && (request.auth.uid == uid || isAdmin(sid));
         allow list: if isAdmin(sid);
         allow create: if signedIn() && request.auth.uid == uid && request.resource.data.ok == false
-          && request.resource.data.keys().hasOnly(['name', 'cls', 'at', 'ok']) && request.resource.data.name.size() <= 20
-          && request.resource.data.cls is int;
+          && request.resource.data.keys().hasOnly(['name', 'cls', 'at', 'ok', 'pw']) && request.resource.data.name.size() <= 20
+          && request.resource.data.cls is int
+          && request.resource.data.pw == get(/databases/$(database)/documents/schools/$(sid)/private/join).data.hash;
         allow update: if isAdmin(sid) && request.resource.data.cls is int;
         allow delete: if isAdmin(sid) || request.auth.uid == uid;
       }
