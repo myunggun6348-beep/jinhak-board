@@ -443,6 +443,11 @@ function buildTestPage() {
   check("관리자: 이 브라우저 자료를 학교 장부로(반 번호만 드러남)", sdocs.map((k) => KV[k].cls).sort(), [2, 5]);
   check("저장소엔 암호문만(이름·학번·대학 안 보임)", /김예시|30201|부산대/.test(JSON.stringify(KV)), false);
   check("새 학교 코드는 8자리", /^[2-9A-HJKMNP-Z]{4}-[2-9A-HJKMNP-Z]{4}$/.test(lastCode), true);
+  const firstCode = lastCode;
+  await adm.click("#tabAll"); await adm.waitForTimeout(300);
+  await adm.fill("#schoolPanel input[name=rename]", "테스트고 3학년"); await adm.click("#schoolPanel button >> text=이름 바꾸기"); await adm.waitForTimeout(800);
+  check("관리자: 학교 이름 나중에 바꾸기", [KV[sids[0]].name, KV[sids[0]].admins.join(), /테스트고 3학년/.test(await adm.innerText("#whoChip"))], ["테스트고 3학년", "admin@x.com", true]);
+  await adm.click("#tabClass");
   const t2 = await who({ hash: "#join=" + lastCode });
   check("초대 링크: 코드가 채워지고 칸은 숨김, 주소에서 코드 지움", [await gateTitle(t2), await t2.$eval("#banner input[name=code]", (e) => e.hidden && /^[0-9A-Z]{4}-[0-9A-Z]{4}$/.test(e.value)), t2.url().includes("join=")], ["선생님: 초대 링크로 가입하기", true, false]);
   await t2.fill("#banner input[name=name]", "박담임"); await t2.selectOption("#banner select[name=cls]", "2");
@@ -466,6 +471,12 @@ function buildTestPage() {
   const other = await who({ email: "other@x.com", school: "다른고" });
   await other.makeSchool(); await other.waitForTimeout(500);
   check("다른 학교는 서로 안 보임", [Object.keys(KV).filter((k) => /^schools\/[0-9a-f]{40}$/.test(k)).length, (await rowNames(other)).includes("김예시")], [2, false]);
+  const adm2 = await who({ email: "admin@x.com" });
+  await adm2.click("#banner .choice >> text=관리자입니다"); await adm2.click("#banner .btn >> text=구글로 로그인"); await adm2.waitForTimeout(300);
+  const codeHidden = await adm2.$eval("#banner input[name=code]", (e) => e.hidden);
+  await adm2.click("#banner .linkbtn >> text=학교 코드로 열기"); await adm2.fill("#banner input[name=code]", firstCode); await adm2.click("#banner .btn >> text=들어가기"); await adm2.waitForTimeout(1500);
+  check("관리자 다른 컴퓨터: 코드 칸은 접혀 있다가 펼쳐 열기", [codeHidden, await gateTitle(adm2), /관리자/.test(await adm2.innerText("#whoChip"))], [true, "", true]);
+  await adm2.context().close();
   const wrong = await who({});
   await join(wrong, "AAAA-BBBB-CCCC-DDDD", "누구", 1);
   check("틀린 코드: 학교 없음", /이 코드의 학교가 없습니다/.test(await wrong.innerText("#banner")), true);
