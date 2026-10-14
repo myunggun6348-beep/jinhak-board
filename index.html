@@ -3972,9 +3972,9 @@ function codeGate(err,mode,preset){
   var back=el("button","linkbtn","← 처음으로"); back.onclick=function(){ codeGate(); };
   var help=el("button","linkbtn","사용 설명서"); help.onclick=openHelp;
   if(!mode){
-    var t=el("button","choice"); t.appendChild(el("b",null,"선생님입니다")); t.appendChild(el("span",null,"관리자에게 학교 코드를 받았어요"));
+    var t=el("button","choice"); t.appendChild(el("b",null,"선생님입니다")); t.appendChild(el("span",null,"관리자에게 초대 링크(또는 학교 코드)와 가입 암호를 받았어요"));
     t.onclick=function(){ codeGate("","teacher"); };
-    var a=el("button","choice"); a.appendChild(el("b",null,"관리자입니다")); a.appendChild(el("span",null,"우리 학교를 처음 만들거나, 만든 학교를 관리해요"));
+    var a=el("button","choice"); a.appendChild(el("b",null,"관리자입니다")); a.appendChild(el("span",null,"학교를 처음 등록하는 분은 여기부터. 구글 로그인 → 학교 이름·가입 암호 정하기"));
     a.onclick=function(){ codeGate("","admin"); };
     var lo=el("button","choice"); lo.appendChild(el("b",null,"혼자 쓰기")); lo.appendChild(el("span",null,"로그인 없이 이 컴퓨터(브라우저)에만 저장해요. 나중에 학교 장부로 옮길 수 있어요"));
     lo.onclick=function(){
@@ -3989,7 +3989,8 @@ function codeGate(err,mode,preset){
   if(mode==="teacher"){
     var ci=inp("code","학교 코드 (예: K7QM-3XPA)",preset?fmtCode(preset):""), ni=inp("name","선생님 이름 (예: 김○○)",myName()), ks=clsSelect(getMyCls()||"");
     if(preset) ci.hidden=true;
-    var pi=inp("pw","가입 암호 (관리자에게 따로 받은 것)"); pi.type="password";
+    var pi=inp("pw","가입 암호 (관리자가 정해서 알려 준 것)"); pi.type="password";
+    var toAdm=el("button","linkbtn","관리자이신가요? 학교를 만들거나 관리하려면 여기를 누르세요"); toAdm.onclick=function(){ codeGate("","admin"); };
     var rl=el("label","ckrow"), rc=document.createElement("input"); rc.type="checkbox"; rc.checked=true;
     rl.appendChild(rc); rl.appendChild(document.createTextNode(" 이 컴퓨터에 코드 기억(여럿이 쓰는 컴퓨터면 끄세요)"));
     var go=el("button","btn","가입 요청 · 들어가기");
@@ -4003,7 +4004,7 @@ function codeGate(err,mode,preset){
       enterCode(ci.value,{remember:rc.checked, pw:pi.value});
     };
     [ci,ni,pi].forEach(function(x){ x.onkeydown=function(e){ if(e.key==="Enter") go.onclick(); }; });
-    [ci,ni,ks,pi,rl,go,note,back].forEach(function(x){ f.appendChild(x); });
+    [toAdm,ci,ni,ks,pi,rl,go,note,back].forEach(function(x){ f.appendChild(x); });
     showGate(preset?"선생님: 초대 링크로 가입하기":"선생님: 학교 코드로 가입하기",
       preset?"학교 코드는 이미 들어가 있습니다. 이름·담당 반과 관리자에게 따로 받은 가입 암호를 넣고 가입을 요청하세요. 관리자가 승인하면 화면이 저절로 열리고, 담당 반 학생만 보입니다.":
       "관리자가 보낸 초대 링크를 누르면 코드를 칠 필요가 없습니다. 코드로 가입하려면 학교 코드·이름·담당 반·가입 암호를 넣고 가입을 요청하세요.",[f]);
@@ -4021,12 +4022,14 @@ function codeGate(err,mode,preset){
     s1.appendChild(gi);
   }
   var s2=el("div","step"+(mail?"":" off")); s2.appendChild(el("b",null,"② 처음이면: 새 학교 만들기"));
-  var sn=inp("school","학교 이름 (예: 성지고등학교 3학년)"), sp=inp("joinpw","가입 암호 정하기 (4자 이상, 담임에게 따로 알려 줌)"), mk=el("button","btn sec","학교 만들기");
+  var sn=inp("school","학교 이름 (예: 성지고등학교 3학년)"), sp=inp("joinpw","가입 암호 새로 만들기 (4자 이상, 예: sj2027)"), mk=el("button","btn sec","학교 만들기");
   sp.type="password"; sp.autocomplete="new-password";
   sn.disabled=sp.disabled=mk.disabled=!mail;
   mk.onclick=function(){ createSchool(sn.value,sp.value,note); };
   [sn,sp].forEach(function(x){ x.onkeydown=function(e){ if(e.key==="Enter") mk.onclick(); }; });
-  s2.appendChild(sn); s2.appendChild(sp); s2.appendChild(mk);
+  s2.appendChild(sn); s2.appendChild(sp);
+  s2.appendChild(el("span","shint","가입 암호는 선생님이 지금 새로 정하는 암호입니다(구글 비밀번호 아님). 담임 선생님들이 가입할 때 넣습니다."));
+  s2.appendChild(mk);
   var s3=el("div","step"+(mail?"":" off")); s3.appendChild(el("b",null,"또는: 이미 만든 학교 들어가기"));
   var ac=inp("code","학교 코드 (예: K7QM-3XPA)"), ag=el("button","btn sec","들어가기"); ac.disabled=ag.disabled=!mail;
   ag.onclick=function(){ if(normCode(ac.value).length<8){ say("학교 코드를 넣어 주세요."); return; } enterCode(ac.value,{remember:true}); };
