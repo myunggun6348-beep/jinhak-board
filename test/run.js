@@ -404,7 +404,7 @@ function buildTestPage() {
     await c.addInitScript((a) => { if (!sessionStorage.getItem("seeded")) { sessionStorage.setItem("seeded", "1"); localStorage.setItem("jh.cls", "2");
       if (a.local) localStorage.setItem("jh.local.students", JSON.stringify(a.local)); } if (a.email) window.__fbEmail = a.email; }, o);
     const x = await c.newPage(); x.on("pageerror", (e) => errors.push(String(e))); x.on("dialog", (d) => d.accept());
-    await x.goto("http://localhost:" + port + "/?fb=1"); await x.waitForTimeout(500);
+    await x.goto("http://localhost:" + port + "/?fb=1" + (o.hash || "")); await x.waitForTimeout(600);
     x.makeSchool = async () => {
       await x.click("#banner .choice >> text=관리자입니다"); await x.click("#banner .btn >> text=구글로 로그인"); await x.waitForTimeout(300);
       await x.fill("#banner input[name=school]", o.school || "테스트고"); await x.click("#banner .btn >> text=학교 만들기"); await x.waitForTimeout(3500);
@@ -427,8 +427,10 @@ function buildTestPage() {
   const sdocs = Object.keys(KV).filter((k) => /\/students\//.test(k));
   check("관리자: 이 브라우저 자료를 학교 장부로(반 번호만 드러남)", sdocs.map((k) => KV[k].cls).sort(), [2, 5]);
   check("저장소엔 암호문만(이름·학번·대학 안 보임)", /김예시|30201|부산대/.test(JSON.stringify(KV)), false);
-  const t2 = await who({});
-  await join(t2, lastCode, "박담임", 2);
+  const t2 = await who({ hash: "#join=" + lastCode });
+  check("초대 링크: 코드가 채워지고 칸은 숨김, 주소에서 코드 지움", [await gateTitle(t2), await t2.$eval("#banner input[name=code]", (e) => e.hidden && e.value.length > 12), t2.url().includes("join=")], ["선생님: 초대 링크로 가입하기", true, false]);
+  await t2.fill("#banner input[name=name]", "박담임"); await t2.selectOption("#banner select[name=cls]", "2");
+  await t2.click("#banner .codeform .btn"); await t2.waitForTimeout(1500);
   check("선생님: 가입 요청하면 승인 대기, 자료 안 보임", [await gateTitle(t2), (await rowNames(t2)).includes("김예시")], ["관리자 승인을 기다리는 중입니다", false]);
   await adm.click("#tabAll"); await adm.waitForTimeout(800);
   check("관리자: 승인 기다리는 선생님(반 포함) 보임", /박담임/.test(await adm.innerText("#schoolPanel")) && await adm.$eval("#schoolPanel .uitem select", (e) => e.value), "2");

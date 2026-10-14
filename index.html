@@ -493,8 +493,8 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
   <h2>진학 현황판 사용 설명서</h2>
   <h3>담임 선생님</h3>
   <ol>
-    <li>관리자에게 <b>학교 코드</b>를 받습니다.</li>
-    <li>크롬·엣지에서 <b>jinhak-board.vercel.app</b> → <b>선생님입니다</b> → 학교 코드·이름·담당 반 → <b>가입 요청</b>.</li>
+    <li>관리자가 학교 메신저로 보낸 <b>초대 링크</b>를 크롬·엣지에서 누릅니다.</li>
+    <li>이름과 <b>담당 반</b>을 고르고 <b>가입 요청</b>. (링크가 없으면 <b>선생님입니다</b> → 학교 코드를 직접 넣어도 됩니다.)</li>
     <li>관리자가 승인하면 화면이 저절로 열립니다. <b>담당 반 학생만</b> 보입니다.</li>
     <li>처음 한 번, 우리 반 <b>지원 현황 파일</b>(PDF·엑셀·한글)을 화면에 끌어다 놓습니다.</li>
     <li>그다음부터는 학생 이름을 눌러 <b>결과(합격·충원대기·불합격)</b>만 바꾸면 됩니다. 저장은 자동입니다.</li>
@@ -502,7 +502,7 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
   <h3>관리자 (진학부장 등)</h3>
   <ol>
     <li><b>관리자입니다</b> → ① 구글로 로그인 → ② 학교 이름 → <b>학교 만들기</b>.</li>
-    <li>화면에 나온 <b>학교 코드</b>를 적어 두고 담임 선생님들께 학교 메신저로 보냅니다.</li>
+    <li><b>초대 링크 복사</b>를 눌러 담임 선생님들께 학교 메신저로 보냅니다. 화면의 <b>학교 코드</b>는 관리자가 적어 둡니다.</li>
     <li>가입 요청이 오면 화면 위 <b>승인 대기</b> → 담당 반을 확인하고 <b>승인</b>.</li>
     <li>관리자는 <b>모든 반</b>을 봅니다. 전체 현황 맨 아래에서 반 바꾸기·빼기·관리자 추가를 합니다.</li>
   </ol>
@@ -3849,7 +3849,10 @@ function startFirebase(){
     m.U.onAuthStateChanged(fb.auth,function(){
       if(!first) return; first=false;   // 처음 한 번만 길을 정한다. 그 뒤 로그인·로그아웃은 각 단추가 처리한다.
       var saved=""; try{ saved=localStorage.getItem(CODE_KEY)||""; }catch(e){}
-      if(saved) enterCode(saved,{remember:true}); else codeGate();
+      // 초대 링크(#join=코드)로 열었으면 코드를 채운 가입 화면으로. # 뒤는 서버로 가지 않는다. 주소창에서는 바로 지운다.
+      var inv=location.hash.match(/join=([0-9A-Za-z-]{12,})/);
+      if(inv){ try{ history.replaceState(null,"",location.pathname+location.search); }catch(e){} codeGate("","teacher",inv[1]); }
+      else if(saved) enterCode(saved,{remember:true}); else codeGate();
     });
   }).catch(function(){
     setSync("off","공용 장부에 연결하지 못했습니다");
@@ -3891,7 +3894,8 @@ function clsSelect(val){
   return s;
 }
 /* 처음 화면: 선생님 / 관리자 두 갈래. mode = ""(고르기) | "teacher" | "admin" */
-function codeGate(err,mode){
+function inviteLink(code){ return location.origin+location.pathname+"#join="+fmtCode(code); }
+function codeGate(err,mode,preset){
   leaveSchool();
   setSync("","시작 전");
   if(mode===undefined) mode=myMail()?"admin":"";
@@ -3909,7 +3913,8 @@ function codeGate(err,mode){
     render(); return;
   }
   if(mode==="teacher"){
-    var ci=inp("code","학교 코드 (예: K7QM-3XPA-9RTD-HW2C)"), ni=inp("name","선생님 이름 (예: 김○○)",myName()), ks=clsSelect(getMyCls()||"");
+    var ci=inp("code","학교 코드 (예: K7QM-3XPA-9RTD-HW2C)",preset?fmtCode(preset):""), ni=inp("name","선생님 이름 (예: 김○○)",myName()), ks=clsSelect(getMyCls()||"");
+    if(preset) ci.hidden=true;
     var rl=el("label","ckrow"), rc=document.createElement("input"); rc.type="checkbox"; rc.checked=true;
     rl.appendChild(rc); rl.appendChild(document.createTextNode(" 이 컴퓨터에 코드 기억(여럿이 쓰는 컴퓨터면 끄세요)"));
     var go=el("button","btn","가입 요청 · 들어가기");
@@ -3923,7 +3928,9 @@ function codeGate(err,mode){
     };
     [ci,ni].forEach(function(x){ x.onkeydown=function(e){ if(e.key==="Enter") go.onclick(); }; });
     [ci,ni,ks,rl,go,note,back].forEach(function(x){ f.appendChild(x); });
-    showGate("선생님: 학교 코드로 가입하기","학교 코드·이름·담당 반을 넣고 가입을 요청하세요. 관리자가 승인하면 화면이 저절로 열리고, 담당 반 학생만 보입니다.",[f]);
+    showGate(preset?"선생님: 초대 링크로 가입하기":"선생님: 학교 코드로 가입하기",
+      preset?"학교 코드는 이미 들어가 있습니다. 이름과 담당 반만 고르고 가입을 요청하세요. 관리자가 승인하면 화면이 저절로 열리고, 담당 반 학생만 보입니다.":
+      "관리자가 보낸 초대 링크를 누르면 코드를 칠 필요가 없습니다. 코드로 가입하려면 학교 코드·이름·담당 반을 넣고 가입을 요청하세요.",[f]);
     render(); return;
   }
   // 관리자: ① 구글 로그인 → ② 새 학교 만들기 또는 만든 학교 들어가기
@@ -3969,8 +3976,9 @@ function showNewCode(code,name){
   setSync("","학교를 만들었습니다");
   var box=el("div","codeshow"); box.appendChild(el("b","mono codetext",fmtCode(code)));
   var cp=el("button","ghost","복사"); cp.onclick=function(){ copyText(fmtCode(code),function(){ flashBtn(cp,"복사됨 ✓"); }); };
+  var il=el("button","btn sec","초대 링크 복사"); il.onclick=function(){ copyText(inviteLink(code),function(){ flashBtn(il,"복사됨 ✓"); }); };
   var go=el("button","btn","들어가기"); go.onclick=function(){ enterCode(code,{remember:true}); };
-  showGate("'"+name+"' 학교를 만들었습니다","아래 학교 코드를 적어 두고 담임 선생님들께 학교 메신저로 보내세요. 코드를 잃어버리면 자료를 열 수 없습니다(관리자는 전체 현황 맨 아래에서 다시 볼 수 있습니다).",[box,cp,go]);
+  showGate("'"+name+"' 학교를 만들었습니다","담임 선생님들께는 '초대 링크 복사'를 눌러 학교 메신저로 보내세요. 링크를 누르면 코드가 저절로 들어갑니다. 아래 코드는 관리자가 적어 두세요(잃어버리면 자료를 열 수 없습니다. 전체 현황 맨 아래에서 다시 볼 수 있습니다).",[box,il,cp,go]);
 }
 function enterCode(code,o){
   o=o||{};
@@ -4064,8 +4072,9 @@ function renderSchoolPanel(){
   row.appendChild(el("b","mono",codeShown?fmtCode(school.code):"••••-••••-••••-••••"));
   var sh=el("button","ghost",codeShown?"가리기":"보기"); sh.onclick=function(){ codeShown=!codeShown; renderSchoolPanel(); };
   var cp=el("button","ghost","복사"); cp.onclick=function(){ copyText(fmtCode(school.code),function(){ flashBtn(cp,"복사됨 ✓"); }); };
-  row.appendChild(sh); row.appendChild(cp); host.appendChild(row);
-  host.appendChild(el("div","shint","담임 선생님은 이 코드로 가입을 요청하고, 관리자가 반을 확인해 승인합니다. 담임은 자기 반만, 관리자는 모든 반을 봅니다. 코드는 학교 메신저로만 전하세요."));
+  var il=el("button","btn sec","초대 링크 복사"); il.onclick=function(){ copyText(inviteLink(school.code),function(){ flashBtn(il,"복사됨 ✓"); }); };
+  row.appendChild(sh); row.appendChild(cp); row.appendChild(il); host.appendChild(row);
+  host.appendChild(el("div","shint","담임 선생님께 초대 링크를 보내면 누르기만 해서 가입을 요청하고, 관리자가 반을 확인해 승인합니다. 담임은 자기 반만, 관리자는 모든 반을 봅니다. 코드는 학교 메신저로만 전하세요."));
   var ms=school.members||[], wait=ms.filter(function(m){ return !m.ok; }), ok=ms.filter(function(m){ return m.ok; });
   var pb=document.getElementById("pendBtn"); if(pb){ pb.hidden=!wait.length; pb.textContent="승인 대기 "+wait.length; }
   var mref=function(m){ return sRef(school.K.room,"members",m.uid); };
