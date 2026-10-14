@@ -100,6 +100,7 @@ button{cursor:pointer}
 .helpdlg{max-width:560px; width:calc(100% - 32px); border:1px solid var(--line); border-radius:var(--radius); background:var(--surface); color:var(--ink); padding:18px 20px; font-size:13.5px; line-height:1.6}
 .helpdlg::backdrop{background:rgba(0,0,0,.35)}
 .helpdlg h2{font-size:17px; margin:0 0 6px} .helpdlg h3{font-size:14px; margin:14px 0 4px; color:var(--accent)}
+.helpfoot{display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap} .helpfoot a{text-decoration:none}
 .helpdlg ol,.helpdlg ul{margin:0; padding-left:20px} .helpdlg form{text-align:right; margin-top:12px}
 .codeform .choice{display:flex; flex-direction:column; gap:3px; text-align:left; border:1px solid var(--line-2); background:var(--surface); color:var(--ink); border-radius:10px; padding:13px 15px; cursor:pointer; font:inherit}
 .codeform .choice:hover{border-color:var(--accent-2); background:var(--accent-soft)}
@@ -525,7 +526,7 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
     <li>Claude 앱 안의 창에서는 구글 로그인이 막힙니다. 크롬·엣지로 여세요.</li>
     <li>화면이 이상하면 <b>Ctrl+F5</b>(새로고침).</li>
   </ul>
-  <form method="dialog"><button class="btn">닫기</button></form>
+  <form method="dialog" class="helpfoot"><a class="btn sec" href="https://jinhak-board.vercel.app/guide.html" target="_blank" rel="noopener">자세한 사용 설명서 (그림·표)</a><button class="btn">닫기</button></form>
 </dialog>
 <div class="wrap">
   <div id="banner" class="banner" hidden></div>
