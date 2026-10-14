@@ -509,6 +509,12 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
     <li>가입 요청이 오면 화면 위 <b>승인 대기</b> → 담당 반을 확인하고 <b>승인</b>.</li>
     <li>관리자는 <b>모든 반</b>을 봅니다. 전체 현황 맨 아래에서 반 바꾸기·빼기·관리자 추가를 합니다.</li>
   </ol>
+  <h3>혼자 쓰기</h3>
+  <ul>
+    <li>첫 화면에서 <b>혼자 쓰기</b>를 고르면 로그인 없이 그 컴퓨터(브라우저)에만 저장합니다. 다음부터는 바로 열립니다.</li>
+    <li>브라우저 기록을 지우면 자료도 지워지니 <b>우리 반 파일 받기</b>로 가끔 받아 두세요.</li>
+    <li>나중에 위쪽 <b>학교 장부로</b>를 누르고 학교에 들어가면, 이 브라우저 자료를 올릴지 묻습니다.</li>
+  </ul>
   <h3>알아 둘 것</h3>
   <ul>
     <li>학교 코드를 잃어버리면 자료를 열 수 없습니다. 관리자는 전체 현황 맨 아래에서 다시 볼 수 있습니다.</li>
@@ -3730,6 +3736,18 @@ function handleFile(f){
   reader.readAsArrayBuffer(f);
 }
 
+function localMode(){ try{ return localStorage.getItem("jh.mode")||""; }catch(e){ return ""; } }
+function setLocalMode(v){ try{ if(v) localStorage.setItem("jh.mode",v); else localStorage.removeItem("jh.mode"); }catch(e){} }
+// 혼자 쓰는 중에도 학교 장부로 옮길 수 있게 위쪽에 단추를 둔다
+function showLocalChip(){
+  if(!useFirebase()) return;
+  var chip=document.getElementById("whoChip"); chip.hidden=false; chip.innerHTML="";
+  chip.appendChild(el("span",null,"혼자 쓰기 · 이 컴퓨터에만 저장"));
+  var go=el("button","ghost","학교 장부로");
+  go.title="학교 코드로 들어가 다른 선생님과 함께 씁니다. 이 브라우저 자료는 들어갈 때 올릴지 묻습니다";
+  go.onclick=function(){ setLocalMode(""); location.reload(); };
+  chip.appendChild(go);
+}
 function startPractice(){
   setSync("","예시 화면 · 아직 저장된 자료 없음");
   if(!demo||practice) return;
@@ -3744,6 +3762,7 @@ function startPractice(){
     demo=false;
     b.hidden=true;
     setSync("live","이 브라우저에 저장됨");
+    showLocalChip();
     fillAll(); render(); return;
   }
   students=new Map(DEMO.map(function(d){ return [d.id, JSON.parse(JSON.stringify(d))]; }));
@@ -3751,6 +3770,7 @@ function startPractice(){
   b.appendChild(document.createTextNode("이 화면은 "));
   b.appendChild(el("b",null,"이 브라우저에만 저장되는 화면"));
   b.appendChild(document.createTextNode("입니다. 파일을 넣거나 학생을 추가하면 예시는 사라지고, 넣은 자료는 이 브라우저에 저장됩니다(다른 컴퓨터·다른 선생님과는 공유되지 않습니다)."));
+  showLocalChip();
   fillAll(); render();
 }
 /* ── 학교별 공용 장부(Vercel 판): Firebase + 학교 코드 암호화 + 관리자 승인 ─────────────
@@ -3916,7 +3936,13 @@ function codeGate(err,mode,preset){
     t.onclick=function(){ codeGate("","teacher"); };
     var a=el("button","choice"); a.appendChild(el("b",null,"관리자입니다")); a.appendChild(el("span",null,"우리 학교를 처음 만들거나, 만든 학교를 관리해요"));
     a.onclick=function(){ codeGate("","admin"); };
-    f.appendChild(t); f.appendChild(a); f.appendChild(note); f.appendChild(help);
+    var lo=el("button","choice"); lo.appendChild(el("b",null,"혼자 쓰기")); lo.appendChild(el("span",null,"로그인 없이 이 컴퓨터(브라우저)에만 저장해요. 나중에 학교 장부로 옮길 수 있어요"));
+    lo.onclick=function(){
+      setLocalMode("local"); leaveSchool(); canWrite=null;
+      var b=document.getElementById("banner"); b.className="banner"; b.hidden=false;
+      startPractice();
+    };
+    f.appendChild(t); f.appendChild(a); f.appendChild(lo); f.appendChild(note); f.appendChild(help);
     showGate("진학 현황판 시작하기","처음이시면 아래에서 고르세요. 담임 선생님은 관리자에게 받은 학교 코드로 가입하고, 관리자가 승인하면 우리 반 자료를 함께 씁니다.",[f]);
     render(); return;
   }
@@ -4051,6 +4077,7 @@ function waitApproval(K,code,info,mref){
   },function(){ codeGate("학교에 연결하지 못했습니다. 새로고침해 주세요."); });
 }
 function enterSchool(K,code,info,admin,cls){
+  setLocalMode("");
   school={K:K, code:normCode(code), name:info.name||"", admins:info.admins||[], admin:admin, cls:cls||0};
   if(!admin&&cls){ setMyCls(cls); setCls(cls); }
   var chip=document.getElementById("whoChip"); chip.hidden=false; chip.innerHTML="";
@@ -4193,7 +4220,7 @@ function start(){
   render();
   setSync("", "연결 중");
 
-  if(!window.claude||!window.claude.use){ if(useFirebase()) startFirebase(); else startPractice(); return; }
+  if(!window.claude||!window.claude.use){ if(useFirebase()&&(localMode()!=="local"||/join=/.test(location.hash))) startFirebase(); else startPractice(); return; }
 
   window.claude.use("user").then(function(u){
     userCap=u;

@@ -412,7 +412,7 @@ function buildTestPage() {
     return x;
   };
   const rowNames = (x) => x.evaluate(() => [...document.querySelectorAll(".row .nm")].map((e) => e.textContent));
-  const gateTitle = (x) => x.evaluate(() => { const b = document.getElementById("banner"); return b.hidden ? "" : b.querySelector("h2").textContent; });
+  const gateTitle = (x) => x.evaluate(() => { const b = document.getElementById("banner"), h = b.querySelector("h2"); return b.hidden || !h ? "" : h.textContent; });
   const join = async (x, code, name, cls, pw) => {
     await x.click("#banner .choice >> text=선생님입니다");
     await x.fill("#banner input[name=code]", code); await x.fill("#banner input[name=name]", name); await x.selectOption("#banner select[name=cls]", String(cls)); await x.fill("#banner input[name=pw]", pw || "1234");
@@ -458,7 +458,14 @@ function buildTestPage() {
   await adm.click("#tabAll"); await adm.waitForTimeout(500);
   await adm.click("#schoolPanel button >> text=빼기"); await t2.waitForTimeout(2500);
   check("관리자가 빼면 담임 화면이 막힘", [await gateTitle(t2), (await rowNames(t2)).includes("김예시")], ["진학 현황판 시작하기", false]);
-  for (const x of [adm, t2, other, wrong]) await x.context().close();
+  const solo = await who({});
+  await solo.click("#banner .choice >> text=혼자 쓰기"); await solo.waitForTimeout(500);
+  check("혼자 쓰기: 이 브라우저 저장으로 바로", [await solo.$eval("#whoChip", (e) => !e.hidden && /혼자 쓰기/.test(e.textContent)), await solo.$eval("#addPanel", (e) => !e.hidden)], [true, true]);
+  await solo.reload(); await solo.waitForTimeout(800);
+  check("혼자 쓰기: 다시 열어도 코드 화면 없이", [await gateTitle(solo) === "진학 현황판 시작하기", /혼자 쓰기/.test(await solo.innerText("#whoChip"))], [false, true]);
+  await solo.click("#whoChip button >> text=학교 장부로"); await solo.waitForTimeout(900);
+  check("혼자 쓰기 → 학교 장부로: 첫 화면", await gateTitle(solo), "진학 현황판 시작하기");
+  for (const x of [adm, t2, other, wrong, solo]) await x.context().close();
   srv.close();
 
   check("자바스크립트 오류 없음", errors, []);
