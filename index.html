@@ -3707,7 +3707,14 @@ function startPractice(){
    관리자가 승인해야 자료를 읽고 쓸 수 있다(규칙: firestore.rules). 학생 자료는 학교 코드로 이 컴퓨터에서
    암호화한 뒤 올리므로 저장소(구글)에는 알아볼 수 없는 글자만 남는다.
    FIREBASE_CONFIG 를 넣기 전에는 지금처럼 이 브라우저에만 저장한다. */
-var FIREBASE_CONFIG=null;
+var FIREBASE_CONFIG={   // 공개돼도 되는 식별자다. 접근은 firestore.rules 가 막는다.
+  apiKey:"AIzaSyAw1_xpfBRgIuYDAtiKhg7t_PgBtS15T7E",
+  authDomain:"jinhak-board.firebaseapp.com",
+  projectId:"jinhak-board",
+  storageBucket:"jinhak-board.firebasestorage.app",
+  messagingSenderId:"22874805232",
+  appId:"1:22874805232:web:4f3652b1b8eb0145264335"
+};
 var FBV="10.12.2", fb=null, CODE_KEY="jh.code", school=null, memberWatch=null, membersWatch=null;
 function useFirebase(){
   return !!(FIREBASE_CONFIG||window.__fbMock)&&/^https?:$/.test(location.protocol)&&
