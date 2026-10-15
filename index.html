@@ -116,6 +116,24 @@ button{cursor:pointer}
 #schoolPanel .uitem{gap:8px}
 .codeshow{margin:12px 0}
 .codetext{font-size:22px; letter-spacing:.08em}
+.made{max-width:560px; margin:0 auto; text-align:left; word-break:keep-all}
+.made-top{text-align:center; margin-bottom:18px}
+.made-ok{width:52px; height:52px; border-radius:50%; background:var(--ok-soft); color:var(--ok); display:grid; place-items:center; margin:0 auto 10px}
+.made-ok svg{width:28px; height:28px}
+.gate .made-top h2{font-size:21px; margin:0 0 6px}
+.gate .made-top p{font-size:14px; margin:0}
+.made-steps{list-style:none; margin:0; padding:0; border:1px solid var(--line); border-radius:14px; background:var(--surface)}
+.made-steps li{display:grid; grid-template-columns:30px 1fr; gap:4px 12px; padding:14px 16px}
+.made-steps li + li{border-top:1px solid var(--line)}
+.made-steps .n{grid-row:span 3; width:28px; height:28px; border-radius:50%; background:var(--accent); color:var(--on-accent,#fff); display:grid; place-items:center; font-weight:800; font-size:13px}
+.made-steps b{font-size:15px}
+.made-steps .d{font-size:13px; color:var(--ink-2); line-height:1.6}
+.made-steps .btn{justify-self:start; margin-top:6px}
+.made-code{display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px; margin-top:12px; padding:12px 16px; border-radius:14px; background:var(--surface-2)}
+.made-code .l{flex-basis:100%; font-size:12.5px; font-weight:700; color:var(--ink-2)}
+.made-code .codetext{font-size:24px}
+.made-code .d{flex-basis:100%; font-size:12px; color:var(--ink-3)}
+.made-go{display:block; width:100%; margin-top:16px; padding:12px; font-size:15px}
 .backupbar{display:flex; flex-wrap:wrap; align-items:center; gap:6px 10px; border:1px solid var(--line); background:var(--surface); border-radius:var(--radius); padding:7px 12px; margin-bottom:14px; font-size:12.5px; color:var(--ink-2)}
 .backupbar.due{border-color:var(--warn); background:var(--warn-soft); color:var(--warn); font-weight:600}
 .backupbar .sp{margin-left:auto; display:flex; gap:6px}
@@ -4293,11 +4311,28 @@ function createSchool(name,pw,note){
 }
 function showNewCode(code,name){
   setSync("","학교를 만들었습니다");
-  var box=el("div","codeshow"); box.appendChild(el("b","mono codetext",fmtCode(code)));
-  var cp=el("button","ghost","복사"); cp.onclick=function(){ copyText(fmtCode(code),function(){ flashBtn(cp,"복사됨 ✓"); }); };
+  setLanding(true);
+  var g=document.getElementById("banner"); g.hidden=false; g.className="gate"; g.innerHTML="";
+  var w=el("div","made"), top=el("div","made-top"), ok=el("div","made-ok");
+  ok.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg>';
+  top.appendChild(ok); top.appendChild(el("h2",null,"‘"+name+"’ 학교를 만들었습니다")); top.appendChild(el("p",null,"이제 담임 선생님들을 초대하면 됩니다."));
+  w.appendChild(top);
+  var ol=document.createElement("ol"); ol.className="made-steps";
+  var step=function(n,t,d,btn){ var li=document.createElement("li"); li.appendChild(el("span","n",n)); li.appendChild(el("b",null,t)); li.appendChild(el("span","d",d)); if(btn) li.appendChild(btn); ol.appendChild(li); };
   var il=el("button","btn sec","초대 링크 복사"); il.onclick=function(){ copyText(inviteLink(code),function(){ flashBtn(il,"복사됨 ✓"); }); };
-  var go=el("button","btn","들어가기"); go.onclick=function(){ enterCode(code,{remember:true}); };
-  showGate("'"+name+"' 학교를 만들었습니다","담임 선생님들께 '초대 링크 복사'로 링크를 보내고, 가입 암호는 따로(말로·문자로) 알려 주세요. 링크에 코드가 들어 있어 담임은 코드를 칠 필요가 없습니다. 아래 코드는 이 컴퓨터가 기억하니, 관리자는 다른 컴퓨터에서 열 때를 위해 적어만 두세요(‘학교 관리’ 탭에서도 다시 볼 수 있습니다).",[box,il,cp,go]);
+  step("1","초대 링크 보내기","학교 메신저로 담임 선생님들께 보내세요. 링크에 학교 코드가 들어 있어 담임은 코드를 칠 필요가 없어요.",il);
+  step("2","가입 암호 알려 주기","방금 정한 가입 암호는 링크와 따로(말이나 문자로) 알려 주세요. 링크와 암호가 둘 다 있어야 가입할 수 있어요.");
+  step("3","가입 승인하기","선생님이 가입을 요청하면 위쪽 ‘학교 관리’ 탭에 숫자가 떠요. 담당 반을 확인하고 승인하면 끝이에요.");
+  w.appendChild(ol);
+  var box=el("div","made-code");
+  box.appendChild(el("span","l","학교 코드 · 관리자용"));
+  box.appendChild(el("b","mono codetext",fmtCode(code)));
+  var cp=el("button","ghost","복사"); cp.onclick=function(){ copyText(fmtCode(code),function(){ flashBtn(cp,"복사됨 ✓"); }); }; box.appendChild(cp);
+  box.appendChild(el("span","d","이 컴퓨터는 기억합니다. 다른 컴퓨터에서 학교를 열 때만 필요하니 적어 두세요. ‘학교 관리’ 탭에서도 다시 볼 수 있어요."));
+  w.appendChild(box);
+  var go=el("button","btn made-go","학교로 들어가기 →"); go.onclick=function(){ enterCode(code,{remember:true}); };
+  w.appendChild(go);
+  g.appendChild(w);
 }
 function enterCode(code,o){
   o=o||{};
