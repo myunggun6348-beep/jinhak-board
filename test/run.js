@@ -451,6 +451,11 @@ function buildTestPage() {
   }
   await p.click("#btnJungsi"); await p.waitForTimeout(100);
 
+  const mf = JSON.parse(fs.readFileSync(path.join(ROOT, "manifest.webmanifest"), "utf8"));
+  let swOk = true; try { new Function(fs.readFileSync(path.join(ROOT, "sw.js"), "utf8")); } catch (e) { swOk = false; }
+  check("휴대폰 앱: manifest(이름·아이콘 파일)·서비스 워커·설치 단추", [mf.display, mf.icons.every((i) => fs.existsSync(path.join(ROOT, i.src))), mf.icons.some((i) => i.purpose === "maskable"), swOk,
+    await p.evaluate(() => !!document.querySelector("link[rel=manifest]") && !!document.getElementById("btnInstall"))], ["standalone", true, true, true, true]);
+
   /* ── 자료 지키기(백업 알림) ── */
   const bb = () => p.evaluate(() => { const b = document.getElementById("backupBar"); return [!b.hidden, b.classList.contains("due"), b.textContent]; });
   let B1 = await bb();
