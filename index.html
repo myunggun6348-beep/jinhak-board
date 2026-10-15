@@ -265,6 +265,9 @@ body.landing .gate{margin-top:10px}
 .pill.s-wait{background:var(--warn-soft); border-color:transparent; color:var(--warn); font-weight:700}
 .pill.s-bad{background:var(--bad-soft); border-color:transparent; color:var(--bad)}
 .pill.s-go{background:var(--accent-soft); border-color:transparent; color:var(--accent)}
+.acwhy{flex-basis:100%; font-size:12px; color:var(--ink-3); padding-left:2px}
+.acsum{display:flex; flex-wrap:wrap; gap:6px; margin:4px 0 8px}
+.acnog{display:flex; flex-wrap:wrap; align-items:center; gap:6px 10px; margin-top:10px; padding:9px 12px; border-radius:10px; background:var(--surface-2); font-size:12.5px; color:var(--ink-2)}
 .pill.empty{color:var(--ink-3); border-style:dashed; background:transparent}
 .flagmark{font-size:11px; font-weight:700; color:var(--bad); background:var(--bad-soft);
   padding:2.5px 8px; border-radius:999px; white-space:nowrap}
@@ -645,6 +648,7 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
     <div class="glance" id="glance"></div>
     <div class="sched" id="sched"></div>
     <div class="sched" id="todo" hidden></div>
+    <div class="sched" id="afterCsat" hidden></div>
 
     <div class="listhead">
       <h2 id="listTitle">학생</h2>
@@ -715,6 +719,7 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
     <div class="glance" id="allGlance"></div>
     <div class="sched" id="allSched"></div>
     <div class="sched" id="allTodo" hidden></div>
+    <div class="sched" id="allAfterCsat" hidden></div>
     <div class="sched" id="allLog"></div>
     <div class="listhead"><h2>반별 현황</h2><span class="sp"><button class="ghost" id="btnBackup" title="모든 반 학생·지원 자료를 파일 하나로 받습니다">전체 백업 받기</button><button class="ghost" id="btnMerge" title="여러 선생님이 받은 반 파일을 한꺼번에 골라 합칩니다">반 파일 합치기</button><input type="file" id="mergeFile" accept=".json,application/json" multiple hidden><button class="ghost" id="btnRestore" title="백업 파일의 학생 자료로 되돌립니다">백업 되살리기</button><input type="file" id="restoreFile" accept=".json,application/json" hidden><button class="ghost" id="btnCsvAll">전체 CSV 내려받기</button></span></div>
     <div class="tablewrap"><table id="classTable"></table></div>
@@ -1234,6 +1239,7 @@ function render(){
   renderSched(document.getElementById("sched"), mine, false);
   document.getElementById("sched").hidden=!cls;
   renderTodo(document.getElementById("todo"), cls?mine:[], false);
+  renderAfterCsat(document.getElementById("afterCsat"), cls?mine:[], false);
   renderRows(mine, cls);
   renderCsat(cls?mine:[]);
   renderJungsi(cls?mine:[]);
@@ -1632,6 +1638,7 @@ function renderAll(){
   document.getElementById("allGlance").hidden=!all.length;
   renderSched(document.getElementById("allSched"), all, true);
   renderTodo(document.getElementById("allTodo"), all, true);
+  renderAfterCsat(document.getElementById("allAfterCsat"), all, true);
   renderRecent(document.getElementById("allLog"), all);
 
   var byCls={};
@@ -2129,6 +2136,7 @@ function renderSched(host, arr, showClass){
     row.appendChild(who);
     row.appendChild(el("span","sub",[(a.jc?"전문대 ":"")+shortUniv(a.univ), shortMajor(a.major), a.kind==="정시"?(a.group&&!a.jc?a.group+"군":"정시"):jhText(a)].filter(Boolean).join(" · ")));
     if(e.kind==="due"&&a.rank) row.appendChild(el("span","pill s-wait","예비 "+a.rank));
+    if(e.kind==="itv"&&afterCsatApp(a)){ var vd=examVerdict(s,a); if(vd&&(vd.v!=="go"||a.mreq&&vd.why.indexOf("없음")<0)) row.appendChild(el("span","pill "+VERD[vd.v][1],VERD[vd.v][0])); }
     if(e.kind!=="itv"&&a.status&&a.status!=="지원완료") row.appendChild(el("span","pill "+statusClass(a.status),a.status));
     host.appendChild(row);
   });
@@ -2185,8 +2193,72 @@ function renderTodo0(host, arr, showClass){
   }
 }
 function st0(s){ return students.get(s.id)||s; }
+/* ── 수능 뒤 응시 판단 ──
+   수능 다음 날 가채점 등급을 넣으면, 수능 뒤에 있는 면접·논술·실기마다 최저를 따져 갈지 말지 보여 준다.
+   아슬아슬 = 지금은 충족이지만 한 과목만 한 등급 내려가도 미충족(가채점은 경계에서 틀릴 수 있다). */
+var VERD={skip:["안 가도 됨","s-bad"],check:["확인 필요","empty"],edge:["응시 · 아슬아슬","s-wait"],go:["응시","s-ok"]};
+var VORDER=["skip","check","edge","go"];
+function csatDay(){ var k=KEYDATES.filter(function(x){ return x.id==="csat"; })[0]; return k?k.s:"9999"; }
+function afterCsatApp(a){
+  var s0=a.status||"지원완료";
+  return a.kind==="수시"&&!!a.itv&&String(a.itv).slice(0,10)>=csatDay()&&(s0==="지원완료"||s0==="1단계합");
+}
+function examVerdict(st,a){
+  if(!hasCsat(st)) return null;
+  var r=judgeMin(a.mreq, st.csat);
+  if(!a.mreq||r.res==="해당없음") return {v:"go", why:"수능최저 없음"};
+  if(r.res==="미충족") return {v:"skip", why:"최저 미충족"+(r.why?" — "+r.why:"")};
+  if(!r.res) return {v:"check", why:r.why};
+  var g=st.csat, edge=GK.some(function(k){
+    if(!g[k]||+g[k]>=9) return false;
+    var g2=JSON.parse(JSON.stringify(g)); g2[k]=String(+g[k]+1);
+    return judgeMin(a.mreq,g2).res==="미충족";
+  });
+  if(edge) return {v:"edge", why:"지금은 충족이지만 한 과목만 한 등급 내려가도 미충족"+(g.src==="가채점"?" — 가채점이니 응시하세요":"")};
+  return {v:"go", why:"최저 충족"+(r.why?" — "+r.why:"")};
+}
+function renderAfterCsat(host, arr, showClass){
+  host.innerHTML="";
+  var rows=[], noGrade=[], gachae=false;
+  arr.forEach(function(st){
+    var mine=(st.apps||[]).filter(afterCsatApp); if(!mine.length) return;
+    if(!hasCsat(st)){ noGrade.push(st); return; }
+    if(st.csat.src==="가채점") gachae=true;
+    mine.forEach(function(a){ rows.push({s:st,a:a,r:examVerdict(st,a)}); });
+  });
+  host.hidden=!rows.length&&!(noGrade.length&&daysTo(csatDay())<=0);
+  if(host.hidden) return;
+  var hd=el("div","schedhead");
+  hd.appendChild(el("h2",null,"수능 뒤 응시 판단"));
+  hd.appendChild(el("span","cnt",rows.length?rows.length+"건":""));
+  if(gachae) hd.appendChild(el("span","pill s-wait","가채점 기준"));
+  host.appendChild(hd);
+  host.appendChild(el("div","shint","수능 뒤에 있는 면접·논술·실기마다, 넣은 수능 등급으로 최저를 따져 봅니다. ‘아슬아슬’은 한 과목만 한 등급 내려가도 미충족인 경우입니다. 최종 결정은 학생·학부모와 상의하세요."));
+  var cnt={}; rows.forEach(function(x){ cnt[x.r.v]=(cnt[x.r.v]||0)+1; });
+  var sum=el("div","acsum");
+  VORDER.forEach(function(v){ if(cnt[v]) sum.appendChild(el("span","pill "+VERD[v][1],VERD[v][0]+" "+cnt[v])); });
+  if(rows.length) host.appendChild(sum);
+  rows.sort(function(x,y){ return VORDER.indexOf(x.r.v)-VORDER.indexOf(y.r.v)||String(x.a.itv).localeCompare(String(y.a.itv))||(x.s.cls-y.s.cls)||String(x.s.no||"").localeCompare(String(y.s.no||"")); });
+  rows.forEach(function(x){
+    var s=x.s, a=x.a, row=el("div","sitem");
+    row.appendChild(el("span","pill "+VERD[x.r.v][1],VERD[x.r.v][0]));
+    var who=el("button","who",(showClass&&s.cls?s.cls+"반 ":"")+(s.no?s.no+" ":"")+(s.name||"")); who.title="이 학생 보기";
+    who.onclick=function(){ goStudent(s); }; row.appendChild(who);
+    row.appendChild(el("span","sub",[mdw(a.itv)+" "+(a.type==="논술"?"논술":a.type==="실기"?"실기":"면접·고사"), (a.jc?"전문대 ":"")+shortUniv(a.univ), shortMajor(a.major), jhText(a)].filter(Boolean).join(" · ")));
+    row.appendChild(el("span","acwhy",x.r.why+(a.mreq&&x.r.why.indexOf("없음")<0?" (기준: "+(minShort(a.mreq)||a.mreq)+")":"")));
+    host.appendChild(row);
+  });
+  if(noGrade.length){
+    var ng=el("div","acnog");
+    ng.appendChild(el("span",null,"수능 등급을 아직 넣지 않은 학생 "+noGrade.length+"명: "+noGrade.slice(0,6).map(function(st){ return (showClass&&st.cls?st.cls+"반 ":"")+st.name; }).join(", ")+(noGrade.length>6?" 외":"")));
+    if(!showClass){ var gb=el("button","ghost","수능 성적 넣기"); gb.onclick=function(){ csatOpen=true; csatMode="grade"; render(); var p=document.getElementById("csatPanel"); if(p) p.scrollIntoView({block:"start"}); }; ng.appendChild(gb); }
+    host.appendChild(ng);
+  }
+}
 /* ── 수능 등급 한 번에 넣기 ── */
-var csatOpen=false, csatMode="grade";
+var csatOpen=false, csatMode="grade", csatSrcSel="";
+// 성적 통지일 전에 넣는 등급은 가채점으로 본다. 넣는 칸 위에서 바꿀 수 있다.
+function csatSrcNow(){ if(csatSrcSel) return csatSrcSel; var k=KEYDATES.filter(function(x){ return x.id==="score"; })[0]; return k&&daysTo(k.s)>0?"가채점":"성적표"; }
 var GK=CSAT.map(function(k){ return k[0]; });
 function minResult(st){
   var ok=0, bad=[], none=[];
@@ -2198,6 +2270,7 @@ function minResult(st){
     else if(r.res!=="해당없음") none.push(shortUniv(a.univ)+": "+r.why);
   });
   var box=el("span");
+  if(hasCsat(st)&&st.csat.src==="가채점") box.appendChild(el("span","pill s-wait","가채점"));
   if(!hasCsat(st)&&(ok||bad.length||none.length)){ box.appendChild(el("span","pill empty","등급 입력 전")); return box; }
   if(ok) box.appendChild(el("span","pill s-ok","충족 "+ok));
   if(bad.length) box.appendChild(el("span","pill s-bad","미충족: "+bad.join(", ")));
@@ -2219,6 +2292,11 @@ function renderCsat(mine){
     b.onclick=function(){ csatMode=p[0]; pendingRender=false; render(); }; mseg.appendChild(b);
   });
   hd.appendChild(mseg);
+  if(csatMode==="grade"){
+    var sseg=el("span","seg"); sseg.title="지금 넣는 등급이 가채점인지 성적표(12/11 통지)인지. 판정 화면에 표시됩니다";
+    ["가채점","성적표"].forEach(function(v){ var b=el("button",null,v); b.setAttribute("aria-pressed",String(csatSrcNow()===v)); b.onclick=function(){ csatSrcSel=v; pendingRender=false; render(); }; sseg.appendChild(b); });
+    hd.appendChild(sseg);
+  }
   var x=el("button","ghost","닫기"); x.style.marginLeft="auto";
   x.onclick=function(){ csatOpen=false; render(); };
   if(csatMode==="score"){
@@ -2368,7 +2446,7 @@ function scoreCsv(arr){
 }
 function setGrade(st,k,v,quiet){
   if(!quiet) remember("수능 등급");
-  st.csat=st.csat||{}; st.csat[k]=v; applyMin(st); save(st);
+  st.csat=st.csat||{}; st.csat[k]=v; if(v&&GK.indexOf(k)>=0) st.csat.src=csatSrcNow(); applyMin(st); save(st);
 }
 function renderLockBar(cls){
   var bar=document.getElementById("lockbar"), m=getMyCls();
@@ -2775,7 +2853,11 @@ function noticeText(st, days, cls){
   var nm=function(a){ return [shortUniv(a.univ), a.major].filter(Boolean).join(" ")+(a.kind==="정시"?" (정시"+(a.group?" "+a.group+"군":"")+")":a.type?" ("+a.type+")":""); };
   upcoming([st], days).forEach(function(e){
     var a=e.a;
-    if(e.kind==="itv") add(e.when, (a.type==="논술"?"논술":a.type==="실기"?"실기":"면접·고사")+" — "+nm(a));
+    if(e.kind==="itv"){
+      var vd=afterCsatApp(a)?examVerdict(st,a):null, vt="";
+      if(vd) vt=vd.v==="skip"?" → 수능최저 미충족(가채점 기준이면 확인), 응시하지 않아도 됩니다":vd.v==="edge"?" → 수능최저 아슬아슬, 응시하세요":vd.v==="check"?" → 수능최저 충족 여부 담임과 확인":a.mreq&&vd.why.indexOf("없음")<0?" → 수능최저 충족, 응시하세요":"";
+      add(e.when, (a.type==="논술"?"논술":a.type==="실기"?"실기":"면접·고사")+" — "+nm(a)+vt);
+    }
     else if(e.kind==="ann") add(e.when, "합격자 발표 — "+nm(a));
     else if(e.kind==="ann1") add(e.when, "1단계 합격자 발표 — "+nm(a));
     else add(e.when, "충원 합격 마감 — "+nm(a)+(a.rank?" (예비 "+a.rank+"번)":""));
@@ -4611,7 +4693,7 @@ try{ if(location.protocol==="file:"||location.hostname==="localhost"){
     parseDelimited:parseDelimited, readApps:readApps, pdfTableRows:pdfTableRows, last:function(){ return lastRead; },
     checkStudent:checkStudent, parseMin:parseMin, judgeMin:judgeMin, rowsFromPdf:rowsFromPdf,
     univFound:univFound, univRegion:univRegion, outcomeOf:outcomeOf, resultsOf:resultsOf,
-    KEYDATES:KEYDATES, minGaps:minGaps, render:function(){ render(); }, leftText:leftText, normCode:normCode, codeKeys:codeKeys, sealDoc:sealDoc, openDoc:openDoc, mergeData:function(l){ var r=mergeData(l); render(); return r; }, students:function(){ return JSON.parse(JSON.stringify(Array.from(students.values()))); }, scoreSum:scoreSum, scoreOk:scoreOk, noticeText:noticeText, diffLines:diffLines, logs:function(){ var o=[]; students.forEach(function(x){ (x.log||[]).forEach(function(e){ o.push(e); }); }); return o; }, glanceData:glanceData, univKey:univKey, majorKey:majorKey, upcoming:upcoming, pending:pending, isRec:isRec, recGroups:recGroups, icsFold:icsFold, jungsiOf:jungsiOf};
+    KEYDATES:KEYDATES, minGaps:minGaps, render:function(){ render(); }, leftText:leftText, normCode:normCode, codeKeys:codeKeys, sealDoc:sealDoc, openDoc:openDoc, mergeData:function(l){ var r=mergeData(l); render(); return r; }, students:function(){ return JSON.parse(JSON.stringify(Array.from(students.values()))); }, scoreSum:scoreSum, scoreOk:scoreOk, noticeText:noticeText, diffLines:diffLines, logs:function(){ var o=[]; students.forEach(function(x){ (x.log||[]).forEach(function(e){ o.push(e); }); }); return o; }, glanceData:glanceData, univKey:univKey, majorKey:majorKey, upcoming:upcoming, pending:pending, examVerdict:examVerdict, afterCsatApp:afterCsatApp, isRec:isRec, recGroups:recGroups, icsFold:icsFold, jungsiOf:jungsiOf};
 } }catch(e){}
 
 /* 켜 둔 채로 시간이 흐르면 D-day·남은 시간·경고·결과 입력할 것을 1분마다 새로 그린다.

@@ -327,6 +327,23 @@ function buildTestPage() {
       { cls: 3, no: "2", name: "나", apps: [{ kind: "수시", univ: "부산대학교(부산)", jh: "학생부교과(학교장추천)", rec: false }, { kind: "수시", univ: "부산대학교", jh: "지역인재(학교추천)" }] }]);
     return { r, g: g.map((x) => x.univ + x.list.length) }; });
   check("학교장추천: 전형명에서 저절로, 칸이 있으면 그 값", rec.r, [true, true, false]);
+  const ac = await p.evaluate(() => { const d = window.__dev;
+    const st = (g) => ({ name: "가", csat: g });
+    const a = (m) => ({ kind: "수시", univ: "A대학교", itv: "2026-11-28", status: "1단계합", mreq: m });
+    const V = (g, m) => (d.examVerdict(st(g), a(m)) || {}).v;
+    return {
+      edge: V({ kor: "2", math: "3", eng: "4", inq1: "5", inq2: "5", his: "4" }, "국수영탐 중 2개합 5"),
+      go: V({ kor: "1", math: "1", eng: "1", inq1: "1", inq2: "1", his: "1" }, "국수영탐 중 2개합 5"),
+      skip: V({ kor: "4", math: "4", eng: "4", inq1: "4", inq2: "4", his: "4" }, "국수영탐 중 2개합 5"),
+      none: V({ kor: "4" }, ""),
+      noGrade: d.examVerdict(st({}), a("2개합 5")),
+      before: d.afterCsatApp({ kind: "수시", itv: "2026-11-14", status: "지원완료" }),
+      done: d.afterCsatApp({ kind: "수시", itv: "2026-11-28", status: "1단계불" }),
+      notice: d.noticeText({ name: "가", csat: { kor: "4", math: "4", eng: "4", inq1: "4", inq2: "4", his: "4", src: "가채점" }, apps: [{ kind: "수시", univ: "부산대학교", major: "경영학과", type: "논술", itv: "2026-11-28", status: "지원완료", mreq: "국수영탐 중 2개합 5" }] }, 400, 2),
+    }; });
+  check("수능 뒤 응시 판단: 아슬아슬·응시·안 가도 됨·최저 없음", [ac.edge, ac.go, ac.skip, ac.none], ["edge", "go", "skip", "go"]);
+  check("수능 뒤 응시 판단: 등급 없으면 판단 안 함, 수능 전 고사·떨어진 지원은 빼기", [ac.noGrade, ac.before, ac.done], [null, false, false]);
+  check("일정 안내 문자: 최저 미충족이면 응시 안 해도 됨", /논술 — 부산대 경영학과.*응시하지 않아도 됩니다/.test(ac.notice), true);
   check("학교장추천 현황: 대학별로 묶고 직접 끈 것·정시는 빼기", rec.g, ["부산대2", "부경대1"]);
   check("달력 줄 75바이트 안으로 접기", misc.foldMax <= 75 && misc.foldCont, true);
   check("정시 현황: 수시 합격·가군·전문대 구분", misc.jungsi, "1,1,1");
