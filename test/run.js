@@ -423,6 +423,13 @@ function buildTestPage() {
 
   check("경고는 학생마다 한 칸(이름·경고 수)", await p.evaluate(() => { const g = [...document.querySelectorAll("#alerts .alert.grp")]; return g.length > 0 && g.every((x) => x.querySelector(".stu b") && x.querySelectorAll("li").length >= 1); }), true);
 
+  await p.click(".row >> nth=0 >> .rowhead"); await p.waitForTimeout(200);
+  await p.fill(".detail textarea[name=note]", "학부모 상담 — 정시 가능성 설명"); await p.click(".detail .btn >> text=기록 추가"); await p.waitForTimeout(300);
+  const nts = await p.evaluate(() => { const S = window.__dev.students(); const s = S.find((x) => (x.notes || []).length); return s ? [s.notes.length, s.notes[0].t, s.notes[0].k, window.__dev.logs().some((e) => e.w.some((w) => /상담 기록 추가/.test(w)))] : null; });
+  check("상담 기록: 학생 화면에서 추가, 변경 기록에 남음", nts, [1, "학부모 상담 — 정시 가능성 설명", "학생", true]);
+  check("상담 기록: 줄 머리에 상담 수, 반 CSV 단추", await p.evaluate(() => [document.querySelector(".row .cnote") && document.querySelector(".row .cnote").textContent, !document.getElementById("btnNotesCsv").hidden]), ["상담 1", true]);
+  await p.click(".row >> nth=0 >> .rowhead"); await p.waitForTimeout(100);
+
   /* ── 자료 지키기(백업 알림) ── */
   const bb = () => p.evaluate(() => { const b = document.getElementById("backupBar"); return [!b.hidden, b.classList.contains("due"), b.textContent]; });
   let B1 = await bb();
