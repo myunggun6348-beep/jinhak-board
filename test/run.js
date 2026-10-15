@@ -352,6 +352,13 @@ function buildTestPage() {
   check("면접 준비: 면접 4·논술 3·실기 2 항목, 한 것 세기", [pr.list, pr.done], [[4, 3, 2], 2]);
   check("면접 준비: 남은 면접만(떨어졌거나 날짜 없으면 빼기)", pr.needs, [true, false, false]);
   check("변경 기록에 면접 준비", pr.log, ["부산대 경영학 — 면접 준비 2→3/4"]);
+  const rg = await p.evaluate(() => { const d = window.__dev;
+    const st = (apps) => ({ id: "r", cls: 2, no: "1", name: "가", apps: apps.map((a, i) => ({ id: "a" + i, kind: "수시", univ: a[0] + "대학교", major: "경영학과", status: a[1] })) });
+    const S = [st([["부산", "최초합"], ["경북", "충원합"], ["동아", "충원대기"]]), st([["부산", "등록완료"], ["경북", "충원대기"]]), st([["부산", "등록포기"]]), st([["부산", "불합격"]])];
+    const I = S.map((x) => d.regInfo(x)); const div = document.createElement("div"); d.renderReg(div, S, false);
+    return { st: I.map((x) => x.state), add: I[0].add, due: I[0].due, btn: div.querySelectorAll(".regapp .btn").length, text: /등록할 곳 정하기 1/.test(div.textContent) && /등록 완료 1/.test(div.textContent) && /모두 포기 1/.test(div.textContent) }; });
+  check("수시 등록: 정하기·완료·모두 포기·해당 없음", rg.st, ["todo", "done", "gaveup", null]);
+  check("수시 등록: 충원합이 있으면 충원 등록 마감, 합격마다 여기 등록 단추", [rg.add, rg.due, rg.btn, rg.text], [true, "2026-12-30", 2, true]);
   check("일정 안내 문자: 최저 미충족이면 응시 안 해도 됨", /논술 — 부산대 경영학과.*응시하지 않아도 됩니다/.test(ac.notice), true);
   check("학교장추천 현황: 대학별로 묶고 직접 끈 것·정시는 빼기", rec.g, ["부산대2", "부경대1"]);
   check("달력 줄 75바이트 안으로 접기", misc.foldMax <= 75 && misc.foldCont, true);

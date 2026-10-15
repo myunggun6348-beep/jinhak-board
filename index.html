@@ -281,6 +281,10 @@ body.landing .gate{margin-top:10px}
 .nrow .nx{font-size:11.5px; padding:2px 8px}
 .cnote{font-size:11px; color:var(--ink-3); white-space:nowrap; margin-left:4px}
 @media (max-width:640px){ .noteadd{grid-template-columns:1fr 1fr} .noteadd textarea{grid-column:1/-1} .noteadd .btn{grid-column:1/-1} }
+.regapps{display:flex; flex-wrap:wrap; gap:6px; flex-basis:100%; padding-left:2px}
+.regapp{display:inline-flex; align-items:center; gap:6px; padding:4px 6px 4px 10px; border:1px solid var(--line-2); border-radius:10px; background:var(--surface); font-size:12.5px}
+.regapp .btn,.regapp .ghost{font-size:12px; padding:3px 9px}
+.reghint{flex-basis:100%; font-size:12px; color:var(--ink-3); padding-left:2px}
 .acwhy{flex-basis:100%; font-size:12px; color:var(--ink-3); padding-left:2px}
 .acsum{display:flex; flex-wrap:wrap; gap:6px; margin:4px 0 8px}
 .acnog{display:flex; flex-wrap:wrap; align-items:center; gap:6px 10px; margin-top:10px; padding:9px 12px; border-radius:10px; background:var(--surface-2); font-size:12.5px; color:var(--ink-2)}
@@ -666,6 +670,7 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
     <div class="sched" id="prep" hidden></div>
     <div class="sched" id="todo" hidden></div>
     <div class="sched" id="afterCsat" hidden></div>
+    <div class="sched" id="reg" hidden></div>
 
     <div class="listhead">
       <h2 id="listTitle">학생</h2>
@@ -739,6 +744,7 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
     <div class="sched" id="allPrep" hidden></div>
     <div class="sched" id="allTodo" hidden></div>
     <div class="sched" id="allAfterCsat" hidden></div>
+    <div class="sched" id="allReg" hidden></div>
     <div class="sched" id="allLog"></div>
     <div class="listhead"><h2>반별 현황</h2><span class="sp"><button class="ghost" id="btnBackup" title="모든 반 학생·지원 자료를 파일 하나로 받습니다">전체 백업 받기</button><button class="ghost" id="btnMerge" title="여러 선생님이 받은 반 파일을 한꺼번에 골라 합칩니다">반 파일 합치기</button><input type="file" id="mergeFile" accept=".json,application/json" multiple hidden><button class="ghost" id="btnRestore" title="백업 파일의 학생 자료로 되돌립니다">백업 되살리기</button><input type="file" id="restoreFile" accept=".json,application/json" hidden><button class="ghost" id="btnCsvAll">전체 CSV 내려받기</button></span></div>
     <div class="tablewrap"><table id="classTable"></table></div>
@@ -871,6 +877,11 @@ function checkStudent(st){
         out.push({lv:"crit",code:"충원마감",msg:a.univ+" 충원 마감이 "+(d===0?"오늘"+leftText(a.due):d+"일 뒤")+"입니다("+fmtDue(a.due)+"). 전화를 받을 수 있어야 합니다."});
     }
   });
+  var ri=regInfo(st);
+  if(ri.state==="todo"){
+    var rd=daysTo(ri.due);
+    if(rd!==null&&rd>=0&&rd<=3) out.push({lv:rd<=1?"crit":"warn",code:"등록 마감",msg:(ri.add?"수시 충원":"수시")+" 등록 마감이 "+(rd===0?"오늘":rd+"일 뒤")+"("+mdw(ri.due)+")인데 등록할 대학을 정하지 않았습니다("+ri.pass.map(function(a){ return shortUniv(a.univ); }).join(", ")+" 합격). 한 곳만 등록하세요."});
+  }
   return out;
 }
 function appWarn(st,a){
@@ -1269,6 +1280,7 @@ function render(){
   document.getElementById("sched").hidden=!cls;
   renderTodo(document.getElementById("todo"), cls?mine:[], false);
   renderAfterCsat(document.getElementById("afterCsat"), cls?mine:[], false);
+  renderReg(document.getElementById("reg"), cls?mine:[], false);
   renderRows(mine, cls);
   document.getElementById("btnNotesCsv").hidden=!mine.some(function(x){ return (x.notes||[]).length; });
   renderCsat(cls?mine:[]);
@@ -1673,6 +1685,7 @@ function renderAll(){
   renderPrep(document.getElementById("allPrep"), all, true);
   renderTodo(document.getElementById("allTodo"), all, true);
   renderAfterCsat(document.getElementById("allAfterCsat"), all, true);
+  renderReg(document.getElementById("allReg"), all, true);
   renderRecent(document.getElementById("allLog"), all);
 
   var byCls={};
@@ -2228,6 +2241,61 @@ function renderTodo0(host, arr, showClass){
   }
 }
 function st0(s){ return students.get(s.id)||s; }
+/* ── 수시 합격·등록 ── 합격(최초합·충원합)한 학생은 한 곳만 등록한다. 마감: 최초합은 수시 등록, 충원합은 충원 등록 */
+function kdOf(id){ return KEYDATES.filter(function(x){ return x.id===id; })[0]; }
+function regInfo(st){
+  var su=(st.apps||[]).filter(function(a){ return a.kind==="수시"; }), by=function(v){ return su.filter(function(a){ return a.status===v; }); };
+  var pass=su.filter(function(a){ return a.status==="최초합"||a.status==="충원합"; }), reg=by("등록완료"), gave=by("등록포기"), wait=by("충원대기");
+  var add=pass.some(function(a){ return a.status==="충원합"; }), k=kdOf(add?"s-addr":"s-reg");
+  return {pass:pass, reg:reg, gave:gave, wait:wait, add:add, due:k?(k.e||k.s):"",
+    state:reg.length?"done":pass.length?"todo":gave.length?"gaveup":null};
+}
+var REGST={todo:["등록할 곳 정하기","s-wait"],done:["등록 완료","s-ok"],gaveup:["모두 포기","empty"]};
+function renderReg(host, arr, showClass){
+  host.innerHTML="";
+  var rows=[];
+  arr.forEach(function(st){ var r=regInfo(st); if(r.state) rows.push({s:st,r:r}); });
+  host.hidden=!rows.length; if(!rows.length) return;
+  var hd=el("div","schedhead"); hd.appendChild(el("h2",null,"수시 합격·등록"));
+  var kr=kdOf("s-reg"), ka=kdOf("s-addr");
+  if(kr){ var dr=daysTo(kr.e); hd.appendChild(el("span","cnt","수시 등록 "+mdw(kr.s)+"~"+mdw(kr.e)+(dr>=0?" · D-"+dr:" · 끝남"))); }
+  if(ka) hd.appendChild(el("span","cnt","충원 등록 마감 "+mdw(ka.s)));
+  host.appendChild(hd);
+  var cnt={}; rows.forEach(function(x){ cnt[x.r.state]=(cnt[x.r.state]||0)+1; });
+  var sum=el("div","acsum");
+  ["todo","done","gaveup"].forEach(function(k){ if(cnt[k]) sum.appendChild(el("span","pill "+REGST[k][1],REGST[k][0]+" "+cnt[k])); });
+  host.appendChild(sum);
+  rows.sort(function(x,y){ return ["todo","done","gaveup"].indexOf(x.r.state)-["todo","done","gaveup"].indexOf(y.r.state)||(x.s.cls-y.s.cls)||String(x.s.no||"").localeCompare(String(y.s.no||"")); });
+  var nm=function(a){ return (a.jc?"전문대 ":"")+shortUniv(a.univ)+" "+shortMajor(a.major); };
+  rows.forEach(function(x){
+    var s=x.s, r=x.r, row=el("div","sitem");
+    row.appendChild(el("span","pill "+REGST[r.state][1],REGST[r.state][0]));
+    var who=el("button","who",(showClass&&s.cls?s.cls+"반 ":"")+(s.no?s.no+" ":"")+(s.name||"")); who.title="이 학생 보기";
+    who.onclick=function(){ goStudent(s); }; row.appendChild(who);
+    if(r.state==="todo"){
+      var d=daysTo(r.due); row.appendChild(el("span","sub",(r.add?"충원 등록":"수시 등록")+" 마감 "+mdw(r.due)+(d!==null&&d>=0?" · D-"+d:"")));
+      var box=el("div","regapps");
+      r.pass.forEach(function(a){
+        var c=el("span","regapp"); c.appendChild(el("span",null,nm(a)+" · "+a.status));
+        if(!ro()){
+          var go=el("button","btn sec","여기 등록"); go.onclick=function(){ remember("등록"); var t=st0(s), aa=(t.apps||[]).filter(function(y){ return y.id===a.id; })[0]; if(!aa) return; aa.status="등록완료"; save(t); render(); };
+          var no=el("button","ghost","포기"); no.onclick=function(){ if(!window.confirm(nm(a)+" 합격을 등록포기로 바꿉니다.")) return; remember("등록"); var t=st0(s), aa=(t.apps||[]).filter(function(y){ return y.id===a.id; })[0]; if(!aa) return; aa.status="등록포기"; save(t); render(); };
+          c.appendChild(go); c.appendChild(no);
+        }
+        box.appendChild(c);
+      });
+      row.appendChild(box);
+      row.appendChild(el("span","reghint",r.pass.length>1?"합격한 곳 중 한 곳만 등록합니다. 나머지는 등록하지 않으면 됩니다(이중등록은 입학 취소).":"등록 기간에 등록금(예치금)을 내야 합격이 확정됩니다."));
+    } else if(r.state==="done"){
+      row.appendChild(el("span","sub","등록: "+r.reg.map(nm).join(", ")));
+      if(r.wait.length) row.appendChild(el("span","reghint","충원 대기 "+r.wait.length+"곳("+r.wait.map(function(a){ return shortUniv(a.univ); }).join(", ")+"). 충원 합격해서 옮기려면 먼저 지금 등록한 곳을 포기해야 합니다."));
+    } else {
+      row.appendChild(el("span","sub","합격 "+r.gave.length+"곳 모두 등록 포기"));
+      row.appendChild(el("span","reghint","수시에 합격하면 등록을 포기해도 정시에 지원할 수 없습니다. 추가모집(2/19~)은 지원할 수 있습니다."));
+    }
+    host.appendChild(row);
+  });
+}
 /* ── 상담 기록 ── 학생마다 날짜·누구와·짧은 내용. 학교 장부에서는 학생 자료와 함께 암호화된다 */
 var NOTEK=["학생","학부모","전화","기타"];
 function ymdNow(){ var d=new Date(); return d.getFullYear()+"-"+pad2(d.getMonth()+1)+"-"+pad2(d.getDate()); }
@@ -4877,7 +4945,7 @@ try{ if(location.protocol==="file:"||location.hostname==="localhost"){
     parseDelimited:parseDelimited, readApps:readApps, pdfTableRows:pdfTableRows, last:function(){ return lastRead; },
     checkStudent:checkStudent, parseMin:parseMin, judgeMin:judgeMin, rowsFromPdf:rowsFromPdf,
     univFound:univFound, univRegion:univRegion, outcomeOf:outcomeOf, resultsOf:resultsOf,
-    KEYDATES:KEYDATES, minGaps:minGaps, render:function(){ render(); }, leftText:leftText, normCode:normCode, codeKeys:codeKeys, sealDoc:sealDoc, openDoc:openDoc, mergeData:function(l){ var r=mergeData(l); render(); return r; }, students:function(){ return JSON.parse(JSON.stringify(Array.from(students.values()))); }, scoreSum:scoreSum, scoreOk:scoreOk, noticeText:noticeText, diffLines:diffLines, logs:function(){ var o=[]; students.forEach(function(x){ (x.log||[]).forEach(function(e){ o.push(e); }); }); return o; }, glanceData:glanceData, univKey:univKey, majorKey:majorKey, upcoming:upcoming, pending:pending, examVerdict:examVerdict, afterCsatApp:afterCsatApp, prepList:prepList, prepDone:prepDone, prepNeeds:prepNeeds, isRec:isRec, recGroups:recGroups, icsFold:icsFold, jungsiOf:jungsiOf};
+    KEYDATES:KEYDATES, minGaps:minGaps, render:function(){ render(); }, leftText:leftText, normCode:normCode, codeKeys:codeKeys, sealDoc:sealDoc, openDoc:openDoc, mergeData:function(l){ var r=mergeData(l); render(); return r; }, students:function(){ return JSON.parse(JSON.stringify(Array.from(students.values()))); }, scoreSum:scoreSum, scoreOk:scoreOk, noticeText:noticeText, diffLines:diffLines, logs:function(){ var o=[]; students.forEach(function(x){ (x.log||[]).forEach(function(e){ o.push(e); }); }); return o; }, glanceData:glanceData, univKey:univKey, majorKey:majorKey, upcoming:upcoming, pending:pending, regInfo:regInfo, renderReg:renderReg, examVerdict:examVerdict, afterCsatApp:afterCsatApp, prepList:prepList, prepDone:prepDone, prepNeeds:prepNeeds, isRec:isRec, recGroups:recGroups, icsFold:icsFold, jungsiOf:jungsiOf};
 } }catch(e){}
 
 /* 켜 둔 채로 시간이 흐르면 D-day·남은 시간·경고·결과 입력할 것을 1분마다 새로 그린다.
