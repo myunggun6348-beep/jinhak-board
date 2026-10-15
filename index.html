@@ -75,6 +75,26 @@ button{cursor:pointer}
   border:0; background:transparent; color:var(--ink-2);
   padding:6px 13px; border-radius:6px; font-size:13px; font-weight:500;
 }
+.tbadge{display:inline-block; min-width:18px; margin-left:5px; padding:0 5px; border-radius:9px; background:var(--bad); color:#fff; font-size:11px; font-weight:700; line-height:18px; text-align:center}
+.adminpage .ahead{display:flex; align-items:baseline; flex-wrap:wrap; gap:4px 10px; margin-bottom:12px}
+.adminpage .ahead h2{font-size:18px; margin:0}
+.adminpage .ahead .cnt{font-size:12.5px; color:var(--ink-3)}
+.agrid{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; align-items:start}
+.agrid .gtile.wide{grid-column:1/-1}
+.agrid .gtile.need{border-color:var(--warn); background:var(--warn-soft)}
+.astep{display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px; padding:9px 0; border-top:1px solid var(--line)}
+.adminpage .gth + .astep,.adminpage .gth + .uitem{border-top:0; padding-top:0}
+.astep .n{flex:none; width:22px; height:22px; border-radius:50%; background:var(--accent-soft); color:var(--accent); font-size:12px; font-weight:800; display:grid; place-items:center}
+.astep .k{font-weight:700; font-size:13px; min-width:68px}
+.astep .ok{color:var(--ok); font-weight:700; font-size:13px}
+.astep .bad{color:var(--bad); font-weight:700; font-size:13px}
+.astep input{flex:1 1 160px; min-width:0; border:1px solid var(--line-2); background:var(--surface); color:var(--ink); border-radius:7px; padding:6px 9px; font-size:13px}
+.astep .shint{flex-basis:100%; margin:0 0 0 30px}
+.adminpage .uitem{display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:7px 0; border-top:1px solid var(--line); font-size:13px}
+
+.adminpage .uitem .sub{color:var(--ink-3); font-size:12px}
+.adminpage .uitem .sp{margin-left:auto; display:flex; gap:6px; align-items:center}
+@media (max-width:820px){ .agrid{grid-template-columns:1fr} }
 .tabs button[aria-selected="true"]{background:var(--surface); color:var(--ink); box-shadow:var(--shadow); font-weight:700}
 .sync{font-size:11.5px; color:var(--ink-3); display:flex; align-items:center; gap:5px; min-width:0}
 .whochip{font-size:12px; color:var(--ink-2); display:flex; align-items:center; gap:6px; white-space:nowrap}
@@ -543,6 +563,7 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
   <div class="tabs" role="tablist">
     <button role="tab" id="tabClass" aria-selected="true">우리 반</button>
     <button role="tab" id="tabAll" aria-selected="false">전체 현황</button>
+    <button role="tab" id="tabAdmin" aria-selected="false" hidden>학교 관리<span class="tbadge" id="tabAdminN" hidden></span></button>
   </div>
   <div class="sync"><span class="dot" id="syncDot"></span><span id="syncText">연결 중</span></div>
   <button class="ghost helpbtn" id="btnHome" type="button" hidden title="이 컴퓨터가 기억한 학교·혼자 쓰기 설정을 풀고 시작 화면으로 갑니다. 자료는 지워지지 않습니다">⌂ 처음 화면</button>
@@ -565,7 +586,7 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
     <li><b>관리자입니다</b> → ① 구글로 로그인 → ② 학교 이름·<b>가입 암호</b> 정하기 → <b>학교 만들기</b>.</li>
     <li><b>초대 링크 복사</b>로 링크를 학교 메신저로 보내고, <b>가입 암호는 따로</b>(말·문자) 알려 줍니다. 화면의 <b>학교 코드</b>는 관리자가 적어 둡니다.</li>
     <li>가입 요청이 오면 화면 위 <b>승인 대기</b> → 담당 반을 확인하고 <b>승인</b>.</li>
-    <li>관리자는 <b>모든 반</b>을 봅니다. 전체 현황 맨 아래에서 반 바꾸기·빼기·관리자 추가를 합니다.</li>
+    <li>관리자는 <b>모든 반</b>을 봅니다. 위쪽 <b>학교 관리</b> 탭에서 가입 승인·반 바꾸기·빼기·관리자 추가를 합니다.</li>
   </ol>
   <h3>혼자 쓰기</h3>
   <ul>
@@ -575,7 +596,7 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
   </ul>
   <h3>알아 둘 것</h3>
   <ul>
-    <li>학교 코드를 잃어버리면 자료를 열 수 없습니다. 관리자는 전체 현황 맨 아래에서 다시 볼 수 있습니다.</li>
+    <li>학교 코드를 잃어버리면 자료를 열 수 없습니다. 관리자는 <b>학교 관리</b> 탭에서 다시 볼 수 있습니다.</li>
     <li>여럿이 쓰는 컴퓨터에서는 '코드 기억'을 끄고, 다 쓰면 위쪽 <b>⌂ 처음 화면</b>.</li>
     <li>Claude 앱 안의 창에서는 구글 로그인이 막힙니다. 크롬·엣지로 여세요.</li>
     <li>화면이 이상하면 <b>Ctrl+F5</b>(새로고침).</li>
@@ -657,6 +678,8 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
     </div>
   </div>
 
+  <div id="viewAdmin" hidden><div id="schoolPanel" class="adminpage" hidden></div></div>
+
   <div id="viewAll" hidden>
     <div class="alerts" id="allAlerts"></div>
     <div class="stats" id="allStats"></div>
@@ -673,7 +696,6 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
     <div class="sched" id="minCheck"></div>
     <div class="listhead" style="margin-top:22px"><h2>진학 실적</h2><span class="cnt">학년 말 보고용</span><span class="sp"><button class="ghost" id="btnResults">실적 엑셀(CSV) 받기</button></span></div>
     <div class="sched" id="resultsBox"></div>
-    <div class="sched" id="schoolPanel" hidden></div>
     <div class="listhead" style="margin-top:22px"><h2>지원 현황</h2>
       <span class="seg" role="group" aria-label="보기"><button id="byUniv" aria-pressed="true">대학별</button><button id="byMajor" aria-pressed="false">학과별</button></span>
       <span class="cnt" id="univCount"></span>
@@ -2960,6 +2982,7 @@ function bindStatic(){
   if(typeof pdfjsLib!=="undefined") pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
   document.getElementById("tabClass").onclick=function(){ switchTab(true); };
   document.getElementById("tabAll").onclick=function(){ switchTab(false); };
+  document.getElementById("tabAdmin").onclick=function(){ switchTab("admin"); };
   document.getElementById("btnAdd").onclick=addOne;
   document.getElementById("btnBulk").onclick=function(){
     var cls=getCls(); if(!cls){ showError("반을 먼저 선택해 주세요.",""); return; }
@@ -3084,12 +3107,12 @@ function bindStatic(){
   document.getElementById("btnCsvAll").onclick=function(){ csv(sorted(list()), "진학현황_"+YEAR+"_전체.csv"); };
   document.getElementById("yearLabel").textContent=YEAR+"학년도";
 }
-function switchTab(isClass){
-  document.getElementById("tabClass").setAttribute("aria-selected",String(isClass));
-  document.getElementById("tabAll").setAttribute("aria-selected",String(!isClass));
-  document.getElementById("viewClass").hidden=!isClass;
-  document.getElementById("viewAll").hidden=isClass;
-  if(!isClass) renderAll();
+function switchTab(v){
+  var t=v===true?"class":v===false?"all":v;
+  [["tabClass","viewClass","class"],["tabAll","viewAll","all"],["tabAdmin","viewAdmin","admin"]].forEach(function(x){
+    document.getElementById(x[0]).setAttribute("aria-selected",String(t===x[2])); document.getElementById(x[1]).hidden=t!==x[2]; });
+  if(t==="all") renderAll();
+  if(t==="admin") renderSchoolPanel();
 }
 
 function addOne(){
@@ -4037,6 +4060,7 @@ function leaveSchool(){
   students=new Map(DEMO.map(function(d){ return [d.id, JSON.parse(JSON.stringify(d))]; })); demo=true;
   document.getElementById("whoChip").hidden=true;
   document.getElementById("schoolPanel").hidden=true;
+  var ta=document.getElementById("tabAdmin"); if(!ta.hidden){ ta.hidden=true; switchTab(true); }
 }
 function googleIn(){
   var pv=new fb.U.GoogleAuthProvider(); pv.setCustomParameters({prompt:"select_account"});
@@ -4171,7 +4195,7 @@ function codeGate(err,mode,preset){
   // 이미 만든 학교: 만든 컴퓨터는 저절로 열리므로, 다른 컴퓨터에서 열 때만 펼친다
   var s3=el("div","step"+(mail?"":" off")), tg=el("button","linkbtn","이미 학교를 만들었나요? 다른 컴퓨터에서 열 때만 → 학교 코드로 열기");
   var ac=inp("code","학교 코드 (예: K7QM-3XPA)"), ag=el("button","btn sec","들어가기"); ac.disabled=ag.disabled=tg.disabled=!mail;
-  var why=el("span","shint","학교를 만든 컴퓨터는 다음부터 저절로 열립니다. 코드는 자료를 여는 열쇠라(저장소의 구글도 자료를 못 읽게 잠가 둠) 새 컴퓨터에서는 한 번 넣어야 합니다. 코드는 학교 화면 ‘전체 현황’ 맨 아래에 있습니다.");
+  var why=el("span","shint","학교를 만든 컴퓨터는 다음부터 저절로 열립니다. 코드는 자료를 여는 열쇠라(저장소의 구글도 자료를 못 읽게 잠가 둠) 새 컴퓨터에서는 한 번 넣어야 합니다. 코드는 학교 화면의 ‘학교 관리’ 탭에 있습니다.");
   ac.hidden=ag.hidden=why.hidden=true;
   tg.onclick=function(){ ac.hidden=ag.hidden=why.hidden=false; tg.hidden=true; ac.focus(); };
   ag.onclick=function(){ if(normCode(ac.value).length<8){ say("학교 코드를 넣어 주세요."); return; } enterCode(ac.value,{remember:true}); };
@@ -4212,7 +4236,7 @@ function showNewCode(code,name){
   var cp=el("button","ghost","복사"); cp.onclick=function(){ copyText(fmtCode(code),function(){ flashBtn(cp,"복사됨 ✓"); }); };
   var il=el("button","btn sec","초대 링크 복사"); il.onclick=function(){ copyText(inviteLink(code),function(){ flashBtn(il,"복사됨 ✓"); }); };
   var go=el("button","btn","들어가기"); go.onclick=function(){ enterCode(code,{remember:true}); };
-  showGate("'"+name+"' 학교를 만들었습니다","담임 선생님들께 '초대 링크 복사'로 링크를 보내고, 가입 암호는 따로(말로·문자로) 알려 주세요. 링크에 코드가 들어 있어 담임은 코드를 칠 필요가 없습니다. 아래 코드는 이 컴퓨터가 기억하니, 관리자는 다른 컴퓨터에서 열 때를 위해 적어만 두세요(전체 현황 맨 아래에서도 다시 볼 수 있습니다).",[box,il,cp,go]);
+  showGate("'"+name+"' 학교를 만들었습니다","담임 선생님들께 '초대 링크 복사'로 링크를 보내고, 가입 암호는 따로(말로·문자로) 알려 주세요. 링크에 코드가 들어 있어 담임은 코드를 칠 필요가 없습니다. 아래 코드는 이 컴퓨터가 기억하니, 관리자는 다른 컴퓨터에서 열 때를 위해 적어만 두세요(‘학교 관리’ 탭에서도 다시 볼 수 있습니다).",[box,il,cp,go]);
 }
 function enterCode(code,o){
   o=o||{};
@@ -4268,7 +4292,8 @@ function enterSchool(K,code,info,admin,cls){
   var chip=document.getElementById("whoChip"); chip.hidden=false; chip.innerHTML="";
   chip.appendChild(el("span",null,(school.name||"학교")+" · "+(admin?"관리자":(cls?cls+"반 ":"")+(myName()||"선생님"))));
   var pend=el("button","btn sec"); pend.id="pendBtn"; pend.hidden=true;
-  pend.onclick=function(){ switchTab(false); document.getElementById("schoolPanel").scrollIntoView({block:"start"}); };
+  pend.onclick=function(){ switchTab("admin"); window.scrollTo(0,0); };
+  document.getElementById("tabAdmin").hidden=!admin;
   chip.appendChild(pend);
   var b=document.getElementById("banner"); b.hidden=true; b.className="banner";
   if(!admin&&!cls) showGate("담당 반이 정해지지 않았습니다","관리자에게 담당 반을 정해 달라고 하세요. 정해지면 이 화면이 저절로 바뀝니다.",[]);
@@ -4298,75 +4323,93 @@ function outOfScope(st){
   },0);
   return true;
 }
-// 전체 현황 맨 아래: 학교 코드, (관리자) 승인·반 정하기·선생님·관리자 관리
+// 학교 관리 탭(관리자만): 승인 대기 · 선생님 초대 · 함께 쓰는 선생님 · 관리자 · 학교 정보
 var codeShown=false;
 function renderSchoolPanel(){
   var host=document.getElementById("schoolPanel");
-  if(!school){ host.hidden=true; return; }
+  var ms=(school&&school.members)||[], wait=ms.filter(function(m){ return !m.ok; }), ok=ms.filter(function(m){ return m.ok; });
+  var pb=document.getElementById("pendBtn"); if(pb){ pb.hidden=!wait.length; pb.textContent="승인 대기 "+wait.length; }
+  var tn=document.getElementById("tabAdminN"); tn.hidden=!wait.length; tn.textContent=String(wait.length);
+  if(!school||!school.admin){ host.hidden=true; return; }
   host.hidden=false; host.innerHTML="";
-  var hd=el("div","schedhead"); hd.appendChild(el("h2",null,school.name||"우리 학교")); hd.appendChild(el("span","cnt",school.admin?"관리자":(school.cls?school.cls+"반 담임":""))); host.appendChild(hd);
-  if(!school.admin){ host.appendChild(el("div","shint","담당 반 학생만 보고 고칠 수 있습니다. 반이 바뀌면 관리자에게 말씀해 주세요.")); return; }
-  var nr=el("div","tadd"), nin=document.createElement("input"); nin.name="rename"; nin.value=school.name||""; nin.maxLength=40;
-  var nb=el("button","ghost","이름 바꾸기");
-  nb.onclick=function(){ var v=nin.value.trim(); if(!v||v===school.name) return; renameSchool(v); };
-  nr.appendChild(el("span",null,"학교 이름")); nr.appendChild(nin); nr.appendChild(nb); host.appendChild(nr);
-  var row=el("div","tadd");
-  row.appendChild(el("span",null,"학교 코드"));
-  row.appendChild(el("b","mono",codeShown?fmtCode(school.code):fmtCode(school.code).replace(/[0-9A-Z]/g,"•")));
-  var sh=el("button","ghost",codeShown?"가리기":"보기"); sh.onclick=function(){ codeShown=!codeShown; renderSchoolPanel(); };
-  var cp=el("button","ghost","복사"); cp.onclick=function(){ copyText(fmtCode(school.code),function(){ flashBtn(cp,"복사됨 ✓"); }); };
-  var il=el("button","btn sec","초대 링크 복사"); il.onclick=function(){ copyText(inviteLink(school.code),function(){ flashBtn(il,"복사됨 ✓"); }); };
-  il.disabled=!school.pwSet; if(!school.pwSet) il.title="가입 암호를 먼저 정해 주세요";
-  row.appendChild(sh); row.appendChild(cp); row.appendChild(il); host.appendChild(row);
-  var pr=el("div","tadd"); pr.appendChild(el("span",null,"가입 암호"));
-  pr.appendChild(el("b",school.pwSet?"":"bad",school.pwSet?"정해짐 ✓":"아직 없음 — 먼저 정하세요"));
-  var pin=document.createElement("input"); pin.type="password"; pin.placeholder=school.pwSet?"새 암호로 바꾸기":"가입 암호 (4자 이상)";
+  var hd=el("div","ahead"); hd.appendChild(el("h2",null,school.name||"우리 학교")); hd.appendChild(el("span","cnt","학교 관리 · 관리자 "+(myMail()||""))); host.appendChild(hd);
+  var grid=el("div","agrid"); host.appendChild(grid);
+  var tile=function(title,sub,cls){ var t=el("div","gtile"+(cls?" "+cls:"")), h=el("div","gth"); h.appendChild(el("h3",null,title)); if(sub) h.appendChild(el("span","gsub",sub)); t.appendChild(h); grid.appendChild(t); return t; };
+  var mref=function(m){ return sRef(school.K.room,"members",m.uid); };
+  var fail=function(e){ alert("바꾸지 못했습니다. ("+((e&&e.code)||"")+")"); };
+  var put=function(m,cls,ok){ fb.S.setDoc(mref(m),{name:m.name||"",cls:+cls||0,at:m.at||"",ok:ok}).catch(fail); };
+  var line=function(box,m,isWait){
+    var r=el("div","uitem"); r.appendChild(el("b",null,m.name||"이름 없음"));
+    if(isWait) r.appendChild(el("span","sub",fmtWhen(m.at)+" 요청"));
+    var sp=el("span","sp"), cs=clsSelect(m.cls||0); cs.title="담당 반";
+    if(!isWait) cs.onchange=function(){ if(cs.value!=="") put(m,cs.value,true); };
+    sp.appendChild(cs);
+    if(isWait){
+      var ap=el("button","btn sec","승인"); ap.onclick=function(){ if(cs.value===""){ alert("담당 반을 골라 주세요."); return; } put(m,cs.value,true); };
+      var no=el("button","ghost","거절"); no.onclick=function(){ if(window.confirm((m.name||"")+" 요청을 거절합니다.")) fb.S.deleteDoc(mref(m)).catch(fail); };
+      sp.appendChild(ap); sp.appendChild(no);
+    } else {
+      var rm=el("button","ghost","빼기"); rm.onclick=function(){ if(window.confirm((m.name||"")+" 선생님을 뺍니다. 바로 자료를 볼 수 없게 됩니다.")) fb.S.deleteDoc(mref(m)).catch(fail); };
+      sp.appendChild(rm);
+    }
+    r.appendChild(sp); box.appendChild(r);
+  };
+
+  // 승인 기다리는 선생님: 있으면 맨 위에 눈에 띄게
+  var w=tile("승인 기다리는 선생님 ("+wait.length+")",wait.length?"담당 반을 확인하고 승인하세요":"",wait.length?"wide need":"");
+  if(!wait.length) w.appendChild(el("div","gempty","없습니다. 가입 요청이 오면 여기와 위쪽 탭에 숫자가 뜹니다."));
+  wait.forEach(function(m){ line(w,m,true); });
+
+  // 선생님 초대: ① 가입 암호 ② 초대 링크 (③ 학교 코드)
+  var inv=tile("선생님 초대","초대 링크와 가입 암호를 따로 보내세요");
+  var step=function(n,k){ var r=el("div","astep"); r.appendChild(el("span","n",n)); r.appendChild(el("span","k",k)); inv.appendChild(r); return r; };
+  var s1=step("1","가입 암호");
+  s1.appendChild(el("span",school.pwSet?"ok":"bad",school.pwSet?"정해짐 ✓":"아직 없음"));
+  var pin=document.createElement("input"); pin.type="password"; pin.placeholder=school.pwSet?"새 암호 (4자 이상)":"가입 암호 (4자 이상)";
   var pb2=el("button","btn sec",school.pwSet?"암호 바꾸기":"암호 정하기");
   pb2.onclick=function(){
     if(pin.value.trim().length<4){ alert("가입 암호를 4자 이상으로 적어 주세요."); return; }
     setJoinPw(school.K.room,pin.value).then(function(){ school.pwSet=true; renderSchoolPanel(); },function(e){ alert("암호를 정하지 못했습니다. ("+((e&&e.code)||"")+")"); });
   };
-  pr.appendChild(pin); pr.appendChild(pb2); host.appendChild(pr);
-  host.appendChild(el("div","shint","담임 선생님께 초대 링크와 가입 암호를 따로 보내면, 링크를 누르고 암호를 넣어 가입을 요청합니다. 관리자가 반을 확인해 승인합니다. 암호를 바꿔도 이미 승인된 선생님은 그대로입니다. 담임은 자기 반만, 관리자는 모든 반을 봅니다. 코드는 학교 메신저로만 전하세요."));
-  var ms=school.members||[], wait=ms.filter(function(m){ return !m.ok; }), ok=ms.filter(function(m){ return m.ok; });
-  var pb=document.getElementById("pendBtn"); if(pb){ pb.hidden=!wait.length; pb.textContent="승인 대기 "+wait.length; }
-  var mref=function(m){ return sRef(school.K.room,"members",m.uid); };
-  var fail=function(e){ alert("바꾸지 못했습니다. ("+((e&&e.code)||"")+")"); };
-  var put=function(m,cls,ok){ fb.S.setDoc(mref(m),{name:m.name||"",cls:+cls||0,at:m.at||"",ok:ok}).catch(fail); };
-  var line=function(m,isWait){
-    var r=el("div","uitem"); r.appendChild(el("b",null,m.name||"이름 없음"));
-    if(isWait) r.appendChild(el("span","sub",fmtWhen(m.at)+" 요청"));
-    var cs=clsSelect(m.cls||0); cs.title="담당 반";
-    if(!isWait) cs.onchange=function(){ if(cs.value!=="") put(m,cs.value,true); };
-    r.appendChild(cs);
-    if(isWait){
-      var ap=el("button","btn sec","승인"); ap.onclick=function(){ if(cs.value===""){ alert("담당 반을 골라 주세요."); return; } put(m,cs.value,true); };
-      var no=el("button","ghost","거절"); no.onclick=function(){ if(window.confirm((m.name||"")+" 요청을 거절합니다.")) fb.S.deleteDoc(mref(m)).catch(fail); };
-      r.appendChild(ap); r.appendChild(no);
-    } else {
-      var rm=el("button","ghost","빼기"); rm.onclick=function(){ if(window.confirm((m.name||"")+" 선생님을 뺍니다. 바로 자료를 볼 수 없게 됩니다.")) fb.S.deleteDoc(mref(m)).catch(fail); };
-      r.appendChild(rm);
-    }
-    host.appendChild(r);
-  };
-  host.appendChild(el("div","umajor","승인 기다리는 선생님 ("+wait.length+")"));
-  if(!wait.length) host.appendChild(el("div","sempty","없습니다."));
-  wait.forEach(function(m){ line(m,true); });
-  host.appendChild(el("div","umajor","함께 쓰는 선생님 ("+ok.length+")"));
-  if(!ok.length) host.appendChild(el("div","sempty","아직 없습니다."));
-  ok.sort(function(a,b){ return (a.cls||99)-(b.cls||99); }).forEach(function(m){ line(m,false); });
-  host.appendChild(el("div","umajor","관리자 ("+school.admins.length+") — 모든 반을 봅니다"));
+  s1.appendChild(pin); s1.appendChild(pb2);
+  s1.appendChild(el("span","shint","암호는 저장하지 않아 다시 볼 수 없습니다. 잊었으면 새로 정해 알려 주세요. 이미 승인된 선생님은 그대로 씁니다."));
+  var s2=step("2","초대 링크");
+  var il=el("button","btn sec","초대 링크 복사"); il.onclick=function(){ copyText(inviteLink(school.code),function(){ flashBtn(il,"복사됨 ✓"); }); };
+  il.disabled=!school.pwSet; if(!school.pwSet) il.title="가입 암호를 먼저 정해 주세요";
+  s2.appendChild(il);
+  s2.appendChild(el("span","shint",school.pwSet?"학교 메신저로 보내세요. 링크를 누르면 학교 코드가 저절로 들어갑니다.":"가입 암호를 먼저 정하면 복사할 수 있습니다."));
+  var s3=step("3","학교 코드");
+  s3.appendChild(el("b","mono",codeShown?fmtCode(school.code):fmtCode(school.code).replace(/[0-9A-Z]/g,"•")));
+  var sh=el("button","ghost",codeShown?"가리기":"보기"); sh.onclick=function(){ codeShown=!codeShown; renderSchoolPanel(); };
+  var cp=el("button","ghost","복사"); cp.onclick=function(){ copyText(fmtCode(school.code),function(){ flashBtn(cp,"복사됨 ✓"); }); };
+  s3.appendChild(sh); s3.appendChild(cp);
+  s3.appendChild(el("span","shint","자료를 여는 열쇠입니다. 관리자가 다른 컴퓨터에서 열 때 씁니다. 적어 두세요."));
+
+  // 함께 쓰는 선생님
+  var mt=tile("함께 쓰는 선생님 ("+ok.length+")","담임은 담당 반만 봅니다");
+  if(!ok.length) mt.appendChild(el("div","gempty","아직 없습니다. 초대 링크를 보내 보세요."));
+  ok.sort(function(a,b){ return (a.cls||99)-(b.cls||99); }).forEach(function(m){ line(mt,m,false); });
+
+  // 관리자
+  var at=tile("관리자 ("+school.admins.length+")","모든 반을 보고 승인합니다");
   school.admins.forEach(function(a){
     var r=el("div","uitem"); r.appendChild(el("b",null,a+(a===myMail()?" (나)":"")));
-    if(school.admins.length>1){ var x=el("button","ghost","빼기"); x.onclick=function(){ if(window.confirm(a+" 를 관리자에서 뺍니다.")) setAdmins(school.admins.filter(function(y){ return y!==a; })); }; r.appendChild(x); }
-    host.appendChild(r);
+    if(school.admins.length>1){ var sp=el("span","sp"), x=el("button","ghost","빼기"); x.onclick=function(){ if(window.confirm(a+" 를 관리자에서 뺍니다.")) setAdmins(school.admins.filter(function(y){ return y!==a; })); }; sp.appendChild(x); r.appendChild(sp); }
+    at.appendChild(r);
   });
-  var ar=el("div","tadd"), ai=document.createElement("input"); ai.type="email"; ai.placeholder="관리자로 더할 구글 이메일 (진학부장 등)";
+  var ar=el("div","astep"), ai=document.createElement("input"); ai.type="email"; ai.placeholder="더할 구글 이메일 (진학부장 등)";
   var ab=el("button","btn sec","관리자 추가");
   ab.onclick=function(){ var m=ai.value.trim().toLowerCase();
     if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(m)){ alert("이메일을 확인해 주세요."); return; }
     if(school.admins.indexOf(m)<0) setAdmins(school.admins.concat([m])); };
-  ar.appendChild(ai); ar.appendChild(ab); host.appendChild(ar);
+  ar.appendChild(ai); ar.appendChild(ab); at.appendChild(ar);
+
+  // 학교 정보
+  var it=tile("학교 정보","화면 위에 보이는 이름표");
+  var nr=el("div","astep"), nin=document.createElement("input"); nin.name="rename"; nin.value=school.name||""; nin.maxLength=40;
+  var nb=el("button","ghost","이름 바꾸기");
+  nb.onclick=function(){ var v=nin.value.trim(); if(!v||v===school.name) return; renameSchool(v); };
+  nr.appendChild(el("span","k","학교 이름")); nr.appendChild(nin); nr.appendChild(nb); it.appendChild(nr);
 }
 function setAdmins(list){
   fb.S.getDoc(sRef(school.K.room)).then(function(d){

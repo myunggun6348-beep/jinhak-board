@@ -464,7 +464,7 @@ function buildTestPage() {
   check("저장소엔 암호문만(이름·학번·대학 안 보임)", /김예시|30201|부산대/.test(JSON.stringify(KV)), false);
   check("새 학교 코드는 8자리", /^[2-9A-HJKMNP-Z]{4}-[2-9A-HJKMNP-Z]{4}$/.test(lastCode), true);
   const firstCode = lastCode;
-  await adm.click("#tabAll"); await adm.waitForTimeout(300);
+  await adm.click("#tabAdmin"); await adm.waitForTimeout(300);
   await adm.fill("#schoolPanel input[name=rename]", "테스트고 3학년"); await adm.click("#schoolPanel button >> text=이름 바꾸기"); await adm.waitForTimeout(800);
   check("관리자: 학교 이름 나중에 바꾸기", [KV[sids[0]].name, KV[sids[0]].admins.join(), /테스트고 3학년/.test(await adm.innerText("#whoChip"))], ["테스트고 3학년", "admin@x.com", true]);
   await adm.click("#tabClass");
@@ -476,12 +476,14 @@ function buildTestPage() {
   await t2.fill("#banner input[name=name]", "박담임"); await t2.selectOption("#banner select[name=cls]", "2");
   await t2.fill("#banner input[name=pw]", "1234"); await t2.click("#banner .codeform .btn"); await t2.waitForTimeout(1500);
   check("선생님: 가입 요청하면 승인 대기, 자료 안 보임", [await gateTitle(t2), (await rowNames(t2)).includes("김예시")], ["관리자 승인을 기다리는 중입니다", false]);
-  await adm.click("#tabAll"); await adm.waitForTimeout(800);
+  check("관리자: 학교 관리 탭에 승인 대기 숫자", await adm.evaluate(() => { const n = document.getElementById("tabAdminN"); return !document.getElementById("tabAdmin").hidden && !n.hidden && n.textContent; }), "1");
+  await adm.click("#tabAdmin"); await adm.waitForTimeout(800);
   check("관리자: 승인 기다리는 선생님(반 포함) 보임", /박담임/.test(await adm.innerText("#schoolPanel")) && await adm.$eval("#schoolPanel .uitem select", (e) => e.value), "2");
   await adm.click("#schoolPanel button >> text=승인"); await t2.waitForTimeout(2500);
   check("승인되면 담임 화면이 열리고 자기 반만", [await gateTitle(t2), await rowNames(t2), await t2.$eval("#classbar", (e) => e.hidden)], ["", ["김예시"], true]);
   await t2.click("#tabAll"); await t2.waitForTimeout(500);
   check("담임은 다른 반(5반) 학생이 안 보임", /박예시/.test(await t2.innerText("#viewAll")), false);
+  await adm.click("#tabAll"); await adm.waitForTimeout(500);
   check("관리자는 모든 반", /2반[\s\S]*5반/.test(await adm.innerText("#classTable")), true);
   await t2.click("#tabClass"); await t2.click(".row >> nth=0 >> .rowhead"); await t2.waitForTimeout(200);
   const ti = await t2.evaluate(() => [...document.querySelectorAll(".detail select")].findIndex((x) => [...x.options].some((o) => o.value === "최초합")));
@@ -500,7 +502,8 @@ function buildTestPage() {
   const wrong = await who({});
   await join(wrong, "AAAA-BBBB-CCCC-DDDD", "누구", 1);
   check("틀린 코드: 학교 없음", /이 코드의 학교가 없습니다/.test(await wrong.innerText("#banner")), true);
-  await adm.click("#tabAll"); await adm.waitForTimeout(500);
+  check("담임에게는 학교 관리 탭이 없음", await t2.$eval("#tabAdmin", (e) => e.hidden), true);
+  await adm.click("#tabAdmin"); await adm.waitForTimeout(500);
   await adm.click("#schoolPanel button >> text=빼기"); await t2.waitForTimeout(2500);
   check("관리자가 빼면 담임 화면이 막힘", [await gateTitle(t2), (await rowNames(t2)).includes("김예시")], ["진학 현황판", false]);
   await adm.click("#btnHome"); await adm.waitForTimeout(1500);
