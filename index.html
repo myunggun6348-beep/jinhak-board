@@ -102,6 +102,38 @@ button{cursor:pointer}
 .helpdlg h2{font-size:17px; margin:0 0 6px} .helpdlg h3{font-size:14px; margin:14px 0 4px; color:var(--accent)}
 .helpfoot{display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap} .helpfoot a{text-decoration:none}
 .helpdlg ol,.helpdlg ul{margin:0; padding-left:20px} .helpdlg form{text-align:right; margin-top:12px}
+/* 시작 화면(학교 장부 쓰는 곳). 들어가기 전에는 예시 화면을 감춘다 */
+body.landing .wrap > :not(#banner){display:none!important}
+body.landing .topbar .tabs,body.landing .topbar .sync,body.landing #btnHome{display:none}
+body.landing .gate{margin-top:10px}
+.gate.hero{border:0; background:none; padding:6px 0 0}
+.land{max-width:980px; margin:0 auto; text-align:left; word-break:keep-all}
+.gate{word-break:keep-all}
+.land-hero{text-align:center; padding:18px 8px 26px}
+.land-badge{display:inline-block; font-size:12px; font-weight:700; color:var(--accent); background:var(--accent-soft); border-radius:999px; padding:5px 13px; letter-spacing:.01em}
+.gate .land-title{font-size:32px; font-weight:800; letter-spacing:-.025em; margin:14px 0 8px; color:var(--ink)}
+.gate .land-sub{font-size:15.5px; color:var(--ink-2); margin:0; line-height:1.6}
+.land-cards{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px}
+.land .choice{display:flex; flex-direction:column; align-items:flex-start; gap:6px; text-align:left; border:1px solid var(--line); background:var(--surface); color:var(--ink);
+  border-radius:16px; padding:20px 20px 18px; cursor:pointer; font:inherit; box-shadow:0 1px 2px rgba(16,24,40,.04); transition:border-color .15s, box-shadow .15s, transform .15s}
+.land .choice:hover,.land .choice:focus-visible{border-color:var(--accent-2); box-shadow:0 10px 28px rgba(30,50,90,.12); transform:translateY(-2px); outline:none}
+.land .ic{width:44px; height:44px; border-radius:12px; display:grid; place-items:center; background:var(--accent-soft); color:var(--accent); margin-bottom:8px}
+.land .ic svg{width:22px; height:22px}
+.land .choice.solo .ic{background:var(--surface-3); color:var(--ink-2)}
+.land .tag{font-size:12px; font-weight:700; color:var(--ink-3)}
+.land .choice b{font-size:18px; letter-spacing:-.01em}
+.land .choice .d{font-size:13.5px; color:var(--ink-2); line-height:1.6; flex:1}
+.land .cta{font-size:13.5px; font-weight:700; color:var(--accent); margin-top:8px}
+.land .choice:hover .cta{text-decoration:underline}
+.land-feats{display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:16px; margin-top:18px; padding:18px 20px; border-radius:16px; background:var(--surface-2)}
+.land-feat{display:flex; gap:10px; align-items:flex-start; font-size:12.5px; color:var(--ink-2); line-height:1.5}
+.land-feat svg{flex:none; width:18px; height:18px; color:var(--accent); margin-top:1px}
+.land-feat b{display:block; color:var(--ink); font-size:13px; margin-bottom:1px}
+.land-foot{display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:6px 18px; margin-top:18px; font-size:13px}
+.land-foot a{color:var(--accent)}
+.land .err{color:var(--bad); text-align:center; font-size:13px}
+@media (max-width:820px){ .land-cards{grid-template-columns:1fr} .land-feats{grid-template-columns:repeat(2,minmax(0,1fr))} .gate .land-title{font-size:26px} }
+@media (max-width:440px){ .land-feats{grid-template-columns:1fr} .land-hero{padding:10px 0 18px} }
 .codeform .choice{display:flex; flex-direction:column; gap:3px; text-align:left; border:1px solid var(--line-2); background:var(--surface); color:var(--ink); border-radius:10px; padding:13px 15px; cursor:pointer; font:inherit}
 .codeform .choice:hover{border-color:var(--accent-2); background:var(--accent-soft)}
 .codeform .choice b{font-size:15px} .codeform .choice span{font-size:12.5px; color:var(--ink-2)}
@@ -3954,7 +3986,9 @@ function startFirebase(){
     showGate("공용 장부에 연결하지 못했습니다","인터넷 연결을 확인한 뒤 새로고침해 주세요. 학교 인터넷에서 막힌 경우 정보부에 www.gstatic.com·firestore.googleapis.com·identitytoolkit.googleapis.com 허용을 부탁해 주세요.");
   });
 }
+function setLanding(on){ document.body.classList.toggle("landing",!!on); }
 function showGate(title,text,nodes){
+  setLanding(true);
   var b=document.getElementById("banner"); b.hidden=false; b.className="gate"; b.innerHTML="";
   b.appendChild(el("h2",null,title)); b.appendChild(el("p",null,text));
   (nodes||[]).forEach(function(n){ b.appendChild(n); });
@@ -3993,6 +4027,55 @@ function clsSelect(val){
   return s;
 }
 /* 처음 화면: 선생님 / 관리자 두 갈래. mode = ""(고르기) | "teacher" | "admin" */
+// 시작 화면: 누구인지 고르는 카드 세 장 + 할 수 있는 일
+var LANDICON={"teacher":"<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"8\" r=\"4\"/><path d=\"M4 21c0-4 3.6-7 8-7s8 3 8 7\"/></svg>","admin":"<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M3 21h18M5 21V10l7-5 7 5v11M9 21v-6h6v6\"/></svg>","solo":"<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"3\" y=\"4\" width=\"18\" height=\"12\" rx=\"2\"/><path d=\"M8 20h8M12 16v4\"/></svg>","warn":"<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 3 2 20h20L12 3z\"/><path d=\"M12 10v4M12 17h.01\"/></svg>","cal":"<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"3\" y=\"5\" width=\"18\" height=\"16\" rx=\"2\"/><path d=\"M3 10h18M8 3v4M16 3v4\"/></svg>","check":"<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"m8 12 3 3 5-6\"/></svg>","lock":"<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"4\" y=\"11\" width=\"16\" height=\"10\" rx=\"2\"/><path d=\"M8 11V7a4 4 0 0 1 8 0v4\"/></svg>"};
+function landingPage(err){
+  var land=el("div","land"), hero=el("div","land-hero");
+  hero.appendChild(el("span","land-badge",YEAR+"학년도 · 고3 담임용"));
+  hero.appendChild(el("h2","land-title","진학 현황판"));
+  hero.appendChild(el("p","land-sub","수시·정시 지원부터 합격·등록까지, 우리 반 진학을 한 화면에서 챙깁니다."));
+  land.appendChild(hero);
+  if(err) land.appendChild(el("p","err",err));
+  var cards=el("div","land-cards");
+  var card=function(cls,icon,tag,title,desc,cta,fn){
+    var c=el("button","choice"+(cls?" "+cls:"")); c.type="button";
+    var ic=el("span","ic"); ic.innerHTML=LANDICON[icon]; c.appendChild(ic);
+    c.appendChild(el("span","tag",tag)); c.appendChild(el("b",null,title)); c.appendChild(el("span","d",desc)); c.appendChild(el("span","cta",cta+" →"));
+    c.onclick=fn; cards.appendChild(c);
+  };
+  card("","teacher","초대 링크를 받았다면","선생님입니다","관리자가 보낸 링크와 가입 암호로 가입해요. 승인되면 우리 반 학생만 보고 고칩니다.","가입하기",function(){ codeGate("","teacher"); });
+  card("","admin","학교에서 처음 시작한다면","관리자입니다","구글로 로그인해 학교를 만들고 담임 선생님들을 초대해요. 모든 반을 봅니다.","학교 만들기",function(){ codeGate("","admin"); });
+  card("solo","solo","로그인 없이 바로","혼자 쓰기","이 컴퓨터(브라우저)에만 저장해요. 나중에 학교 장부로 옮길 수 있어요.","바로 시작",function(){
+    setLocalMode("local"); leaveSchool(); canWrite=null; setLanding(false);
+    var b=document.getElementById("banner"); b.className="banner"; b.hidden=false;
+    startPractice();
+  });
+  land.appendChild(cards);
+  var feats=el("div","land-feats");
+  [["warn","저절로 점검","6장 초과·군 중복·이중등록·최저 미충족을 바로 알려 줘요"],
+   ["cal","일정 챙기기","면접·발표·충원 마감을 D-day와 달력으로, 휴대폰 달력에도"],
+   ["check","수능최저 판정","등급만 넣으면 지원마다 충족·미충족을 가려요"],
+   ["lock","안전하게 저장","학생 자료는 학교 코드로 잠가서 저장해요"]].forEach(function(x){
+    var f0=el("div","land-feat"), sv=el("span"); sv.innerHTML=LANDICON[x[0]]; f0.appendChild(sv.firstChild);
+    var tx=el("div"); tx.appendChild(el("b",null,x[1])); tx.appendChild(document.createTextNode(x[2])); f0.appendChild(tx); feats.appendChild(f0);
+  });
+  land.appendChild(feats);
+  var foot=el("div","land-foot");
+  var g=document.createElement("a"); g.href="guide.html"; g.target="_blank"; g.rel="noopener"; g.textContent="사용 설명서 보기"; foot.appendChild(g);
+  var tour=el("button","linkbtn","예시 화면 둘러보기");
+  tour.onclick=function(){
+    setLanding(false);
+    var b=document.getElementById("banner"); b.className="banner"; b.hidden=false; b.innerHTML="";
+    b.appendChild(el("b",null,"예시 화면입니다. "));
+    b.appendChild(document.createTextNode("지어낸 학생 세 명으로 보여 줍니다. 고쳐도 저장되지 않습니다. "));
+    var bk=el("button","linkbtn","← 시작 화면으로"); bk.onclick=function(){ codeGate("",""); window.scrollTo(0,0); }; b.appendChild(bk);
+    render(); window.scrollTo(0,0);
+  };
+  foot.appendChild(tour);
+  land.appendChild(foot);
+  var b=document.getElementById("banner"); setLanding(true);
+  b.hidden=false; b.className="gate hero"; b.innerHTML=""; b.appendChild(land);
+}
 function inviteLink(code){ return location.origin+location.pathname+"#join="+fmtCode(code); }
 function codeGate(err,mode,preset){
   leaveSchool();
@@ -4002,21 +4085,7 @@ function codeGate(err,mode,preset){
   var say=function(t){ note.textContent=t; note.style.color="var(--bad)"; };
   var back=el("button","linkbtn","← 처음으로"); back.onclick=function(){ codeGate(); };
   var help=el("button","linkbtn","사용 설명서"); help.onclick=openHelp;
-  if(!mode){
-    var t=el("button","choice"); t.appendChild(el("b",null,"선생님입니다")); t.appendChild(el("span",null,"관리자에게 초대 링크(또는 학교 코드)와 가입 암호를 받았어요"));
-    t.onclick=function(){ codeGate("","teacher"); };
-    var a=el("button","choice"); a.appendChild(el("b",null,"관리자입니다")); a.appendChild(el("span",null,"학교를 처음 등록하는 분은 여기부터. 구글 로그인 → 학교 이름·가입 암호 정하기"));
-    a.onclick=function(){ codeGate("","admin"); };
-    var lo=el("button","choice"); lo.appendChild(el("b",null,"혼자 쓰기")); lo.appendChild(el("span",null,"로그인 없이 이 컴퓨터(브라우저)에만 저장해요. 나중에 학교 장부로 옮길 수 있어요"));
-    lo.onclick=function(){
-      setLocalMode("local"); leaveSchool(); canWrite=null;
-      var b=document.getElementById("banner"); b.className="banner"; b.hidden=false;
-      startPractice();
-    };
-    f.appendChild(t); f.appendChild(a); f.appendChild(lo); f.appendChild(note); f.appendChild(help);
-    showGate("진학 현황판 시작하기","처음이시면 아래에서 고르세요. 담임 선생님은 관리자에게 받은 학교 코드로 가입하고, 관리자가 승인하면 우리 반 자료를 함께 씁니다.",[f]);
-    render(); return;
-  }
+  if(!mode){ landingPage(err); render(); return; }
   if(mode==="teacher"){
     var ci=inp("code","학교 코드 (예: K7QM-3XPA)",preset?fmtCode(preset):""), ni=inp("name","선생님 이름 (예: 김○○)",myName()), ks=clsSelect(getMyCls()||"");
     if(preset) ci.hidden=true;
@@ -4159,7 +4228,7 @@ function waitApproval(K,code,info,mref){
   },function(){ codeGate("학교에 연결하지 못했습니다. 새로고침해 주세요."); });
 }
 function enterSchool(K,code,info,admin,cls){
-  setLocalMode("");
+  setLocalMode(""); setLanding(false);
   school={K:K, code:normCode(code), name:info.name||"", admins:info.admins||[], admin:admin, cls:cls||0};
   if(!admin&&cls){ setMyCls(cls); setCls(cls); }
   var chip=document.getElementById("whoChip"); chip.hidden=false; chip.innerHTML="";
