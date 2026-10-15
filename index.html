@@ -293,7 +293,7 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
 .sitem .sub{color:var(--ink-2)}
 .sk{font-size:11px; font-weight:700; padding:2px 7px; border-radius:5px; white-space:nowrap}
 .sk.itv{color:var(--accent); background:var(--accent-soft)}
-.sk.ann{color:var(--ok); background:var(--ok-soft)}
+.sk.ann,.sk.ann1{color:var(--ok); background:var(--ok-soft)}
 .sk.due{color:var(--warn); background:var(--warn-soft)}
 .sk.late{color:var(--bad); background:var(--bad-soft)}
 .shint{font-size:12px; color:var(--ink-3); margin-top:4px}
@@ -391,7 +391,7 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
 .gday.key{color:var(--bad)}
 .gday .gd{display:flex; gap:2px; height:6px}
 .gday .gd i{width:5px; height:5px; border-radius:50%}
-.gday .gd .itv{background:var(--accent-2)} .gday .gd .ann{background:var(--ok)} .gday .gd .due{background:var(--warn)}
+.gday .gd .itv{background:var(--accent-2)} .gday .gd .ann{background:var(--ok)} .gday .gd .ann1{background:var(--ok); opacity:.5} .gday .gd .due{background:var(--warn)}
 .gday .gn{font-size:9.5px; font-weight:700; line-height:1}
 .gdaylist{margin-top:10px}
 .urow td .ubar{display:inline-block; height:7px; border-radius:2px; background:var(--accent-2); opacity:.45; margin-right:8px; vertical-align:1px}
@@ -657,7 +657,7 @@ function soon(days,h){var d=new Date(); d.setDate(d.getDate()+days); d.setHours(
 var DEMO=[
  {id:"d1",cls:2,no:"30203",name:"강민서",csat:{kor:"4",math:"4",eng:"3",inq1:"4",inq2:"5",his:"3"},apps:[
    {id:"a1",kind:"수시",univ:"부산대학교",major:"수학교육과",jh:"학생부교과(학교장추천)",type:"교과",c6:true,itv:"",due:"",status:"지원완료",rank:"",note:"",mreq:"국수영탐 중 2개합 6",mmet:"미충족"},
-   {id:"a2",kind:"수시",univ:"경북대학교",major:"통계학과",jh:"학생부종합(일반)",type:"학종",c6:true,itv:"2026-11-28",due:"",status:"1단계합",rank:"",note:""}]},
+   {id:"a2",kind:"수시",univ:"경북대학교",major:"통계학과",jh:"학생부종합(일반)",type:"학종",c6:true,ann1:"2026-11-20",itv:"2026-11-28",due:"",status:"1단계합",rank:"",note:""}]},
  {id:"d2",cls:2,no:"30211",name:"윤하늘",apps:[
    {id:"b1",kind:"수시",univ:"동아대학교",major:"기계공학과",jh:"학생부교과",type:"교과",c6:true,itv:"",due:"",status:"최초합",rank:"",note:"",mreq:"",mmet:"충족"}]},
  {id:"d3",cls:2,no:"30218",name:"임도현",apps:[
@@ -724,6 +724,8 @@ function checkStudent(st){
         msg:(a.univ||"한 곳")+" 수능최저를 채우지 못했습니다"+(a.mreq?"("+a.mreq+")":"")+". 사실상 탈락이니 정시 준비로 돌려야 합니다."});
     if(a.ann&&AWAIT[a.status]&&daysTo(a.ann)<0)
       out.push({lv:"warn",code:"결과 미입력",msg:(a.univ||"한 곳")+" 발표일("+a.ann+")이 지났는데 상태가 ‘"+a.status+"’ 그대로입니다. 학생에게 결과를 확인해 주세요."});
+    else if(ann1Late(a))
+      out.push({lv:"warn",code:"결과 미입력",msg:(a.univ||"한 곳")+" 1단계 발표일("+a.ann1+")이 지났는데 상태가 ‘지원완료’ 그대로입니다. 1단계 합격·불합격을 넣어 주세요."});
     if(a.status==="충원대기"&&a.due){
       var d=daysTo(a.due);
       if(d!==null&&d>=0&&d<=3)
@@ -740,9 +742,14 @@ function appWarn(st,a){
   if(a.itv&&apps.some(function(x){return x.itv===a.itv&&x.univ!==a.univ;})) return "면접·고사일 중복";
   if(a.status==="등록완료"&&apps.filter(function(x){return x.status==="등록완료";}).length>1) return "이중등록";
   if(a.status==="충원대기"&&a.due){var d=daysTo(a.due); if(d!==null&&d>=0&&d<=3) return "충원 마감 임박";}
-  if(a.ann&&AWAIT[a.status]&&daysTo(a.ann)<0) return "결과 미입력";
+  if(a.ann&&AWAIT[a.status]&&daysTo(a.ann)<0||ann1Late(a)) return "결과 미입력";
   return "";
 }
+// 1단계 발표: 아직 지원완료(1단계 결과 전)일 때만 의미가 있다
+function ann1Wait(a){ return !!a.ann1&&(a.status||"지원완료")==="지원완료"; }
+function ann1Late(a){ return ann1Wait(a)&&daysTo(a.ann1)<0; }
+var KINDNAME={itv:"면접·고사", ann1:"1단계 발표", ann:"발표", due:"충원 마감"};
+function kindName(e,withTime){ return e.kind==="due"&&withTime?"충원 마감 "+fmtDue(e.a.due).split(" ")[1]:KINDNAME[e.kind]; }
 
 /* ── 수능최저 자동 판정 ─────────────────────
    기준 문장을 읽어 조건 목록으로 바꾼다. 알아보지 못한 부분이 조금이라도 남으면 판정하지 않는다.
@@ -935,7 +942,7 @@ var base=new Map(), actLabel="", LOGMAX=80, logOpenId=null;
 function setBase(st){ base.set(st.id, JSON.stringify(st)); }
 function resetBase(){ base=new Map(); students.forEach(function(st){ setBase(st); }); }
 var LOGF=[["status","상태"],["univ","대학"],["major","모집단위"],["jh","전형명"],["type","전형"],["kind","구분"],["group","군"],
-  ["itv","면접·고사일"],["ann","발표일"],["due","충원 마감"],["rank","예비 순번"],["mreq","최저 기준"],["mmet","최저 충족"],
+  ["ann1","1단계 발표일"],["itv","면접·고사일"],["ann","발표일"],["due","충원 마감"],["rank","예비 순번"],["mreq","최저 기준"],["mmet","최저 충족"],
   ["c6","6장 포함"],["jc","전문대"],["region","지역"],["note","메모"]];
 function lnorm(v){ return v==null||v===false?"":String(v); }
 function lval(v){
@@ -1217,6 +1224,7 @@ function minShort(raw){
   else if(/평균/.test(t)) p.push("탐2 평균");
   return p.length? p.join(" · ") : (t.length>18?t.slice(0,17)+"…":t);
 }
+function annCell(a){ return [a.ann1?"1단계 "+mmdd(a.ann1):"", mmdd(a.ann)].filter(Boolean).join(" / "); }
 function mmdd(s){ var m=String(s||"").match(/^\d{4}-(\d{2})-(\d{2})/); return m?(+m[1])+"/"+(+m[2]):""; }
 
 function renderRows(arr, cls){
@@ -1357,7 +1365,7 @@ function detail(st){
       tr.insertCell().textContent=a.univ||"미입력";
       tr.insertCell().textContent=a.major||"";
       tr.insertCell().textContent=a.jh||a.type||"";
-      tr.insertCell().textContent=[a.itv?mmdd(a.itv)+" 면접":"", a.ann?mmdd(a.ann)+" 발표":""].filter(Boolean).join(" · ")||"—";
+      tr.insertCell().textContent=[a.ann1?mmdd(a.ann1)+" 1단계":"", a.itv?mmdd(a.itv)+" 면접":"", a.ann?mmdd(a.ann)+" 발표":""].filter(Boolean).join(" · ")||"—";
       var mc=tr.insertCell();
       mc.textContent=a.kind==="수시"?(minShort(a.mreq)||"—"):"—";
       if(a.mreq) mc.title=a.mreq+(a.msrc?"\n출처: "+a.msrc:"");
@@ -1411,8 +1419,12 @@ function appEditor(st,a,w){
     g.appendChild(field("전형명", txt(a.jh,"학생부종합(일반)",function(v){a.jh=v; save(st);})));
     g.appendChild(field("전형유형", sel(TYPES,a.type,function(v){a.type=v; save(st);})));
     if(a.kind==="정시"&&!a.jc) g.appendChild(field("군", sel([""].concat(GROUPS),a.group||"",function(v){a.group=v; save(st);})));
+    if(a.kind==="수시"){
+      var a1=field("1단계 발표일", dateInput("date",a.ann1,function(v){a.ann1=v; save(st); render();}));
+      a1.title="서류로 먼저 거르는 단계형 전형(학종 등)만 넣습니다. 일괄합산이면 비워 두세요."; g.appendChild(a1);
+    }
     g.appendChild(field("면접일", dateInput("date",a.itv,function(v){a.itv=v; save(st); render();})));
-    g.appendChild(field("발표일", dateInput("date",a.ann,function(v){a.ann=v; save(st); render();})));
+    g.appendChild(field(a.kind==="수시"?"최종 발표일":"발표일", dateInput("date",a.ann,function(v){a.ann=v; save(st); render();})));
     g.appendChild(field("충원 마감", dateInput("datetime-local",a.due,function(v){a.due=v; save(st); render();})));
     if(a.kind==="수시") g.appendChild(field("최저 충족", sel(MINSTATES,a.mmet||"미정",function(v){a.mmet=v; save(st); render();})));
     g.appendChild(field("예비번호", txt(a.rank,"",function(v){a.rank=v; save(st);},"mono")));
@@ -1640,7 +1652,7 @@ function univDetail(list,byM){
     row.appendChild(el("span","pill "+statusClass(a.status),a.status||"지원완료"));
     row.appendChild(el("span","sub",[a.jc?"전문대":"", a.kind==="정시"?(a.group&&!a.jc?a.group+"군":"정시"):"수시", a.jh||a.type].filter(Boolean).join(" · ")));
     var meta=el("div","meta");
-    var bits=[a.itv?mmdd(a.itv)+" 면접":"", a.ann?mmdd(a.ann)+" 발표":"", a.due?"충원 "+fmtDue(a.due)+"까지":"", a.rank?"예비 "+a.rank:""].filter(Boolean);
+    var bits=[a.ann1?mmdd(a.ann1)+" 1단계 발표":"", a.itv?mmdd(a.itv)+" 면접":"", a.ann?mmdd(a.ann)+" 발표":"", a.due?"충원 "+fmtDue(a.due)+"까지":"", a.rank?"예비 "+a.rank:""].filter(Boolean);
     if(a.kind==="수시"&&a.mreq) bits.push("최저 "+(minShort(a.mreq)||a.mreq));
     meta.textContent=bits.join(" · ");
     if(a.kind==="수시"&&a.mmet==="미충족"){ meta.appendChild(document.createTextNode(bits.length?" · ":"")); meta.appendChild(el("span","miss","최저 미충족")); }
@@ -1660,6 +1672,7 @@ function upcoming(arr,days){
   arr.forEach(function(s){ (s.apps||[]).forEach(function(a){
     var add=function(when,kind){ var d=daysTo(when); if(d!==null&&d>=0&&d<=lim) ev.push({s:s,a:a,kind:kind,when:when,d:d}); };
     if(a.itv&&!PASS[a.status]&&!/불/.test(a.status||"")) add(a.itv,"itv");
+    if(ann1Wait(a)) add(a.ann1,"ann1");
     if(a.ann&&AWAIT[a.status||"지원완료"]) add(a.ann,"ann");
     if(a.due&&a.status==="충원대기") add(a.due,"due");
   }); });
@@ -1695,7 +1708,7 @@ function saveIcs(ev, label){
       .concat(allDay(day),["SUMMARY:"+icsText(title),"DESCRIPTION:"+icsText(desc)],alarm(title,"-PT15H"),["END:VEVENT"]));
   });
   ev.filter(function(e){ return e.kind!=="ann"; }).forEach(function(e){
-    var s=e.s, a=e.a, kind=e.kind==="itv"?"면접·고사":"충원 마감";
+    var s=e.s, a=e.a, kind=KINDNAME[e.kind];
     var title="["+kind+"] "+(s.cls?s.cls+"반 ":"")+(s.name||"")+" · "+[(a.jc?"전문대 ":"")+shortUniv(a.univ), shortMajor(a.major)].filter(Boolean).join(" ");
     var desc=[a.univ, a.major, a.jh||a.type, "상태: "+(a.status||"지원완료")+(a.rank?" (예비 "+a.rank+")":""),
       a.kind==="수시"&&a.mreq?"수능최저: "+(minShort(a.mreq)||a.mreq)+(a.mmet&&a.mmet!=="미정"&&a.mmet!=="해당없음"?" ("+a.mmet+")":""):""].filter(Boolean).join("\n");
@@ -1884,11 +1897,11 @@ function renderCal(host, arr, showClass){
       b.appendChild(el("span",null,String(d.getDate())));
       var dots=el("span","gd"), kinds={};
       list.forEach(function(e){ kinds[e.kind]=(kinds[e.kind]||0)+1; });
-      ["itv","ann","due"].forEach(function(x){ if(kinds[x]) dots.appendChild(el("i",x)); });
+      ["itv","ann1","ann","due"].forEach(function(x){ if(kinds[x]) dots.appendChild(el("i",x)); });
       b.appendChild(dots);
       if(list.length>1) b.appendChild(el("span","gn",list.length+"건"));
       var tip=[]; if(keyd[k]) tip.push("[입시] "+keyd[k]);
-      list.forEach(function(e){ tip.push((e.kind==="itv"?"면접·고사":e.kind==="ann"?"발표":"충원 마감")+" · "+(showClass&&e.s.cls?e.s.cls+"반 ":"")+(e.s.name||"")+" "+shortUniv(e.a.univ)); });
+      list.forEach(function(e){ tip.push(kindName(e)+" · "+(showClass&&e.s.cls?e.s.cls+"반 ":"")+(e.s.name||"")+" "+shortUniv(e.a.univ)); });
       if(tip.length) b.title=tip.join("\n");
       if(list.length){ (function(k){ b.onclick=function(){ calSel=(calSel===k?null:k); render(); }; })(k); }
       else b.disabled=true;
@@ -1903,7 +1916,7 @@ function renderCal(host, arr, showClass){
     dl.appendChild(el("div","sday",(dd.getMonth()+1)+"/"+dd.getDate()+" ("+WD[dd.getDay()]+") — "+by[calSel].length+"건"));
     by[calSel].forEach(function(e){
       var it=el("div","sitem");
-      it.appendChild(el("span","sk "+e.kind,e.kind==="itv"?"면접·고사":e.kind==="ann"?"발표":"충원 마감"));
+      it.appendChild(el("span","sk "+e.kind,kindName(e)));
       var who=el("button","who",(showClass&&e.s.cls?e.s.cls+"반 ":"")+(e.s.name||""));
       who.onclick=function(){ goStudent(e.s); }; it.appendChild(who);
       it.appendChild(el("span","sub",[shortUniv(e.a.univ),shortMajor(e.a.major),e.a.type].filter(Boolean).join(" · ")));
@@ -1948,7 +1961,7 @@ function renderSched(host, arr, showClass){
       host.appendChild(h);
     }
     var row=el("div","sitem"), s=e.s, a=e.a;
-    row.appendChild(el("span","sk "+e.kind,e.kind==="itv"?"면접·고사":e.kind==="ann"?"발표":"충원 마감 "+fmtDue(a.due).split(" ")[1]));
+    row.appendChild(el("span","sk "+e.kind,kindName(e,true)));
     var who=el("button","who",(showClass&&s.cls?s.cls+"반 ":"")+(s.no?s.no+" ":"")+(s.name||""));
     who.title="이 학생 보기";
     who.onclick=function(){ goStudent(s); };
@@ -1970,6 +1983,7 @@ function pending(arr){
   var out=[], now=Date.now();
   arr.forEach(function(s){ (s.apps||[]).forEach(function(a){
     if(a.ann&&AWAIT[a.status||"지원완료"]&&daysTo(a.ann)<0) out.push({s:s,a:a,kind:"ann",when:a.ann,late:-daysTo(a.ann)});
+    else if(ann1Late(a)) out.push({s:s,a:a,kind:"ann1",when:a.ann1,late:-daysTo(a.ann1)});
     else if(a.due&&a.status==="충원대기"&&new Date(a.due).getTime()<now) out.push({s:s,a:a,kind:"due",when:a.due,late:Math.max(0,-daysTo(a.due))});
   }); });
   return out.sort(function(x,y){ return String(x.when).localeCompare(String(y.when))||(x.s.cls-y.s.cls)||String(x.s.no||"").localeCompare(String(y.s.no||"")); });
@@ -1987,18 +2001,18 @@ function renderTodo0(host, arr, showClass){
   hd.appendChild(el("h2",null,"결과 입력할 것"));
   hd.appendChild(el("span","cnt",list.length+"건"));
   host.appendChild(hd);
-  host.appendChild(el("div","shint","발표일(충원 마감)이 지났는데 결과가 들어오지 않은 지원입니다. 오른쪽에서 결과를 고르면 목록에서 빠집니다."));
+  host.appendChild(el("div","shint","발표일(1단계 발표·충원 마감)이 지났는데 결과가 들어오지 않은 지원입니다. 오른쪽에서 결과를 고르면 목록에서 빠집니다."));
   var LIMIT=12;
   list.slice(0,todoAll?list.length:LIMIT).forEach(function(e){
     var row=el("div","sitem"), s=e.s, a=e.a;
-    row.appendChild(el("span","sk late",e.kind==="ann"?"발표 "+mmdd(a.ann):"충원 마감 "+mmdd(a.due)));
+    row.appendChild(el("span","sk late",e.kind==="ann"?"발표 "+mmdd(a.ann):e.kind==="ann1"?"1단계 발표 "+mmdd(a.ann1):"충원 마감 "+mmdd(a.due)));
     var who=el("button","who",(showClass&&s.cls?s.cls+"반 ":"")+(s.no?s.no+" ":"")+(s.name||""));
     who.title="이 학생 보기";
     who.onclick=function(){ goStudent(s); };
     row.appendChild(who);
     row.appendChild(el("span","sub",[(a.jc?"전문대 ":"")+shortUniv(a.univ), shortMajor(a.major), a.kind==="정시"?(a.group&&!a.jc?a.group+"군":"정시"):(a.jh||a.type)].filter(Boolean).join(" · ")));
     if(e.late) row.appendChild(el("span","late",e.late+"일 지남"));
-    var opts=e.kind==="due"?["충원대기","충원합","불합격","등록완료","등록포기"]:STATUSES;
+    var opts=e.kind==="due"?["충원대기","충원합","불합격","등록완료","등록포기"]:e.kind==="ann1"?["지원완료","1단계합","1단계불"]:STATUSES;
     curCls=s.cls;
     row.appendChild(sel(opts,a.status||"지원완료",function(v){ a.status=v; save(st0(s)); render(); }));
     host.appendChild(row);
@@ -2436,7 +2450,7 @@ function printDoc(cls, arr){
       var kind=(a.jc?"전문대 ":"")+(a.kind==="정시"?(a.group&&!a.jc?a.group+"군":"정시"):"수시");
       var mn=a.kind==="수시"?((minShort(a.mreq)||"")+(a.mmet&&a.mmet!=="미정"&&a.mmet!=="해당없음"?" ("+a.mmet+")":"")):"";
       var stt=(a.status||"")+(a.status==="충원대기"&&a.rank?" 예비"+a.rank:"");
-      out.push('<tr><td>'+h(kind)+'</td><td>'+h(a.univ)+'</td><td>'+h(a.major)+'</td><td>'+h(a.jh||a.type)+'</td><td>'+h(mmdd(a.itv))+'</td><td>'+h(mmdd(a.ann))+'</td><td>'+h(mn)+'</td><td class="st">'+h(stt)+'</td></tr>');
+      out.push('<tr><td>'+h(kind)+'</td><td>'+h(a.univ)+'</td><td>'+h(a.major)+'</td><td>'+h(a.jh||a.type)+'</td><td>'+h(mmdd(a.itv))+'</td><td>'+h(annCell(a))+'</td><td>'+h(mn)+'</td><td class="st">'+h(stt)+'</td></tr>');
     });
     out.push('</tbody></table></div>');
   });
@@ -2498,7 +2512,7 @@ function printStudent(st){
   var ev=upcoming([st],9999);
   o.push('<h2>다가오는 일정</h2>');
   if(ev.length) o.push('<ul>'+ev.map(function(e){ var a=e.a, d=new Date(String(e.when).slice(0,10)+"T00:00:00");
-    return '<li>'+h((d.getMonth()+1)+"/"+d.getDate()+" ("+WD[d.getDay()]+") ")+'<b>'+h(e.kind==="itv"?"면접·고사":e.kind==="ann"?"발표":"충원 마감 "+fmtDue(a.due).split(" ")[1])+'</b> '+h(shortUniv(a.univ)+" "+shortMajor(a.major)+" "+(a.jh||a.type))+'</li>'; }).join("")+'</ul>');
+    return '<li>'+h((d.getMonth()+1)+"/"+d.getDate()+" ("+WD[d.getDay()]+") ")+'<b>'+h(kindName(e,true))+'</b> '+h(shortUniv(a.univ)+" "+shortMajor(a.major)+" "+(a.jh||a.type))+'</li>'; }).join("")+'</ul>');
   else o.push('<div class="na">오늘 이후 일정이 없습니다.</div>');
   // 수시
   o.push('<h2>수시 지원</h2>');
@@ -2512,7 +2526,7 @@ function printStudent(st){
         mn=h(minShort(a.mreq)||a.mreq)+(res&&res!=="미정"&&res!=="해당없음"?' · <span class="'+(res==="충족"?"ok":"bad")+'">'+h(res)+'</span>':'')+
           (!r.res&&hasCsat(st)&&!/없음/.test(minShort(a.mreq))?'<br><span class="na">'+h(r.why)+'</span>':'');
       }
-      o.push('<tr><td>'+h((a.jc?"전문대 ":"")+a.univ)+'</td><td>'+h(a.major)+'</td><td>'+h(a.jh||a.type)+'</td><td>'+h(mmdd(a.itv))+'</td><td>'+h(mmdd(a.ann))+'</td><td>'+mn+'</td><td>'+
+      o.push('<tr><td>'+h((a.jc?"전문대 ":"")+a.univ)+'</td><td>'+h(a.major)+'</td><td>'+h(a.jh||a.type)+'</td><td>'+h(mmdd(a.itv))+'</td><td>'+h(annCell(a))+'</td><td>'+mn+'</td><td>'+
         h((a.status||"지원완료")+(a.status==="충원대기"&&a.rank?" 예비"+a.rank:""))+'</td></tr>');
     });
     o.push('</table>');
@@ -2602,6 +2616,7 @@ function noticeText(st, days, cls){
     var a=e.a;
     if(e.kind==="itv") add(e.when, (a.type==="논술"?"논술":a.type==="실기"?"실기":"면접·고사")+" — "+nm(a));
     else if(e.kind==="ann") add(e.when, "합격자 발표 — "+nm(a));
+    else if(e.kind==="ann1") add(e.when, "1단계 합격자 발표 — "+nm(a));
     else add(e.when, "충원 합격 마감 — "+nm(a)+(a.rank?" (예비 "+a.rank+"번)":""));
   });
   var apps=st.apps||[], kd=function(id){ return KEYDATES.filter(function(k){ return k.id===id; })[0]; };
@@ -2866,7 +2881,7 @@ function goStudent(s){
 
 /* ── csv ───────────────────────────────────── */
 function csv(arr,name){
-  var head=["반","학번","이름","구분","대학구분","대학","모집단위","전형명","전형유형","군","6장포함","면접일","발표일","충원마감","상태","수능최저기준","최저충족","예비번호","메모","점검"];
+  var head=["반","학번","이름","구분","대학구분","대학","모집단위","전형명","전형유형","군","6장포함","1단계발표일","면접일","발표일","충원마감","상태","수능최저기준","최저충족","예비번호","메모","점검"];
   var lines=[head.join(",")];
   var q=function(v){ v=String(v==null?"":v); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
   arr.forEach(function(s){
@@ -2874,7 +2889,7 @@ function csv(arr,name){
     var apps=s.apps&&s.apps.length?s.apps:[{}];
     apps.forEach(function(a){
       lines.push([s.cls,s.no,s.name,a.kind||"",a.kind?(a.jc?"전문대":"4년제"):"",a.univ||"",a.major||"",a.jh||"",a.type||"",a.group||"",
-        a.c6?"Y":"N",a.itv||"",a.ann||"",a.due||"",a.status||"",a.mreq||"",a.mmet||"",a.rank||"",a.note||"",w].map(q).join(","));
+        a.c6?"Y":"N",a.ann1||"",a.itv||"",a.ann||"",a.due||"",a.status||"",a.mreq||"",a.mmet||"",a.rank||"",a.note||"",w].map(q).join(","));
     });
   });
   saveFile(name,"﻿"+lines.join("\r\n"));
@@ -3303,7 +3318,8 @@ var COLMAP=[
   ["c6",      /^(6장포함|6장|제한포함|6장제한)$/],
   ["itv",     /^(면접일|면접일자|면접날짜|면접)$/],
   ["exam",    /^(논술일자|논술일|실기일자|실기일|적성일자|적성일|고사일|대학별고사일)$/],
-  ["ann",     /^(발표일|발표일자|발표|합격자발표|합격자발표일|결과발표|결과발표일)$/],
+  ["ann1",    /^(1단계발표일|1단계발표|1단계합격자발표|1단계합격자발표일|1차발표일|1차발표|1차합격자발표|1차합격자발표일|서류발표일|서류합격자발표|서류합격자발표일)$/],
+  ["ann",     /^(발표일|발표일자|발표|합격자발표|합격자발표일|결과발표|결과발표일|최종발표일|최종발표|최종합격자발표|최종합격자발표일)$/],
   ["due",     /^(충원마감|충원마감일|충원|예비마감|충원기간)$/],
   ["status",  /^(상태|결과|합불|진행상태|합격여부)$/],
   ["mflag",   /^(수능최저유무|최저유무|수능최저여부|최저여부|수능최저적용|최저적용여부)$/],
@@ -3389,7 +3405,7 @@ function colKey(raw){
   for(var i=0;i<COLMAP.length;i++) if(COLMAP[i][1].test(b)) return COLMAP[i][0];
   var L=[["no",/학번|학생번호/],["name",/성명|이름|학생명/],["mmet",/충족/],["mreq",/수능최저|최저학력|최저기준/],
     ["type",/전형유형|전형구분|유형/],["jh",/전형/],["major",/모집단위|학과|전공|학부/],["itv",/면접/],
-    ["ann",/발표/],["due",/충원|추합/],["status",/상태|결과|합불|합격/],["rank",/예비|순위/],
+    ["ann1",/(1단계|1차|서류).*발표/],["ann",/발표/],["due",/충원|추합/],["status",/상태|결과|합불|합격/],["rank",/예비|순위/],
     ["note",/비고|메모|특이/],["group",/모집군/],["univ",/대학|학교/]];
   for(var j=0;j<L.length;j++) if(L[j][1].test(b)) return L[j][0];
   return null;
@@ -3423,10 +3439,10 @@ function pushApp(res, no, name, f, cls){
   var st=mapStatus(f.status);
   if(f.status&&!st){ res.notes.status++; res.notes.statusRaw.push((name||no)+" “"+str(f.status)+"”"); }
   if(!str(f.itv)&&f.exam) f.itv=f.exam;   // 논술·실기·적성 일자도 면접·고사일로
-  var itv=parseDate(f.itv,false), ann=parseDate(f.ann,false);
+  var itv=parseDate(f.itv,false), ann=parseDate(f.ann,false), ann1=parseDate(f.ann1,false);
   var due=parseDate(f.due,true);
   if(due&&/T00:00$/.test(due)) res.notes.due++;
-  [itv,ann,due].forEach(function(d){
+  [ann1,itv,ann,due].forEach(function(d){
     if(d&&!inYear(d)){ res.notes.oldDate++; if(res.notes.oldRaw.length<3) res.notes.oldRaw.push((name||no)+" "+shortUniv(str(f.univ))+" "+d.slice(0,10)); }
   });
   var yn=parseYN(f.c6);
@@ -3442,7 +3458,7 @@ function pushApp(res, no, name, f, cls){
     type:mapType(f.type)||mapType(f.jh)||(kind==="정시"?"정시":"학종"),
     group:(function(){var g=norm(f.group).replace(/군$/,""); return /^[가나다]$/.test(g)?g:"";})(),
     c6:(yn===null? kind==="수시" : yn),
-    itv:itv, ann:ann, due:due,
+    ann1:ann1, itv:itv, ann:ann, due:due,
     mreq:str(f.mreq), mmet:(kind==="정시"?"해당없음":(mapMin(f.mmet)||"미정")),
     status:st||"지원완료", rank:str(f.rank), note:str(f.note), region:str(f.region)}});
 }
@@ -3646,7 +3662,7 @@ function commitApps(byStudent, cls, res, source){
           (!x.jh || !a.app.jh || sameKey(x.jh)===sameKey(a.app.jh));
       })[0];
       if(same){
-        ["jh","group","itv","ann","due","rank","note","region"].forEach(function(k){ if(a.app[k]) same[k]=a.app[k]; });
+        ["jh","group","ann1","itv","ann","due","rank","note","region"].forEach(function(k){ if(a.app[k]) same[k]=a.app[k]; });
         if(a.given.status) same.status=a.app.status;
         if(a.given.type) same.type=a.app.type;
         if(a.given.c6) same.c6=a.app.c6;
@@ -3677,10 +3693,10 @@ function tmplRoster(){
 }
 function tmplApps(){
   var rows=[
-    ["학번","이름","구분","대학","모집단위","전형명","전형유형","군","6장포함","면접일","발표일","충원마감","상태","수능최저기준","최저충족","예비번호","메모"],
-    ["30201","예시 김민수","수시","부산대학교","수학교육과","학생부교과(학교장추천)","교과","","Y","","2026-12-12","","지원완료","국수영탐 중 2개합 5","미정","",""],
-    ["30201","예시 김민수","수시","경북대학교","통계학과","학생부종합(일반)","학종","","Y","2026-11-28","2026-12-12","2026-12-26 18:00","1단계합","해당없음","해당없음","",""],
-    ["30202","예시 이서연","정시","동아대학교","기계공학과","수능위주","정시","가","N","","","","지원완료","","","",""]
+    ["학번","이름","구분","대학","모집단위","전형명","전형유형","군","6장포함","1단계발표일","면접일","발표일","충원마감","상태","수능최저기준","최저충족","예비번호","메모"],
+    ["30201","예시 김민수","수시","부산대학교","수학교육과","학생부교과(학교장추천)","교과","","Y","","","2026-12-12","","지원완료","국수영탐 중 2개합 5","미정","",""],
+    ["30201","예시 김민수","수시","경북대학교","통계학과","학생부종합(일반)","학종","","Y","2026-11-20","2026-11-28","2026-12-12","2026-12-26 18:00","1단계합","해당없음","해당없음","",""],
+    ["30202","예시 이서연","정시","동아대학교","기계공학과","수능위주","정시","가","N","","","","","지원완료","","","",""]
   ];
   saveCsv(rows,"지원현황서식.csv");
 }

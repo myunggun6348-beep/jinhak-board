@@ -217,6 +217,8 @@ function buildTestPage() {
       gunJc: c(mk([{ kind: "정시", univ: "A", group: "가" }, { kind: "정시", univ: "B", jc: true }, { kind: "정시", univ: "C", jc: true }])).map((w) => w.code),
       gunNone: c(mk([{ kind: "정시", univ: "A" }])).map((w) => w.code),
       annPast: c(mk([{ kind: "수시", univ: "A", status: "면접완료", ann: "2020-01-01" }])).map((w) => w.code),
+      ann1Past: c(mk([{ kind: "수시", univ: "A", status: "지원완료", ann1: "2020-01-01", ann: "2099-12-01" }])).map((w) => w.code),
+      ann1Done: c(mk([{ kind: "수시", univ: "A", status: "1단계합", ann1: "2020-01-01", ann: "2099-12-01" }])).map((w) => w.code),
       annDone: c(mk([{ kind: "수시", univ: "A", status: "불합격", ann: "2020-01-01" }])).map((w) => w.code),
       dual: c(mk([{ kind: "수시", univ: "A", status: "등록완료" }, { kind: "수시", univ: "B", status: "등록완료" }])).map((w) => w.code),
       due: c(mk([{ kind: "수시", univ: "A", status: "충원대기", due: iso }])).map((w) => w.code),
@@ -238,6 +240,8 @@ function buildTestPage() {
   check("⑥ 수능최저 미충족", rules.minreq, ["최저 미충족"]);
   check("⑦ 발표일 지났는데 결과 미입력", rules.annPast, ["결과 미입력"]);
   check("⑦ 결과가 들어갔으면 경고 없음", rules.annDone, []);
+  check("⑦ 1단계 발표일 지났는데 지원완료면 결과 미입력", rules.ann1Past, ["결과 미입력"]);
+  check("⑦ 1단계 결과가 들어갔으면 경고 없음", rules.ann1Done, []);
   check("문제 없는 학생은 경고 없음", rules.clean, []);
 
   console.log("\n[수능최저 자동 판정]");
@@ -290,6 +294,9 @@ function buildTestPage() {
       { id: "b", kind: "수시", univ: "B", ann: day(-2), status: "1단계합" },
       { id: "c", kind: "수시", univ: "C", itv: day(5), status: "불합격" },
       { id: "e", kind: "수시", univ: "E", due: day(-1) + "T18:00", status: "충원대기" },
+      { id: "f", kind: "수시", univ: "F", ann1: day(4), itv: day(9), ann: day(30), status: "지원완료" },
+      { id: "g", kind: "수시", univ: "G", ann1: day(-1), status: "지원완료" },
+      { id: "h", kind: "수시", univ: "H", ann1: day(2), status: "1단계합" },
     ] };
     const enc = new TextEncoder();
     const folded = d.icsFold("SUMMARY:" + "가".repeat(80)).split("\r\n");
@@ -302,14 +309,18 @@ function buildTestPage() {
       pending: d.pending([st]).map((e) => e.a.id + e.kind),
       foldMax: Math.max(...folded.map((l) => enc.encode(l).length)),
       foldCont: folded.slice(1).every((l) => l[0] === " "),
+      notice: d.noticeText(st, 14, 2),
+      ann1Read: (() => { const a = d.readApps([["이름", "대학", "1단계 발표일", "최종발표일"], ["김기현", "부산대학교", "11/20", "12/12"]]).apps[0].app; return [a.ann1, a.ann]; })(),
       jungsi: [j.pass.length, j.gun["가"].length, j.jc.length].join(","),
     };
   });
   check("대학 표기 묶기(국립·줄임말)", misc.univSame, true);
   check("캠퍼스가 다르면 따로", misc.campusApart, true);
   check("학과 끝말·괄호 무시하고 묶기", misc.majorSame, true);
-  check("다가오는 일정: 불합격 면접은 빼고", misc.upcoming, ["aitv"]);
-  check("결과 입력할 것: 지난 발표·지난 충원 마감", misc.pending, ["bann", "edue"]);
+  check("다가오는 일정: 불합격 면접은 빼고, 1단계 발표는 결과 전만", misc.upcoming, ["aitv", "fann1", "fitv"]);
+  check("결과 입력할 것: 지난 발표·1단계 발표·충원 마감", misc.pending, ["bann", "gann1", "edue"]);
+  check("일정 안내 문자에 1단계 발표", /1단계 합격자 발표 — F/.test(misc.notice), true);
+  check("파일 읽기: 1단계 발표일·최종 발표일 따로", misc.ann1Read, ["2026-11-20", "2026-12-12"]);
   check("달력 줄 75바이트 안으로 접기", misc.foldMax <= 75 && misc.foldCont, true);
   check("정시 현황: 수시 합격·가군·전문대 구분", misc.jungsi, "1,1,1");
 
