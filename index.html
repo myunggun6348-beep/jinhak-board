@@ -386,14 +386,30 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
 .kdlist .src{font-size:11px; color:var(--ink-3); margin-top:6px}
 .tdot{display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:5px; vertical-align:1px; background:var(--ink-3)}
 .t-hj,.gbar .gt .t-hj{background:#4C7BD9} .t-gk,.gbar .gt .t-gk{background:#1E9E8A} .t-ns,.gbar .gt .t-ns{background:#8A5CD6} .t-sg,.gbar .gt .t-sg{background:#D6577F} .t-js,.gbar .gt .t-js{background:#C9862B}
-.glance{border:1px solid var(--line); border-radius:var(--radius); background:var(--surface); padding:12px 14px; margin-bottom:18px}
-.glance .gh{display:flex; align-items:center; gap:8px; flex-wrap:wrap}
-.glance .gh h2{font-size:14px; font-weight:700; margin:0}
+.glance{margin-bottom:18px}
+.glance .gh{display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:10px}
+.glance .gh h2{font-size:15px; font-weight:700; margin:0}
 .glance .gh .sp{margin-left:auto}
-.ggrid{display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:12px 22px; margin-top:10px}
-.gcard h3{font-size:12.5px; font-weight:700; margin:0 0 8px; color:var(--ink-2)}
-.gstack{display:flex; height:16px; border-radius:5px; overflow:hidden; background:var(--surface-2)}
+.gtile{border:1px solid var(--line); border-radius:12px; background:var(--surface); padding:14px 16px; min-width:0}
+.gtile h3{font-size:13px; font-weight:700; margin:0; color:var(--ink)}
+.gth{display:flex; align-items:baseline; flex-wrap:wrap; gap:4px 10px; margin-bottom:12px}
+.gth .gsub{font-size:12px; color:var(--ink-3)}
+.gth .glegend{margin:0 0 0 auto}
+.grow3{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin-top:12px}
+.grow3.two{grid-template-columns:repeat(2,minmax(0,1fr))}
+.gcalwrap{margin-top:12px}
+.gstack{display:flex; gap:2px; height:14px; border-radius:7px; overflow:hidden}
 .gstack span{display:block; height:100%}
+.gkpis{display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:8px; margin-top:12px}
+.gk{display:flex; flex-direction:column; gap:2px; padding:9px 12px; border-radius:10px; background:var(--surface-2)}
+.gk .l{display:flex; align-items:center; gap:6px; font-size:12px; color:var(--ink-2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.gk .l i{flex:none; width:8px; height:8px; border-radius:50%}
+.gk .v{font-size:21px; font-weight:800; color:var(--ink); font-variant-numeric:tabular-nums; line-height:1.2}
+.gk .v small{font-size:12px; font-weight:500; color:var(--ink-3); margin-left:4px}
+.gk.zero .v{color:var(--ink-3)}
+.gempty{font-size:12.5px; color:var(--ink-3); padding:6px 0}
+.gtile .gbar{padding:6px 0; font-size:12.5px} .gtile .gbar .gt{height:12px; border-radius:6px} .gtile .gbar .gt span{border-radius:6px}
+@media (max-width:900px){ .grow3,.grow3.two{grid-template-columns:1fr} .gkpis{grid-template-columns:repeat(3,minmax(0,1fr))} .gth .glegend{margin-left:0} }
 .glegend{display:flex; flex-wrap:wrap; gap:4px 12px; margin-top:8px; font-size:12px; color:var(--ink-2)}
 .glegend i{display:inline-block; width:9px; height:9px; border-radius:2px; margin-right:5px; vertical-align:-1px}
 .glegend b{color:var(--ink); margin-left:3px}
@@ -404,18 +420,20 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
 .gbar .gt span{display:block; height:100%; border-radius:3px; background:var(--accent-2)}
 .gbar .gv{text-align:right; font-variant-numeric:tabular-nums; color:var(--ink)}
 .gbar .gv small{color:var(--ink-3); margin-left:3px}
-.ghist{display:flex; align-items:flex-end; gap:6px; height:84px; padding-top:14px}
+.ghist{display:flex; align-items:flex-end; gap:6px; height:104px; padding-top:14px; border-bottom:1px solid var(--line)}
 .ghist .hc{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; font-size:11px; color:var(--ink-2)}
-.ghist .hb{width:100%; max-width:34px; border-radius:4px 4px 0 0; background:var(--accent-2); min-height:2px}
+.ghist .hb{width:100%; max-width:30px; border-radius:5px 5px 0 0; background:var(--accent-2); min-height:3px}
+.ghist .hb.zero{background:var(--line)}
 .ghist .hb.low{background:var(--warn)}
 .ghist .hn{font-weight:700; color:var(--ink); font-size:11.5px; margin-bottom:2px}
-.ghist .hx{margin-top:4px; color:var(--ink-3)}
-.gcal{display:flex; flex-wrap:wrap; gap:14px 22px; margin-top:12px}
+.ghist .hx{margin-top:4px; color:var(--ink-3); position:relative; top:22px}
+.ghist{margin-bottom:24px}
+.gcal{display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:16px 32px}
 .gmon h3{font-size:12.5px; font-weight:700; margin:0 0 6px}
-.gmon table{border-collapse:collapse; min-width:0; width:auto}
+.gmon table{border-collapse:collapse; min-width:0; width:100%; table-layout:fixed}
 .gmon th{font-size:10.5px; font-weight:400; color:var(--ink-3); padding:0 0 3px; text-align:center; background:none; border:0}
 .gmon td{padding:1px; border:0; text-align:center}
-.gday{width:34px; height:34px; border:1px solid transparent; border-radius:7px; background:none; color:var(--ink-2); font-size:11.5px; padding:2px 0 0; display:flex; flex-direction:column; align-items:center; gap:1px; cursor:default; font-family:inherit}
+.gday{width:100%; max-width:46px; margin:0 auto; height:40px; border:1px solid transparent; border-radius:7px; background:none; color:var(--ink-2); font-size:11.5px; padding:2px 0 0; display:flex; flex-direction:column; align-items:center; gap:1px; cursor:default; font-family:inherit}
 .gday.past{color:var(--ink-3); opacity:.55}
 .gday.today{border-color:var(--accent)}
 .gday.has{cursor:pointer; background:var(--surface-2); color:var(--ink); font-weight:700}
@@ -427,7 +445,7 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
 .gday .gn{font-size:9.5px; font-weight:700; line-height:1}
 .gdaylist{margin-top:10px}
 .urow td .ubar{display:inline-block; height:7px; border-radius:2px; background:var(--accent-2); opacity:.45; margin-right:8px; vertical-align:1px}
-@media (max-width:560px){ .gday{width:38px; height:38px} .gbar{grid-template-columns:54px 1fr 58px} }
+@media (max-width:560px){ .gday{height:38px} .gbar{grid-template-columns:54px 1fr 58px} }
 .ncard{border-top:1px solid var(--line); padding:10px 0}
 .ncard:first-of-type{border-top:0}
 .ncard .nh{display:flex; align-items:center; gap:8px; margin-bottom:6px}
@@ -1864,39 +1882,46 @@ function renderGlance(host, arr, showClass){
   hd.appendChild(tg); host.appendChild(hd);
   if(!glanceOpen) return;
   if(!D.n){ host.appendChild(el("div","sempty","지원 현황 파일을 넣으면 결과·전형·지역 그래프와 일정 달력이 나옵니다.")); return; }
-  var grid=el("div","ggrid");
+  var tile=function(title,sub){ var t=el("div","gtile"), h=el("div","gth"); h.appendChild(el("h3",null,title)); if(sub) h.appendChild(el("span","gsub",sub)); t.appendChild(h); return t; };
 
-  // 결과 진행
-  var c1=el("div","gcard"); c1.appendChild(el("h3",null,"결과 진행 (지원 "+D.n+"건)"));
-  var parts=[["ok","합격"],["wait","충원 대기"],["go","1단계 합격·면접 완료"],["bad","불합격"],["none","결과 기다림"]];
+  // 결과 진행: 막대 하나 + 숫자 칸 다섯
+  var parts=[["ok","합격"],["wait","충원 대기"],["go","1단계·면접 통과"],["bad","불합격"],["none","결과 기다림"]];
+  var c1=tile("결과 진행","지원 "+D.n+"건 · 결과가 난 지원 "+(D.R.ok+D.R.bad)+"건");
   var st=el("div","gstack");
-  parts.forEach(function(p){ if(!D.R[p[0]]) return; var s=el("span","c-"+p[0]); s.style.width=(D.R[p[0]]/D.n*100)+"%"; s.title=p[1]+" "+D.R[p[0]]+"건"; st.appendChild(s); });
+  parts.forEach(function(p){ if(!D.R[p[0]]) return; var s=el("span","c-"+p[0]); s.style.flex=String(D.R[p[0]]); s.title=p[1]+" "+D.R[p[0]]+"건"; st.appendChild(s); });
   c1.appendChild(st);
-  var lg=el("div","glegend");
-  parts.forEach(function(p){ var x=el("span"); x.appendChild(el("i","c-"+p[0])); x.appendChild(document.createTextNode(p[1])); x.appendChild(el("b",null,String(D.R[p[0]]))); lg.appendChild(x); });
-  c1.appendChild(lg);
-  // 지원 장수
-  c1.appendChild(el("h3",null,"학생별 수시 지원 장수")).style.marginTop="14px";
+  var kp=el("div","gkpis");
+  parts.forEach(function(p){
+    var v=D.R[p[0]], k=el("div","gk"+(v?"":" zero")), l=el("span","l");
+    l.appendChild(el("i","c-"+p[0])); l.appendChild(document.createTextNode(p[1])); k.appendChild(l);
+    var n=el("span","v",String(v)); n.appendChild(el("small",null,Math.round(v/D.n*100)+"%")); k.appendChild(n);
+    kp.appendChild(k);
+  });
+  c1.appendChild(kp);
+  host.appendChild(c1);
+
+  // 지원 장수 · 전형별 · 지역별: 고른 칸으로
+  var row=el("div","grow3");
+  var low=D.H.slice(0,6).reduce(function(x,y){ return x+y; },0);
+  var c2=tile("학생별 수시 지원 장수",low?"6장 미만 "+low+"명":"모두 6장");
   var hs=el("div","ghist"), hmax=Math.max.apply(null,D.H.concat([1]));
   D.H.forEach(function(v,i){
     var c=el("div","hc"); c.title=i+(i===6?"장 이상":"장")+" 지원: "+v+"명";
     c.appendChild(el("span","hn",v?String(v):""));
-    var b=el("span","hb"+(i<6&&v?" low":"")); b.style.height=Math.round(v/hmax*56)+"px"; c.appendChild(b);
+    var b=el("span","hb"+(!v?" zero":i<6?" low":"")); b.style.height=(v?Math.round(v/hmax*72):3)+"px"; c.appendChild(b);
     c.appendChild(el("span","hx",i+"장")); hs.appendChild(c);
   });
-  c1.appendChild(hs);
-  var low=D.H.slice(0,6).reduce(function(x,y){ return x+y; },0);
-  if(low) c1.appendChild(el("div","shint","6장을 다 쓰지 않은 학생 "+low+"명 (주황 막대)"));
-  grid.appendChild(c1);
-
-  // 전형별
-  var c2=el("div","gcard"); c2.appendChild(el("h3",null,"전형별"));
-  gBars(c2, D.T, ["학종","교과","논술","실기","정시"], function(k){ return TYPEDOT[k]||""; });
-  // 지역별
-  c2.appendChild(el("h3",null,"지역별")).style.marginTop="14px";
-  gBars(c2, D.G, null);
-  grid.appendChild(c2);
-  host.appendChild(grid);
+  c2.appendChild(hs);
+  if(low) c2.appendChild(el("div","shint","주황 막대: 6장을 다 쓰지 않은 학생"));
+  row.appendChild(c2);
+  var c3=tile("전형별");
+  gBars(c3, D.T, ["학종","교과","논술","실기","정시"], function(k){ return TYPEDOT[k]||""; });
+  row.appendChild(c3);
+  // 지역은 파일에 지역 칸이나 대학 이름 뒤 (부산) 같은 표시가 있을 때만 안다
+  if(Object.keys(D.G).some(function(k){ return k!=="미상"; })){
+    var c4=tile("지역별"); gBars(c4, D.G, null); row.appendChild(c4);
+  } else row.className="grow3 two";
+  host.appendChild(row);
 
   // 달력
   renderCal(host, arr, showClass);
@@ -1910,12 +1935,12 @@ function renderCal(host, arr, showClass){
   var months=[], m=new Date(today.getFullYear(),today.getMonth(),1);
   while(m<=last&&months.length<3){ months.push(new Date(m)); m=new Date(m.getFullYear(),m.getMonth()+1,1); }
   if(!months.length) months.push(new Date(today.getFullYear(),today.getMonth(),1));
-  var wrap=el("div","gcard"); wrap.style.marginTop="14px";
-  var h=el("h3",null,"면접·고사·발표 달력"); wrap.appendChild(h);
-  var lg=el("div","glegend"); lg.style.marginTop="0";
+  var wrap=el("div","gtile gcalwrap"), gh=el("div","gth");
+  gh.appendChild(el("h3",null,"면접·고사·발표 달력")); gh.appendChild(el("span","gsub","날짜를 누르면 그날 일정"));
+  var lg=el("div","glegend");
   [["c-go","면접·고사"],["c-ok","발표"],["c-wait","충원 마감"]].forEach(function(p){ var x=el("span"); x.appendChild(el("i",p[0])); x.appendChild(document.createTextNode(p[1])); lg.appendChild(x); });
-  var kx=el("span"); kx.style.color="var(--bad)"; kx.textContent="빨간 날짜: 입시 공통 일정"; lg.appendChild(kx);
-  wrap.appendChild(lg);
+  var kx=el("span"); kx.style.color="var(--bad)"; kx.textContent="빨간 날짜: 입시 공통 일정";  lg.appendChild(kx);
+  gh.appendChild(lg); wrap.appendChild(gh);
   var cal=el("div","gcal");
   months.forEach(function(m0){
     var box=el("div","gmon"); box.appendChild(el("h3",null,m0.getFullYear()+"년 "+(m0.getMonth()+1)+"월"));
