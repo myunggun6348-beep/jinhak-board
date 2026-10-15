@@ -201,6 +201,17 @@ body.landing .gate{margin-top:10px}
 .alert.crit{border-left-color:var(--bad); background:var(--bad-soft)}
 .alert b{font-weight:700}
 .alert .who{font-weight:700; white-space:nowrap}
+.alert.grp{display:grid; grid-template-columns:150px minmax(0,1fr); gap:6px 14px; padding:11px 14px; align-items:start}
+.alert.grp .stu{display:flex; flex-direction:column; align-items:flex-start; gap:3px; border:0; background:none; padding:0; font:inherit; color:var(--ink); cursor:pointer; text-align:left}
+.alert.grp .stu b{font-size:14px} .alert.grp .stu:hover b{text-decoration:underline}
+.alert.grp .stu span{font-size:11.5px; color:var(--ink-3)}
+.alert.grp ul{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:5px}
+.alert.grp li{display:flex; gap:8px; align-items:baseline; color:var(--ink-2); line-height:1.5}
+.alert.grp li + li{border-top:1px dashed var(--line-2); padding-top:5px}
+.alert .wc{flex:none; font-size:11.5px; font-weight:700; padding:1px 7px; border-radius:5px; background:var(--surface); color:var(--warn); border:1px solid currentColor}
+.alert .wc.crit{color:var(--bad)}
+.alerts .amore{align-self:flex-start}
+@media (max-width:560px){ .alert.grp{grid-template-columns:1fr} .alert.grp .stu{flex-direction:row; align-items:baseline; gap:8px} }
 .alert .msg{color:var(--ink-2)}
 .alert .msg strong{color:var(--ink); font-weight:700}
 
@@ -1255,23 +1266,35 @@ function renderStats(host, arr){
     d.appendChild(n1); d.appendChild(k); host.appendChild(d);
   });
 }
+var alertsAll=false;
 function renderAlerts(host, arr, showClass){
   host.innerHTML="";
-  var items=[];
-  arr.forEach(function(s){
-    checkStudent(s).forEach(function(w){ items.push({s:s,w:w}); });
+  var groups=[];
+  arr.forEach(function(st){
+    var w=checkStudent(st); if(!w.length) return;
+    w.sort(function(x,y){ return (x.lv==="crit"?0:1)-(y.lv==="crit"?0:1); });
+    groups.push({s:st, w:w, crit:w.some(function(x){ return x.lv==="crit"; })});
   });
-  items.sort(function(a,b){ return (a.w.lv==="crit"?0:1)-(b.w.lv==="crit"?0:1); });
-  items.slice(0,12).forEach(function(it){
-    var a=el("div","alert"+(it.w.lv==="crit"?" crit":""));
-    var who=el("span","who",(showClass?it.s.cls+"반 ":"")+it.s.name);
-    var m=el("span","msg");
-    var b=el("strong",null,it.w.code); m.appendChild(b); m.appendChild(document.createTextNode(" · "+it.w.msg));
-    a.appendChild(who); a.appendChild(m); host.appendChild(a);
+  groups.sort(function(x,y){ return (y.crit-x.crit)||(y.w.length-x.w.length)||((x.s.cls||0)-(y.s.cls||0))||String(x.s.no||"").localeCompare(String(y.s.no||"")); });
+  var LIMIT=8;
+  groups.slice(0,alertsAll?groups.length:LIMIT).forEach(function(g){
+    var box=el("div","alert grp"+(g.crit?" crit":""));
+    var who=el("button","stu"); who.type="button"; who.title="이 학생 보기";
+    who.appendChild(el("b",null,(showClass&&g.s.cls?g.s.cls+"반 ":"")+(g.s.name||"")));
+    who.appendChild(el("span",null,[g.s.no||"","경고 "+g.w.length].filter(Boolean).join(" · ")));
+    who.onclick=function(){ goStudent(g.s); };
+    var ul=document.createElement("ul");
+    g.w.forEach(function(w){
+      var li=document.createElement("li");
+      li.appendChild(el("span","wc"+(w.lv==="crit"?" crit":""),w.code));
+      li.appendChild(el("span",null,w.msg)); ul.appendChild(li);
+    });
+    box.appendChild(who); box.appendChild(ul); host.appendChild(box);
   });
-  if(items.length>12){
-    var more=el("div","alert","그 밖에 "+(items.length-12)+"건의 경고가 더 있습니다.");
-    host.appendChild(more);
+  if(groups.length>LIMIT){
+    var m=el("button","ghost amore",alertsAll?"접기":"경고가 있는 학생 "+(groups.length-LIMIT)+"명 더 보기");
+    m.onclick=function(){ alertsAll=!alertsAll; render(); };
+    host.appendChild(m);
   }
 }
 /* ── 짧게 보여주기 ─────────────────────────────

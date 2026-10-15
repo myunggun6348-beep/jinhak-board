@@ -395,6 +395,8 @@ function buildTestPage() {
   await p.click("#brandHome"); await p.waitForTimeout(200);
   check("제목 누르면 홈(우리 반 맨 위, 펼친 학생 닫힘)", await p.evaluate(() => [!document.getElementById("viewClass").hidden, document.querySelectorAll(".detail").length]), [true, 0]);
 
+  check("경고는 학생마다 한 칸(이름·경고 수)", await p.evaluate(() => { const g = [...document.querySelectorAll("#alerts .alert.grp")]; return g.length > 0 && g.every((x) => x.querySelector(".stu b") && x.querySelectorAll("li").length >= 1); }), true);
+
   /* ── 자료 지키기(백업 알림) ── */
   const bb = () => p.evaluate(() => { const b = document.getElementById("backupBar"); return [!b.hidden, b.classList.contains("due"), b.textContent]; });
   let B1 = await bb();
