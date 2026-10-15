@@ -493,6 +493,7 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
     <button role="tab" id="tabAll" aria-selected="false">전체 현황</button>
   </div>
   <div class="sync"><span class="dot" id="syncDot"></span><span id="syncText">연결 중</span></div>
+  <button class="ghost helpbtn" id="btnHome" type="button" hidden title="이 컴퓨터가 기억한 학교·혼자 쓰기 설정을 풀고 시작 화면으로 갑니다. 자료는 지워지지 않습니다">⌂ 처음 화면</button>
   <button class="ghost helpbtn" id="btnHelp" type="button">사용 설명서</button>
   <div class="whochip" id="whoChip" hidden></div>
 </div>
@@ -523,7 +524,7 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
   <h3>알아 둘 것</h3>
   <ul>
     <li>학교 코드를 잃어버리면 자료를 열 수 없습니다. 관리자는 전체 현황 맨 아래에서 다시 볼 수 있습니다.</li>
-    <li>여럿이 쓰는 컴퓨터에서는 '코드 기억'을 끄고, 다 쓰면 위쪽 <b>나가기</b>.</li>
+    <li>여럿이 쓰는 컴퓨터에서는 '코드 기억'을 끄고, 다 쓰면 위쪽 <b>⌂ 처음 화면</b>.</li>
     <li>Claude 앱 안의 창에서는 구글 로그인이 막힙니다. 크롬·엣지로 여세요.</li>
     <li>화면이 이상하면 <b>Ctrl+F5</b>(새로고침).</li>
   </ul>
@@ -3007,6 +3008,7 @@ function bindStatic(){
   document.getElementById("mergeFile").onchange=function(){ var fl=[].slice.call(this.files||[]); this.value=""; if(fl.length) mergeFiles(fl); };
   document.getElementById("btnClassFile").onclick=classFile;
   document.getElementById("btnHelp").onclick=openHelp;
+  document.getElementById("btnHome").onclick=goHome;
   document.getElementById("restoreFile").onchange=function(){
     var f=this.files&&this.files[0]; this.value="";
     if(!f) return;
@@ -3798,12 +3800,23 @@ function setLocalMode(v){ try{ if(v) localStorage.setItem("jh.mode",v); else loc
 // 혼자 쓰는 중에도 학교 장부로 옮길 수 있게 위쪽에 단추를 둔다
 function showLocalChip(){
   if(!useFirebase()) return;
+  document.getElementById("btnHome").hidden=false;
   var chip=document.getElementById("whoChip"); chip.hidden=false; chip.innerHTML="";
   chip.appendChild(el("span",null,"혼자 쓰기 · 이 컴퓨터에만 저장"));
   var go=el("button","ghost","학교 장부로");
   go.title="학교 코드로 들어가 다른 선생님과 함께 씁니다. 이 브라우저 자료는 들어갈 때 올릴지 묻습니다";
   go.onclick=function(){ setLocalMode(""); location.reload(); };
   chip.appendChild(go);
+}
+// 처음 화면으로 완전히. 담임의 익명 로그인은 남긴다(풀면 가입이 사라져 다시 승인받아야 한다).
+function goHome(){
+  var msg=school?"처음 화면으로 돌아갑니다. 이 컴퓨터가 기억한 학교 코드를 지웁니다(학교 자료는 그대로). 다시 들어오려면 초대 링크나 학교 코드가 필요합니다"+(myMail()?". 관리자 구글 로그인도 풀립니다":"")+".":
+    localMode()==="local"?"처음 화면으로 돌아갑니다. 이 브라우저 자료는 그대로 남고, 혼자 쓰기를 다시 고르면 이어서 씁니다.":"";
+  if(msg&&!window.confirm(msg)) return;
+  try{ localStorage.removeItem(CODE_KEY); }catch(e){}
+  setLocalMode("");
+  var go=function(){ location.replace(location.pathname+location.search); };
+  if(fb&&myMail()) fb.U.signOut(fb.auth).then(go,go); else go();
 }
 function startPractice(){
   setSync("","예시 화면 · 아직 저장된 자료 없음");
@@ -3919,6 +3932,7 @@ function encDb(K){
   };
 }
 function startFirebase(){
+  document.getElementById("btnHome").hidden=false;
   setSync("","공용 장부 연결 중");
   canWrite=false;
   loadFirebase().then(function(m){
@@ -4152,10 +4166,7 @@ function enterSchool(K,code,info,admin,cls){
   chip.appendChild(el("span",null,(school.name||"학교")+" · "+(admin?"관리자":(cls?cls+"반 ":"")+(myName()||"선생님"))));
   var pend=el("button","btn sec"); pend.id="pendBtn"; pend.hidden=true;
   pend.onclick=function(){ switchTab(false); document.getElementById("schoolPanel").scrollIntoView({block:"start"}); };
-  var out=el("button","ghost","나가기"); out.title="이 컴퓨터에서 학교 코드를 지우고 나갑니다";
-  out.onclick=function(){ if(!window.confirm("이 컴퓨터에서 학교 코드를 지우고 나갑니다. 다시 들어오려면 코드를 넣어야 합니다. 계속할까요?")) return;
-    try{ localStorage.removeItem(CODE_KEY); }catch(e){} codeGate(); };
-  chip.appendChild(pend); chip.appendChild(out);
+  chip.appendChild(pend);
   var b=document.getElementById("banner"); b.hidden=true; b.className="banner";
   if(!admin&&!cls) showGate("담당 반이 정해지지 않았습니다","관리자에게 담당 반을 정해 달라고 하세요. 정해지면 이 화면이 저절로 바뀝니다.",[]);
   setSync("","자료 불러오는 중");
