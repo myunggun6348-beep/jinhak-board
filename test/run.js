@@ -649,8 +649,47 @@ function buildTestPage() {
     const r = await x.evaluate(() => ({ msg: document.querySelector("#csatPanel .acnog").textContent, g: window.__dev.students().map((s) => [s.no, s.csat]), nudge: !document.getElementById("csatNudge").hidden }));
     const gOf = (no) => (r.g.find((y) => y[0] === no) || [])[1] || {};
     check("붙여넣기: 머리줄 건너뛰고 학번으로 맞춤(순서 섞여도), 빈칸은 자리 지킴", [gOf("30201").kor, gOf("30201").inq1, gOf("30201").inq2, gOf("30201").his, gOf("30202").kor, gOf("30203").kor, gOf("30201").src], ["2", undefined, "4", undefined, "5", undefined, "가채점"]);
-    check("붙여넣기 안내: 넣은 학생·못 찾은 줄·잘못된 칸", /학생 2명.*학번·이름으로 맞춤.*못 찾은 줄 1개: 30299 없는학생.*1~9가 아닌 칸 1개/.test(r.msg), true);
+    check("붙여넣기 안내: 넣은 학생·못 찾은 줄·잘못된 칸", /학생 2명.*학번·이름으로 맞춤.*못 찾은 줄 1개: 30299 없는학생.*(1~9가 아닌|알아보지 못한) 칸 1개/.test(r.msg), true);
     check("등급을 다 넣으면 맨 위 알림이 사라짐", r.nudge, false);
+    await c.close();
+  }
+  /* 성적 통지 날(12/11): 가채점 학생 알림 → 학교 성적 엑셀(두 줄 머리, 과목마다 선택·표점·백분위·등급) 통째로 붙여넣기 */
+  console.log("\n[성적 통지 날 성적표 넣기]");
+  {
+    const c = await browser.newContext({ viewport: { width: 1200, height: 900 } });
+    const x = await c.newPage(); x.on("pageerror", (e) => errors.push(String(e))); x.on("dialog", (d) => d.dismiss());
+    await x.clock.install({ time: new Date("2026-12-11T10:00:00+09:00") });
+    const G = { kor: "3", math: "3", eng: "4", inq1: "4", inq2: "4", his: "4", src: "가채점" };
+    const A = (no, name) => ({ id: no, cls: 2, no, name, csat: { ...G }, apps: [{ id: "a" + no, kind: "수시", univ: "부산대학교", major: "경영학과", type: "교과", ann: "2026-12-12", status: "지원완료", c6: true, mmet: "미충족", mreq: "국수영탐(1과목) 중 2개합 5" }] });
+    await x.addInitScript((s) => { if (sessionStorage.getItem("seeded")) return; sessionStorage.setItem("seeded", "1");
+      localStorage.setItem("jh.local.students", JSON.stringify(s)); localStorage.setItem("jh.cls", "2"); localStorage.setItem("jh.mycls", "2"); localStorage.setItem("jh.mode", "local"); },
+      [A("30201", "가나"), A("30202", "다라")]);
+    await x.goto("file://" + page404); await x.waitForTimeout(600);
+    const nudge = await x.$eval("#csatNudge", (e) => !e.hidden && e.textContent);
+    check("성적 통지 날 맨 위 알림: 아직 가채점인 학생", /성적표가 나왔습니다.*2명: 가나, 다라/.test(nudge || ""), true);
+    await x.click("#csatNudge button"); await x.waitForTimeout(200);
+    const seg = await x.$$eval("#csatPanel .seg button", (b) => b.filter((y) => y.getAttribute("aria-pressed") === "true").map((y) => y.textContent));
+    check("성적 통지 날엔 '성적표'가 기본", seg, ["등급(수시 최저)", "성적표"]);
+    await x.click("#csatPanel button:has-text('표준점수')"); await x.waitForTimeout(200);
+    const paste = (t) => x.evaluate((t) => { const i = document.querySelector("#csatPanel input.g"); const dt = new DataTransfer(); dt.setData("text", t);
+      i.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true })); }, t);
+    await paste(["번호	성명	국어				수학				영어	한국사	탐구1				탐구2			",
+      "		선택	표준점수	백분위	등급	선택	표준점수	백분위	등급	등급	등급	과목	표준점수	백분위	등급	과목	표준점수	백분위	등급",
+      "30202	다라	화작	124	82	3	확률과 통계	131	91	2	2	4	생활과 윤리	67	95	2	사회·문화	62	85	3",
+      "30201	가나	언매	131	92	2	미적분	128	88	3	2	3	물리학Ⅰ	64	88	결시	화학Ⅰ	66	93	2"].join("\r\n"));
+    await x.waitForTimeout(300);
+    const r = await x.evaluate(() => ({ msg: document.querySelector("#csatPanel .acnog").textContent, s: window.__dev.students(), nudge: !document.getElementById("csatNudge").hidden }));
+    const S = (no) => r.s.find((y) => y.no === no);
+    const a = S("30201").csat, b = S("30202").csat;
+    check("성적표 통째로: 두 줄 머리 읽고 학번으로 맞춤(등급·표점·백분위·선택과목)", [a.kor, a.korS, a.korP, a.math, a.mathS, a.mathSel, a.eng, a.his, a.inq1S, a.inq1t, a.inq2, a.inq2t, a.src, b.mathSel, b.inq1t, b.inq2t, b.mathP],
+      ["2", "131", "92", "3", "128", "미적", "2", "3", "64", "과", "2", "과", "성적표", "확통", "사", "사", "91"]);
+    check("성적표 통째로: 결시 칸은 넣지 않고 가채점 등급 그대로, 알림", [a.inq1, /학생 2명.*등급·표준점수·백분위·선택과목.*알아보지 못한 칸 1개/.test(r.msg)], ["4", true]);
+    check("성적표로 최저 다시 판정, 맨 위 알림 사라짐", [S("30201").apps[0].mmet, S("30202").apps[0].mmet, r.nudge], ["충족", "충족", false]);
+    // 머리줄 없이 학번·이름 + 8칸, 순서 섞임
+    await paste(["30202	다라	120	80	130	90	60	84	61	83", "30201	가나	130	91	127	87	63	87	65	92"].join("\n"));
+    await x.waitForTimeout(300);
+    const r2 = await x.evaluate(() => window.__dev.students().map((y) => [y.no, y.csat.korS, y.csat.inq2P]));
+    check("표준점수 붙여넣기: 머리줄 없어도 학번으로 맞춤", r2.sort(), [["30201", "130", "92"], ["30202", "120", "83"]]);
     await c.close();
   }
   check("자바스크립트 오류 없음", errors, []);

@@ -2519,55 +2519,126 @@ function renderAfterCsat(host, arr, showClass){
     host.appendChild(ng);
   }
 }
-/* 수능이 끝났는데 등급이 없어 응시 판단을 못 하는 학생이 있으면 반 화면 맨 위에서 알린다 */
+/* 수능이 끝났는데 등급이 없어 응시 판단을 못 하는 학생이 있으면 반 화면 맨 위에서 알린다.
+   성적표가 나온 뒤(12/11~정시 원서 마감)에는 아직 가채점이거나 성적이 없는 학생을 알린다. */
 function renderCsatNudge(host, mine){
-  var need=[], n=0;
-  if(daysTo(csatDay())<=0) mine.forEach(function(st){
+  var kd=function(id){ return KEYDATES.filter(function(k){ return k.id===id; })[0]; }, sc=kd("score"), ja=kd("j-app");
+  var after=sc&&daysTo(sc.s)<=0&&!(ja&&daysTo(ja.e)<0), need=[], n=0, msg="";
+  if(after){
+    mine.forEach(function(st){
+      var live=(st.apps||[]).some(function(a){ return a.kind==="정시"||a.kind==="수시"&&a.mreq&&!parseMin(a.mreq).none&&LIVE[a.status]; })||GUN.some(function(g){ return jcandOf(st,g).length; });
+      if(hasCsat(st)?st.csat.src==="가채점"||!hasScore(st)&&live:live) need.push(st);
+    });
+    if(need.length) msg="수능 성적표가 나왔습니다. 아직 가채점이거나 성적표 점수가 없는 학생 "+need.length+"명: "+need.slice(0,5).map(function(st){ return st.name; }).join(", ")+(need.length>5?" 외":"")+". 학교 성적 엑셀을 머리줄까지 통째로 붙여넣으면 등급·표준점수·백분위·선택과목이 한 번에 들어가고 수능최저도 다시 판정합니다.";
+  }
+  else if(daysTo(csatDay())<=0) mine.forEach(function(st){
     if(hasCsat(st)) return;
     var k=(st.apps||[]).filter(function(a){ return afterCsatApp(a)&&a.mreq&&!parseMin(a.mreq).none&&daysTo(a.itv)>=0; }).length;
     if(k){ need.push(st); n+=k; }
   });
-  host.hidden=!need.length;
+  if(!after&&need.length) msg="수능이 끝났습니다. 가채점 등급을 넣으면 최저가 있는 수능 뒤 면접·논술·실기 "+n+"건을 갈지 말지 바로 판단합니다. 등급이 없는 학생 "+need.length+"명: "+need.slice(0,5).map(function(st){ return st.name; }).join(", ")+(need.length>5?" 외":"");
+  host.hidden=!msg;
   if(host.hidden) return;
   host.innerHTML="";
-  host.appendChild(el("span",null,"수능이 끝났습니다. 가채점 등급을 넣으면 최저가 있는 수능 뒤 면접·논술·실기 "+n+"건을 갈지 말지 바로 판단합니다. 등급이 없는 학생 "+need.length+"명: "+need.slice(0,5).map(function(st){ return st.name; }).join(", ")+(need.length>5?" 외":"")));
+  host.appendChild(el("span",null,msg));
   var sp=el("span","sp"), b=el("button","ghost","수능 성적 넣기");
   b.onclick=function(){ csatOpen=true; csatMode="grade"; render(); var p=document.getElementById("csatPanel"); if(p) p.scrollIntoView({block:"start"}); };
   sp.appendChild(b); host.appendChild(sp);
 }
 /* ── 수능 등급 한 번에 넣기 ── */
 var csatOpen=false, csatMode="grade", csatSrcSel="", csatPasteMsg="";
-/* 엑셀에서 복사한 등급 붙여넣기. 줄 앞쪽에 학번·이름이 있으면 그 학생에게(표 순서가 달라도),
-   없으면 붙여넣은 칸부터 화면 순서대로 넣는다. 머리줄은 건너뛰고, 빈칸은 자리를 지킨다. */
-function pasteGrades(text, mine, ri, ci){
+/* 엑셀에서 복사한 등급·점수 붙여넣기. 줄 앞쪽에 학번·이름이 있으면 그 학생에게(표 순서가 달라도),
+   없으면 붙여넣은 칸부터 화면 순서대로 넣는다. 머리줄은 건너뛰고, 빈칸은 자리를 지킨다.
+   머리줄에 '국어 표준점수'·'수학 등급'·'탐구1 과목' 같은 이름이 있으면(학교 성적 엑셀 통째로) 칸 이름으로 넣는다. */
+function splitCells(line){ return (/\t/.test(line)?line.split("\t"):line.trim().split(/[ ,]+/)).map(function(c){ return c.trim(); }); }
+function pasteIds(mine){
   var byNo={}, byName={};
   mine.forEach(function(st){ if(st.no) byNo[st.no]=st; if(st.name) (byName[st.name]=byName[st.name]||[]).push(st); });
-  var rows=text.replace(/\r/g,"").split("\n").filter(function(l){ return l.trim(); }).map(function(line){
-    var cells=(/\t/.test(line)?line.split("\t"):line.trim().split(/[ ,]+/)).map(function(c){ return c.trim(); });
+  return function(cells, upto){
     var who=null, idTxt="", last=-1;
-    for(var j=0;j<Math.min(4,cells.length);j++){
+    for(var j=0;j<Math.min(upto,cells.length);j++){
       var c=cells[j];
       if(/^\d{5}$/.test(c)){ last=j; idTxt=c; if(byNo[c]) who=byNo[c]; }
-      else if(/[가-힣]{2,}/.test(c)&&!/등급|국어|수학|영어|탐구|한국사/.test(c)){ last=j; if(!who){ idTxt=idTxt?idTxt+" "+c:c; if(byName[c]&&byName[c].length===1) who=byName[c][0]; } }
+      else if(/[가-힣]{2,}/.test(c)&&!/등급|국어|수학|영어|탐구|한국사|표준|백분위|선택|과목/.test(c)){ last=j; if(!who){ idTxt=idTxt?idTxt+" "+c:c; if(byName[c]&&byName[c].length===1) who=byName[c][0]; } }
     }
-    var vals=cells.slice(last+1).map(function(c){ c=c.replace(/\s*등급$/,""); return /^[1-9]$/.test(c)?c:c?"?":""; });
-    return {who:who, id:last>=0, idTxt:idTxt, vals:vals};
-  });
-  var byId=rows.some(function(r){ return r.who; }), pos=ri, put=[], miss=[], bad=0;
-  rows.forEach(function(r){
-    if(!r.vals.some(function(v){ return v&&v!=="?"; })) return;   // 머리줄·빈 줄
-    var st=byId?r.who:mine[pos++];
-    if(!st){ if(byId) miss.push(r.idTxt||r.vals.join(" ")); return; }
-    r.vals.forEach(function(v,dc){
-      var k=GK[ci+dc]; if(!k) return;
-      if(v==="?"){ bad++; return; }
-      if(v) setGrade(st,k,v,true);
-    });
+    return {who:who, idTxt:idTxt, last:last};
+  };
+}
+// 성적표 머리줄 칸 → 저장 칸 이름. 두 줄 머리(위: 국어, 아래: 표준점수·백분위·등급)도 읽는다
+function sheetKey(lab){
+  var s=String(lab||"").replace(/[\s()\[\]·_\-]/g,"");
+  if(/제2외|외국어|한문|직업|직탐/.test(s)) return null;
+  var area=/국어/.test(s)?"kor":/수학/.test(s)?"math":/영어/.test(s)?"eng":/한국사|한사/.test(s)?"his":/(탐구?|사탐|과탐)(1|Ⅰ)|제?1탐구?|탐1/.test(s)?"inq1":/(탐구?|사탐|과탐)(2|Ⅱ)|제?2탐구?|탐2/.test(s)?"inq2":null;
+  if(!area) return null;
+  var kind=/표준|표점/.test(s)?"S":/백분/.test(s)?"P":/등급/.test(s)?"":/선택|과목|영역명|과목명/.test(s)?"sel":/원점수/.test(s)?null:"";
+  if(kind===null) return null;
+  if(kind==="sel") return area==="math"?"mathSel":area==="inq1"?"inq1t":area==="inq2"?"inq2t":null;
+  if((area==="eng"||area==="his")&&kind) return null;
+  return area+kind;
+}
+function sheetVal(k, v){
+  v=String(v||"").trim(); if(!v) return "";
+  if(k==="mathSel") return /확/.test(v)?"확통":/미/.test(v)?"미적":/기/.test(v)?"기하":"?";
+  if(k==="inq1t"||k==="inq2t") return /물리|화학|생명|지구|과학/.test(v)?"과":/윤리|사회|지리|역사|세계사|동아시아|경제|정치|법|사탐/.test(v)?"사":"?";
+  if(GK.indexOf(k)>=0){ v=v.replace(/\s*등급$/,""); return /^[1-9]$/.test(v)?v:"?"; }
+  v=v.replace(/[^0-9]/g,""); return v!==""&&scoreOk(k,v)?String(+v):"?";
+}
+function pasteSheet(text, mine){
+  var lines=text.replace(/\r/g,"").split("\n").filter(function(l){ return l.trim(); }).map(splitCells);
+  var head=[], n=0;
+  while(n<Math.min(2,lines.length)&&!lines[n].some(function(c){ return /^\d+$/.test(c); })) head.push(lines[n++]);
+  if(!head.length) return null;
+  var width=Math.max.apply(null,lines.map(function(l){ return l.length; })), keys=[], area="";
+  for(var j=0;j<width;j++){
+    var top=head[0][j]||"";
+    if(head.length>1){ if(top) area=top; else top=area; }
+    keys.push(sheetKey(top+(head[1]?(head[1][j]||""):"")));
+  }
+  if(keys.filter(Boolean).length<2) return null;   // 성적표 머리줄이 아님
+  var idOf=pasteIds(mine), put=[], miss=[], bad=0, src=csatSrcNow(), got={};
+  lines.slice(n).forEach(function(cells){
+    var first=keys.findIndex(function(k){ return k; }), id=idOf(cells, first<0?4:first);
+    if(!id.who){ if(id.idTxt) miss.push(id.idTxt); return; }
+    var st=id.who, g=st.csat=st.csat||{}, any=false;
+    keys.forEach(function(k,j){ if(!k) return; var v=sheetVal(k,cells[j]); if(v==="?"){ bad++; return; } if(v){ g[k]=v; any=true; got[k]=1; } });
+    if(!any) return;
+    if(GK.some(function(k){ return got[k]; })) g.src=src;
+    applyMin(st); save(st);
     if(put.indexOf(st)<0) put.push(st);
   });
-  var m=["학생 "+put.length+"명에게 등급을 넣었습니다"+(byId?"(학번·이름으로 맞춤).":"(화면 순서대로). 학번·이름 열을 함께 복사하면 표 순서가 달라도 맞춰 넣습니다.")];
+  var parts=[GK.some(function(k){ return got[k]; })&&"등급", SK.some(function(k){ return got[k]; })&&"표준점수·백분위", (got.mathSel||got.inq1t||got.inq2t)&&"선택과목"].filter(Boolean);
+  var m=["성적표 표로 알아보고 학생 "+put.length+"명에게 "+(parts.join("·")||"성적")+"을 넣었습니다(학번·이름으로 맞춤)."];
   if(miss.length) m.push("이 반에서 못 찾은 줄 "+miss.length+"개: "+miss.slice(0,5).join(", ")+(miss.length>5?" 외":"")+".");
-  if(bad) m.push("1~9가 아닌 칸 "+bad+"개는 넣지 않았습니다.");
+  if(bad) m.push("알아보지 못한 칸 "+bad+"개는 넣지 않았습니다(결시·잘못된 숫자 등).");
+  return m.join(" ");
+}
+function pasteCells(text, mine, ri, ci, keys){
+  var sheet=pasteSheet(text, mine); if(sheet) return sheet;
+  var idOf=pasteIds(mine), score=keys===SK;
+  var rows=text.replace(/\r/g,"").split("\n").filter(function(l){ return l.trim(); }).map(function(line){
+    var cells=splitCells(line), id=idOf(cells,4);
+    return {who:id.who, idTxt:id.idTxt, vals:cells.slice(id.last+1)};
+  });
+  var ok=function(k,v){ return score?scoreOk(k,v.replace(/[^0-9]/g,"")):/^[1-9]$/.test(v.replace(/\s*등급$/,"")); };
+  var byId=rows.some(function(r){ return r.who; }), pos=ri, put=[], miss=[], bad=0;
+  rows.forEach(function(r){
+    if(!r.vals.some(function(v,dc){ return v&&keys[ci+dc]&&ok(keys[ci+dc],v); })) return;   // 머리줄·빈 줄
+    var st=byId?r.who:mine[pos++];
+    if(!st){ if(byId) miss.push(r.idTxt||r.vals.join(" ")); return; }
+    var touched=false;
+    r.vals.forEach(function(v,dc){
+      var k=keys[ci+dc]; if(!k||!v) return;
+      if(!ok(k,v)){ bad++; return; }
+      if(score){ st.csat=st.csat||{}; st.csat[k]=String(+v.replace(/[^0-9]/g,"")); touched=true; }
+      else setGrade(st,k,v.replace(/\s*등급$/,""),true);
+    });
+    if(touched) save(st);
+    if(put.indexOf(st)<0) put.push(st);
+  });
+  var what=score?"표준점수·백분위":"등급";
+  var m=["학생 "+put.length+"명에게 "+what+"를 넣었습니다"+(byId?"(학번·이름으로 맞춤).":"(화면 순서대로). 학번·이름 열을 함께 복사하면 표 순서가 달라도 맞춰 넣습니다.")];
+  if(miss.length) m.push("이 반에서 못 찾은 줄 "+miss.length+"개: "+miss.slice(0,5).join(", ")+(miss.length>5?" 외":"")+".");
+  if(bad) m.push((score?"범위를 벗어난 칸(국어·수학 표점 0~200, 그 밖 0~100) ":"1~9가 아닌 칸 ")+bad+"개는 넣지 않았습니다.");
   return m.join(" ");
 }
 // 성적 통지일 전에 넣는 등급은 가채점으로 본다. 넣는 칸 위에서 바꿀 수 있다.
@@ -2618,9 +2689,10 @@ function renderCsat(mine){
   }
   hd.appendChild(x);
   host.appendChild(hd);
-  if(csatMode==="score"){ renderScoreTable(host, mine); return; }
-  host.appendChild(el("div","shint","숫자(1~9)를 치면 다음 칸으로 넘어갑니다. 엑셀에서 학번·이름과 등급 칸(국·수·영·탐1·탐2·한)을 함께 복사해 첫 칸에 붙여넣으면 학생을 맞춰 넣습니다. 탐구는 과목별 등급, 넣는 즉시 수시 최저를 다시 판정합니다. 수학 선택(확통·미적·기하)과 탐구 과목(사·과)은 확통 하향·과탐 필수 같은 대학을 판정할 때 씁니다."));
-  if(csatPasteMsg){ var pm=el("div","acnog",csatPasteMsg); pm.setAttribute("role","status"); host.appendChild(pm); }
+  var pasteNote=function(){ if(csatPasteMsg){ var pm=el("div","acnog",csatPasteMsg); pm.setAttribute("role","status"); host.appendChild(pm); } };
+  if(csatMode==="score"){ renderScoreTable(host, mine, pasteNote); return; }
+  host.appendChild(el("div","shint","숫자(1~9)를 치면 다음 칸으로 넘어갑니다. 엑셀에서 학번·이름과 등급 칸(국·수·영·탐1·탐2·한)을 함께 복사해 첫 칸에 붙여넣으면 학생을 맞춰 넣습니다. 성적표가 나오면 학교 성적 엑셀을 머리줄까지 통째로 붙여넣어도 됩니다. 탐구는 과목별 등급, 넣는 즉시 수시 최저를 다시 판정합니다. 수학 선택(확통·미적·기하)과 탐구 과목(사·과)은 확통 하향·과탐 필수 같은 대학을 판정할 때 씁니다."));
+  pasteNote();
   var tw=el("div","tablewrap"); tw.style.marginTop="8px";
   var t=document.createElement("table"), hr=t.createTHead().insertRow();
   [["학번","no"],["이름",""]].concat(CSAT.map(function(k){ return [k[1].replace("탐구","탐"),"g"]; })).concat([["선택과목","gsel"],["최저 판정","mres"]]).forEach(function(h){
@@ -2654,7 +2726,7 @@ function renderCsat(mine){
         if(!/[\t\n ,]/.test(text.trim())) return;   // 한 칸짜리는 보통 붙여넣기
         e.preventDefault();
         remember("수능 등급 붙여넣기");
-        csatPasteMsg=pasteGrades(text, mine, ri, ci);
+        csatPasteMsg=pasteCells(text, mine, ri, ci, GK);
         pendingRender=false; render();
       };
       td.appendChild(i); row.push(i);
@@ -2680,8 +2752,9 @@ function renderCsat(mine){
   host.onfocusout=function(){ setTimeout(function(){ if(!host.contains(document.activeElement)){ pendingRender=false; render(); } },0); };
   host.onfocusin=function(){ pendingRender=true; };
 }
-function renderScoreTable(host, mine){
-  host.appendChild(el("div","shint","성적통지표의 표준점수와 백분위를 넣습니다(12/11 통지). 칸을 옮기면 저장됩니다. 엑셀에서 국어 표점부터 탐구2 백분위까지 8칸을 학생 순서대로 복사해 첫 칸에 붙여넣어도 됩니다. 영어·한국사는 등급 보기에서 넣습니다. 합계는 국어·수학·탐구 2과목이며 대학별 반영 비율은 각 대학 요강을 보세요."));
+function renderScoreTable(host, mine, pasteNote){
+  host.appendChild(el("div","shint","성적통지표의 표준점수와 백분위를 넣습니다(12/11 통지). 칸을 옮기면 저장됩니다. 학교 성적 엑셀을 머리줄(국어 표준점수·수학 등급·탐구1 과목 …)까지 통째로 복사해 첫 칸에 붙여넣으면 칸 이름을 보고 등급·표준점수·백분위·선택과목을 한 번에 학번·이름에 맞춰 넣습니다. 머리줄 없이 국어 표점부터 탐구2 백분위까지 8칸만 붙여넣어도 됩니다(학번·이름을 앞에 두면 순서가 달라도 맞춤). 합계는 국어·수학·탐구 2과목이며 대학별 반영 비율은 각 대학 요강을 보세요."));
+  if(pasteNote) pasteNote();
   var tw=el("div","tablewrap"); tw.style.marginTop="8px";
   var t=document.createElement("table"), th=t.createTHead(), h1=th.insertRow(), h2=th.insertRow();
   var top=function(txt,cls,span,rows){ var c=el("th",cls||null,txt); if(span) c.colSpan=span; if(rows) c.rowSpan=rows; h1.appendChild(c); };
@@ -2716,17 +2789,8 @@ function renderScoreTable(host, mine){
         if(!/[\t\n ,]/.test(text.trim())) return;
         e.preventDefault();
         remember("수능 점수 붙여넣기");
-        var bad=0;
-        text.replace(/\r/g,"").split("\n").filter(function(l){ return l.trim(); }).forEach(function(line,dr){
-          var st2=mine[ri+dr]; if(!st2) return;
-          var vals=line.trim().split(/[\t ,]+/), touched=false;
-          vals.forEach(function(v,dc){ var k2=SK[ci+dc]; if(!k2) return; v=String(v).replace(/[^0-9]/g,"");
-            if(v===""||!scoreOk(k2,v)){ if(v!=="") bad++; return; }
-            st2.csat=st2.csat||{}; st2.csat[k2]=String(+v); touched=true; });
-          if(touched) save(st2);
-        });
+        csatPasteMsg=pasteCells(text, mine, ri, ci, SK);
         pendingRender=false; render();
-        if(bad) alert("범위를 벗어난 값 "+bad+"개는 넣지 않았습니다(국어·수학 표점 0~200, 그 밖 0~100).");
       };
       td.appendChild(i); row.push(i);
     });
