@@ -282,6 +282,19 @@ function buildTestPage() {
     ["국어, 수학, 영어, 사회/과학탐구 중 수학 포함 2개 영역 등급 합 5 이내, 한국사 4등급 이내 ※ 탐구 2과목 중 과학탐구(1과목 이상) 필수 응시", { ...g, inq1t: "과", inq2t: "사" }, "충족"],
     ["국어, 수학, 영어, 탐구(2개 과목 평균) 4개 영역 중 3개 등급합 6등급 이내 ※ 과탐 1과목 이상 응시자는 탐구 2과목 평균과 과탐 상위 1과목 중 우수한 등급 반영", { kor: "5", math: "3", eng: "2", inq1: "1", inq2: "6", his: "4", inq1t: "과", inq2t: "사" }, "충족"],
   ];
+  // "국수영과탐"처럼 탐구 자리에 과탐·사탐만 적은 기준: 그 과목이 아니면 탐구를 못 쓴다
+  const gs = { kor: "3", math: "3", eng: "4", inq1: "1", inq2: "1", his: "3" };
+  minCasesJ.push(
+    ["국수영과탐 중 수학 포함 3개합 9, 한국사 4", { ...gs, inq1t: "과", inq2t: "과" }, "충족"],
+    ["국수영과탐(1과목) 중 수학 포함 3개합 9, 한국사 4", { ...gs, inq1t: "과", inq2t: "사" }, "충족"],
+    ["국수영과탐 중 수학 포함 3개합 9, 한국사 4", { ...gs, inq1t: "과", inq2t: "사" }, null],   // 2과목 평균이면 갈림
+    ["국수영과탐 중 수학 포함 3개합 9, 한국사 4", { ...gs, inq1t: "사", inq2t: "사" }, "미충족"],
+    ["국수영과탐 중 수학 포함 3개합 9, 한국사 4", gs, null],
+    ["국어, 수학, 영어, 과학탐구 중 2개 영역 등급 합 6 이내", { ...g, inq1t: "과", inq2t: "과" }, "충족"],
+    ["국수영사탐 중 3개합 5", { ...g, inq1t: "사", inq2t: "과" }, "미충족"],
+    ["국수영사탐 중 3개합 6", { ...g, inq1t: "사", inq2t: "과" }, "충족"],
+    ["국수영과탐 중 2개합 3", { ...g, mathSel: "미적" }, "충족"],
+  );
   const judged = await p.evaluate((cs) => cs.map((c) => window.__dev.judgeMin(c[0], c[1]).res), minCasesJ);
   minCasesJ.forEach((c, i) => check("‘" + c[0] + "’", judged[i], c[2]));
 
@@ -335,6 +348,9 @@ function buildTestPage() {
       edge: V({ kor: "2", math: "3", eng: "4", inq1: "5", inq2: "5", his: "4" }, "국수영탐 중 2개합 5"),
       go: V({ kor: "1", math: "1", eng: "1", inq1: "1", inq2: "1", his: "1" }, "국수영탐 중 2개합 5"),
       skip: V({ kor: "4", math: "4", eng: "4", inq1: "4", inq2: "4", his: "4" }, "국수영탐 중 2개합 5"),
+      near: V({ kor: "3", math: "3", eng: "4", inq1: "4", inq2: "4", his: "4", src: "가채점" }, "국수영탐 중 2개합 5"),
+      nearReal: V({ kor: "3", math: "3", eng: "4", inq1: "4", inq2: "4", his: "4", src: "성적표" }, "국수영탐 중 2개합 5"),
+      nearNotice: d.noticeText({ name: "가", csat: { kor: "3", math: "3", eng: "4", inq1: "4", inq2: "4", his: "4", src: "가채점" }, apps: [{ kind: "수시", univ: "부산대학교", major: "경영학과", type: "논술", itv: "2026-11-28", status: "지원완료", mreq: "국수영탐 중 2개합 5" }] }, 400, 2),
       none: V({ kor: "4" }, ""),
       noGrade: d.examVerdict(st({}), a("2개합 5")),
       before: d.afterCsatApp({ kind: "수시", itv: "2026-11-14", status: "지원완료" }),
@@ -343,6 +359,8 @@ function buildTestPage() {
     }; });
   check("수능 뒤 응시 판단: 아슬아슬·응시·안 가도 됨·최저 없음", [ac.edge, ac.go, ac.skip, ac.none], ["edge", "go", "skip", "go"]);
   check("수능 뒤 응시 판단: 등급 없으면 판단 안 함, 수능 전 고사·떨어진 지원은 빼기", [ac.noGrade, ac.before, ac.done], [null, false, false]);
+  check("수능 뒤 응시 판단: 가채점으로 한 등급 모자라면 '안 가도 됨' 대신 응시 권함(성적표면 안 가도 됨)", [ac.near, ac.nearReal], ["near", "skip"]);
+  check("일정 안내 문자: 가채점 한 등급 차이 미충족이면 응시하세요", /논술 — 부산대 경영학과.*한 등급 차이.*응시하세요/.test(ac.nearNotice) && !/응시하지 않아도/.test(ac.nearNotice), true);
   const pr = await p.evaluate(() => { const d = window.__dev;
     const a = { id: "x", kind: "수시", univ: "부산대학교", major: "경영학과", type: "학종", itv: "2026-11-28", status: "1단계합", prep: { read: true, mock: true } };
     const b = JSON.parse(JSON.stringify(a)); b.prep.go = true;
@@ -605,6 +623,31 @@ function buildTestPage() {
   for (const x of [adm, t2, other, wrong, solo]) await x.context().close();
   srv.close();
 
+  /* 수능 다음 날(11/20) 아침: 맨 위 알림 → 엑셀 표(머리줄·학번·이름·순서 섞임) 붙여넣기 → 응시 판단 */
+  console.log("\n[수능 다음 날 가채점 넣기]");
+  {
+    const c = await browser.newContext({ viewport: { width: 1200, height: 900 } });
+    const x = await c.newPage(); x.on("pageerror", (e) => errors.push(String(e)));
+    await x.clock.install({ time: new Date("2026-11-20T08:30:00+09:00") });
+    const A = (no, name, mreq) => ({ id: no, cls: 2, no, name, apps: [{ id: "a" + no, kind: "수시", univ: "부산대학교", major: "경영학과", type: "논술", itv: "2026-11-21", status: "지원완료", c6: true, mmet: "미정", mreq }] });
+    await x.addInitScript((s) => { if (sessionStorage.getItem("seeded")) return; sessionStorage.setItem("seeded", "1");
+      localStorage.setItem("jh.local.students", JSON.stringify(s)); localStorage.setItem("jh.cls", "2"); localStorage.setItem("jh.mycls", "2"); localStorage.setItem("jh.mode", "local"); },
+      [A("30201", "가나", "국수영탐 중 2개합 5"), A("30202", "다라", "국수영탐 중 2개합 5"), A("30203", "마바", "")]);
+    await x.goto("file://" + page404); await x.waitForTimeout(600);
+    const nudge = await x.$eval("#csatNudge", (e) => !e.hidden && e.textContent);
+    check("수능 뒤 맨 위 알림: 최저 있는 고사 2건, 등급 없는 학생 2명", /면접·논술·실기 2건.*학생 2명: 가나, 다라/.test(nudge || ""), true);
+    await x.click("#csatNudge button"); await x.waitForTimeout(200);
+    await x.evaluate((t) => { const i = document.querySelector("#csatPanel input.g"); const dt = new DataTransfer(); dt.setData("text", t);
+      i.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true })); },
+      ["학번\t이름\t국어\t수학\t영어\t탐구1\t탐구2\t한국사", "30202\t다라\t5\t5\t5\t5\t5\t5", "30201\t가나\t2\t2\t3\t\t4\t결시", "30299\t없는학생\t1\t1\t1\t1\t1\t1"].join("\r\n"));
+    await x.waitForTimeout(300);
+    const r = await x.evaluate(() => ({ msg: document.querySelector("#csatPanel .acnog").textContent, g: window.__dev.students().map((s) => [s.no, s.csat]), nudge: !document.getElementById("csatNudge").hidden }));
+    const gOf = (no) => (r.g.find((y) => y[0] === no) || [])[1] || {};
+    check("붙여넣기: 머리줄 건너뛰고 학번으로 맞춤(순서 섞여도), 빈칸은 자리 지킴", [gOf("30201").kor, gOf("30201").inq1, gOf("30201").inq2, gOf("30201").his, gOf("30202").kor, gOf("30203").kor, gOf("30201").src], ["2", undefined, "4", undefined, "5", undefined, "가채점"]);
+    check("붙여넣기 안내: 넣은 학생·못 찾은 줄·잘못된 칸", /학생 2명.*학번·이름으로 맞춤.*못 찾은 줄 1개: 30299 없는학생.*1~9가 아닌 칸 1개/.test(r.msg), true);
+    check("등급을 다 넣으면 맨 위 알림이 사라짐", r.nudge, false);
+    await c.close();
+  }
   check("자바스크립트 오류 없음", errors, []);
   await browser.close();
   fs.unlinkSync(page404);

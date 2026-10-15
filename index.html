@@ -691,6 +691,7 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
   <div id="viewClass">
     <div class="classbar" id="classbar"></div>
     <div class="lockbar" id="lockbar" hidden></div>
+    <div class="backupbar due" id="csatNudge" hidden></div>
     <div class="alerts" id="alerts"></div>
     <div class="stats" id="stats"></div>
     <div class="glance" id="glance"></div>
@@ -889,7 +890,7 @@ function checkStudent(st){
   apps.forEach(function(a){
     if(a.kind==="수시"&&a.mmet==="미충족"&&LIVE[a.status])
       out.push({lv:"warn",code:"최저 미충족",
-        msg:(a.univ||"한 곳")+" 수능최저를 채우지 못했습니다"+(a.mreq?"("+a.mreq+")":"")+". 사실상 탈락이니 정시 준비로 돌려야 합니다."});
+        msg:(a.univ||"한 곳")+" 수능최저를 채우지 못했습니다"+(a.mreq?"("+a.mreq+")":"")+(st.csat&&st.csat.src==="가채점"?". 가채점 기준이니 성적표(12/11)로 다시 확인하고, 그 전에 있는 고사는 ‘수능 뒤 응시 판단’을 보세요.":". 사실상 탈락이니 정시 준비로 돌려야 합니다.")});
     if(a.ann&&AWAIT[a.status]&&daysTo(a.ann)<0)
       out.push({lv:"warn",code:"결과 미입력",msg:(a.univ||"한 곳")+" 발표일("+a.ann+")이 지났는데 상태가 ‘"+a.status+"’ 그대로입니다. 학생에게 결과를 확인해 주세요."});
     else if(ann1Late(a))
@@ -897,7 +898,7 @@ function checkStudent(st){
     if(prepNeeds(a)&&prepLeft(a).length){
       var pd=daysTo(a.itv), pv=afterCsatApp(a)?examVerdict(st,a):null;
       if(pd!==null&&pd>=0&&pd<=2&&!(pv&&pv.v==="skip"))
-        out.push({lv:"warn",code:"면접 준비",msg:(a.univ||"한 곳")+" "+(a.type==="논술"?"논술":a.type==="실기"?"실기":"면접")+"이 "+(pd===0?"오늘":pd===1?"내일":"모레")+"입니다("+mdw(a.itv)+"). 남은 준비: "+prepLeft(a).join(", ")+"."});
+        out.push({lv:"warn",code:(a.type==="논술"?"논술":a.type==="실기"?"실기":"면접")+" 준비",msg:(a.univ||"한 곳")+" "+(a.type==="논술"?"논술":a.type==="실기"?"실기":"면접")+"이 "+(pd===0?"오늘":pd===1?"내일":"모레")+"입니다("+mdw(a.itv)+"). 남은 준비: "+prepLeft(a).join(", ")+"."});
     }
     if(a.status==="충원대기"&&a.due){
       var d=daysTo(a.due);
@@ -995,6 +996,11 @@ function parseMin(raw){
   // 탐구 이름들 → 탐
   s=s.replace(/사회\/과학탐구|사탐\/과탐|사\/과탐|사회혹은과학탐구|사회·과학|사회\/과학|사\/과/g,"탐")
      .replace(/\(탐구?:탐\)/g,"").replace(/\(탐\)/g,"").replace(/\(탐(?=\d|중)/g,"(");
+  // "국수영과탐"·"과학탐구 중" = 탐구는 과탐(사탐)만 센다
+  var tamOnly="";
+  s=s.replace(/과학탐구|과탐/g,function(){ tamOnly=tamOnly&&tamOnly!=="과"?"x":"과"; return "탐"; })
+     .replace(/사회탐구|사탐/g,function(){ tamOnly=tamOnly&&tamOnly!=="사"?"x":"사"; return "탐"; });
+  if(tamOnly==="x") return {err:"선택과목·대체 조건이 있어 직접 확인해야 합니다"};
   if(/또는|혹은/.test(s)) return {err:"선택과목·대체 조건이 있어 직접 확인해야 합니다"};
   // 판정과 상관없는 말
   s=s.replace(/\(필수응시:[^)]*\)/g,"")
@@ -1036,7 +1042,7 @@ function parseMin(raw){
     if(must&&c.n>1){ if(must.split("").some(function(x){ return c.set.indexOf(x)<0; })) return {err:"포함 과목이 영역 목록에 없습니다"}; c.must=must; }
     if(c.n>c.set.length) return {err:c.set+" 중 "+c.n+"개는 고를 수 없습니다"};
   }
-  return {conds:conds, modes:modes, eng12:eng12||undefined, mathDown:mathDown||undefined, needSci:needSci||undefined, sciBest:sciBest||undefined, altSub:altSub||undefined};
+  return {conds:conds, modes:modes, eng12:eng12||undefined, mathDown:mathDown||undefined, needSci:needSci||undefined, sciBest:sciBest||undefined, altSub:altSub||undefined, tamOnly:tamOnly||undefined};
 }
 function minEval(conds,g,mode,p,optimistic){
   p=p||{};
@@ -1045,6 +1051,14 @@ function minEval(conds,g,mode,p,optimistic){
   function gv(a){
     if(a==="탐"){
       var x=+g.inq1||0, y=+g.inq2||0;
+      if(p.tamOnly&&(x||y)){
+        // 과탐(사탐)만 세는 기준: 그 과목이 아니면 탐구를 못 쓴 것(9)으로 본다
+        var nm=p.tamOnly==="과"?"과탐":"사탐";
+        if((x&&!g.inq1t)||(y&&!g.inq2t)){ unknown=unknown||"탐구 과목(사/과)을 넣어 주세요("+nm+"만 인정)"; if(optimistic) return mode==="top"?Math.min(x||9,y||9):mode==="floor"?Math.floor((x+y)/2):(x+y)/2; return 9; }
+        var ok1=g.inq1t===p.tamOnly, ok2=g.inq2t===p.tamOnly;
+        if(mode==="top") return Math.min(ok1&&x?x:9, ok2&&y?y:9);
+        if(!ok1||!ok2) return 9;
+      }
       if(p.sciBest&&mode!=="top"){
         // 과탐 응시자: 2과목 평균과 과탐 상위 1과목 중 나은 쪽
         if(!x||!y) return 0;
@@ -1309,6 +1323,7 @@ function render(){
   document.getElementById("listTitle").textContent = cls? (cls+"반 학생") : "반을 선택하세요";
   document.getElementById("listCount").textContent = cls? (mine.length+"명") : "";
   document.getElementById("addPanel").hidden = !cls || canWrite===false || locked(cls);
+  renderCsatNudge(document.getElementById("csatNudge"), mine);
   renderAlerts(document.getElementById("alerts"), mine, false);
   renderStats(document.getElementById("stats"), mine);
   renderGlance(document.getElementById("glance"), mine, false);
@@ -2434,8 +2449,8 @@ function renderPrep(host, arr, showClass){
 /* ── 수능 뒤 응시 판단 ──
    수능 다음 날 가채점 등급을 넣으면, 수능 뒤에 있는 면접·논술·실기마다 최저를 따져 갈지 말지 보여 준다.
    아슬아슬 = 지금은 충족이지만 한 과목만 한 등급 내려가도 미충족(가채점은 경계에서 틀릴 수 있다). */
-var VERD={skip:["안 가도 됨","s-bad"],check:["확인 필요","empty"],edge:["응시 · 아슬아슬","s-wait"],go:["응시","s-ok"]};
-var VORDER=["skip","check","edge","go"];
+var VERD={skip:["안 가도 됨","s-bad"],near:["응시 권함 · 미충족 아슬아슬","s-wait"],check:["확인 필요","empty"],edge:["응시 · 아슬아슬","s-wait"],go:["응시","s-ok"]};
+var VORDER=["skip","near","check","edge","go"];
 function csatDay(){ var k=KEYDATES.filter(function(x){ return x.id==="csat"; })[0]; return k?k.s:"9999"; }
 function afterCsatApp(a){
   var s0=a.status||"지원완료";
@@ -2445,9 +2460,19 @@ function examVerdict(st,a){
   if(!hasCsat(st)) return null;
   var r=judgeMin(a.mreq, st.csat);
   if(!a.mreq||r.res==="해당없음") return {v:"go", why:"수능최저 없음"};
-  if(r.res==="미충족") return {v:"skip", why:"최저 미충족"+(r.why?" — "+r.why:"")};
+  var g=st.csat;
+  if(r.res==="미충족"){
+    // 가채점은 한 등급쯤 틀릴 수 있다: 한 과목만 한 등급 올라가도 충족이면 '안 가도 됨'이라 하지 않는다
+    var near=g.src==="가채점"&&GK.some(function(k){
+      if(!g[k]||+g[k]<=1) return false;
+      var g2=JSON.parse(JSON.stringify(g)); g2[k]=String(+g[k]-1);
+      return judgeMin(a.mreq,g2).res==="충족";
+    });
+    if(near) return {v:"near", why:"가채점으로는 미충족이지만 한 과목만 한 등급 올라가도 충족 — 성적표가 나오기 전이니 응시를 권합니다"+(r.why?" ("+r.why+")":"")};
+    return {v:"skip", why:"최저 미충족"+(r.why?" — "+r.why:"")};
+  }
   if(!r.res) return {v:"check", why:r.why};
-  var g=st.csat, edge=GK.some(function(k){
+  var edge=GK.some(function(k){
     if(!g[k]||+g[k]>=9) return false;
     var g2=JSON.parse(JSON.stringify(g)); g2[k]=String(+g[k]+1);
     return judgeMin(a.mreq,g2).res==="미충족";
@@ -2471,7 +2496,7 @@ function renderAfterCsat(host, arr, showClass){
   hd.appendChild(el("span","cnt",rows.length?rows.length+"건":""));
   if(gachae) hd.appendChild(el("span","pill s-wait","가채점 기준"));
   host.appendChild(hd);
-  host.appendChild(el("div","shint","수능 뒤에 있는 면접·논술·실기마다, 넣은 수능 등급으로 최저를 따져 봅니다. ‘아슬아슬’은 한 과목만 한 등급 내려가도 미충족인 경우입니다. 최종 결정은 학생·학부모와 상의하세요."));
+  host.appendChild(el("div","shint","수능 뒤에 있는 면접·논술·실기마다, 넣은 수능 등급으로 최저를 따져 봅니다. ‘아슬아슬’은 한 과목만 한 등급 내려가도 미충족인 경우, ‘미충족 아슬아슬’은 한 과목만 한 등급 올라가도 충족인 경우입니다(가채점은 틀릴 수 있어 응시를 권합니다). 최종 결정은 학생·학부모와 상의하세요."));
   var cnt={}; rows.forEach(function(x){ cnt[x.r.v]=(cnt[x.r.v]||0)+1; });
   var sum=el("div","acsum");
   VORDER.forEach(function(v){ if(cnt[v]) sum.appendChild(el("span","pill "+VERD[v][1],VERD[v][0]+" "+cnt[v])); });
@@ -2493,8 +2518,57 @@ function renderAfterCsat(host, arr, showClass){
     host.appendChild(ng);
   }
 }
+/* 수능이 끝났는데 등급이 없어 응시 판단을 못 하는 학생이 있으면 반 화면 맨 위에서 알린다 */
+function renderCsatNudge(host, mine){
+  var need=[], n=0;
+  if(daysTo(csatDay())<=0) mine.forEach(function(st){
+    if(hasCsat(st)) return;
+    var k=(st.apps||[]).filter(function(a){ return afterCsatApp(a)&&a.mreq&&!parseMin(a.mreq).none&&daysTo(a.itv)>=0; }).length;
+    if(k){ need.push(st); n+=k; }
+  });
+  host.hidden=!need.length;
+  if(host.hidden) return;
+  host.innerHTML="";
+  host.appendChild(el("span",null,"수능이 끝났습니다. 가채점 등급을 넣으면 최저가 있는 수능 뒤 면접·논술·실기 "+n+"건을 갈지 말지 바로 판단합니다. 등급이 없는 학생 "+need.length+"명: "+need.slice(0,5).map(function(st){ return st.name; }).join(", ")+(need.length>5?" 외":"")));
+  var sp=el("span","sp"), b=el("button","ghost","수능 성적 넣기");
+  b.onclick=function(){ csatOpen=true; csatMode="grade"; render(); var p=document.getElementById("csatPanel"); if(p) p.scrollIntoView({block:"start"}); };
+  sp.appendChild(b); host.appendChild(sp);
+}
 /* ── 수능 등급 한 번에 넣기 ── */
-var csatOpen=false, csatMode="grade", csatSrcSel="";
+var csatOpen=false, csatMode="grade", csatSrcSel="", csatPasteMsg="";
+/* 엑셀에서 복사한 등급 붙여넣기. 줄 앞쪽에 학번·이름이 있으면 그 학생에게(표 순서가 달라도),
+   없으면 붙여넣은 칸부터 화면 순서대로 넣는다. 머리줄은 건너뛰고, 빈칸은 자리를 지킨다. */
+function pasteGrades(text, mine, ri, ci){
+  var byNo={}, byName={};
+  mine.forEach(function(st){ if(st.no) byNo[st.no]=st; if(st.name) (byName[st.name]=byName[st.name]||[]).push(st); });
+  var rows=text.replace(/\r/g,"").split("\n").filter(function(l){ return l.trim(); }).map(function(line){
+    var cells=(/\t/.test(line)?line.split("\t"):line.trim().split(/[ ,]+/)).map(function(c){ return c.trim(); });
+    var who=null, idTxt="", last=-1;
+    for(var j=0;j<Math.min(4,cells.length);j++){
+      var c=cells[j];
+      if(/^\d{5}$/.test(c)){ last=j; idTxt=c; if(byNo[c]) who=byNo[c]; }
+      else if(/[가-힣]{2,}/.test(c)&&!/등급|국어|수학|영어|탐구|한국사/.test(c)){ last=j; if(!who){ idTxt=idTxt?idTxt+" "+c:c; if(byName[c]&&byName[c].length===1) who=byName[c][0]; } }
+    }
+    var vals=cells.slice(last+1).map(function(c){ c=c.replace(/\s*등급$/,""); return /^[1-9]$/.test(c)?c:c?"?":""; });
+    return {who:who, id:last>=0, idTxt:idTxt, vals:vals};
+  });
+  var byId=rows.some(function(r){ return r.who; }), pos=ri, put=[], miss=[], bad=0;
+  rows.forEach(function(r){
+    if(!r.vals.some(function(v){ return v&&v!=="?"; })) return;   // 머리줄·빈 줄
+    var st=byId?r.who:mine[pos++];
+    if(!st){ if(byId) miss.push(r.idTxt||r.vals.join(" ")); return; }
+    r.vals.forEach(function(v,dc){
+      var k=GK[ci+dc]; if(!k) return;
+      if(v==="?"){ bad++; return; }
+      if(v) setGrade(st,k,v,true);
+    });
+    if(put.indexOf(st)<0) put.push(st);
+  });
+  var m=["학생 "+put.length+"명에게 등급을 넣었습니다"+(byId?"(학번·이름으로 맞춤).":"(화면 순서대로). 학번·이름 열을 함께 복사하면 표 순서가 달라도 맞춰 넣습니다.")];
+  if(miss.length) m.push("이 반에서 못 찾은 줄 "+miss.length+"개: "+miss.slice(0,5).join(", ")+(miss.length>5?" 외":"")+".");
+  if(bad) m.push("1~9가 아닌 칸 "+bad+"개는 넣지 않았습니다.");
+  return m.join(" ");
+}
 // 성적 통지일 전에 넣는 등급은 가채점으로 본다. 넣는 칸 위에서 바꿀 수 있다.
 function csatSrcNow(){ if(csatSrcSel) return csatSrcSel; var k=KEYDATES.filter(function(x){ return x.id==="score"; })[0]; return k&&daysTo(k.s)>0?"가채점":"성적표"; }
 var GK=CSAT.map(function(k){ return k[0]; });
@@ -2536,7 +2610,7 @@ function renderCsat(mine){
     hd.appendChild(sseg);
   }
   var x=el("button","ghost","닫기"); x.style.marginLeft="auto";
-  x.onclick=function(){ csatOpen=false; render(); };
+  x.onclick=function(){ csatOpen=false; csatPasteMsg=""; render(); };
   if(csatMode==="score"){
     var sv=el("button","ghost","성적 CSV 받기"); sv.style.marginLeft="auto"; x.style.marginLeft="";
     sv.onclick=function(){ scoreCsv(mine); }; hd.appendChild(sv);
@@ -2544,7 +2618,8 @@ function renderCsat(mine){
   hd.appendChild(x);
   host.appendChild(hd);
   if(csatMode==="score"){ renderScoreTable(host, mine); return; }
-  host.appendChild(el("div","shint","숫자(1~9)를 치면 다음 칸으로 넘어갑니다. 엑셀에서 등급 칸을 복사해 첫 칸에 붙여넣어도 됩니다. 탐구는 과목별 등급, 넣는 즉시 수시 최저를 다시 판정합니다. 수학 선택(확통·미적·기하)과 탐구 과목(사·과)은 확통 하향·과탐 필수 같은 대학을 판정할 때 씁니다."));
+  host.appendChild(el("div","shint","숫자(1~9)를 치면 다음 칸으로 넘어갑니다. 엑셀에서 학번·이름과 등급 칸(국·수·영·탐1·탐2·한)을 함께 복사해 첫 칸에 붙여넣으면 학생을 맞춰 넣습니다. 탐구는 과목별 등급, 넣는 즉시 수시 최저를 다시 판정합니다. 수학 선택(확통·미적·기하)과 탐구 과목(사·과)은 확통 하향·과탐 필수 같은 대학을 판정할 때 씁니다."));
+  if(csatPasteMsg){ var pm=el("div","acnog",csatPasteMsg); pm.setAttribute("role","status"); host.appendChild(pm); }
   var tw=el("div","tablewrap"); tw.style.marginTop="8px";
   var t=document.createElement("table"), hr=t.createTHead().insertRow();
   [["학번","no"],["이름",""]].concat(CSAT.map(function(k){ return [k[1].replace("탐구","탐"),"g"]; })).concat([["선택과목","gsel"],["최저 판정","mres"]]).forEach(function(h){
@@ -2578,13 +2653,7 @@ function renderCsat(mine){
         if(!/[\t\n ,]/.test(text.trim())) return;   // 한 칸짜리는 보통 붙여넣기
         e.preventDefault();
         remember("수능 등급 붙여넣기");
-        text.replace(/\r/g,"").split("\n").filter(function(l){ return l.trim(); }).forEach(function(line,dr){
-          var st2=mine[ri+dr]; if(!st2) return;
-          line.trim().split(/[\t ,]+/).forEach(function(v,dc){
-            var k2=GK[ci+dc]; v=String(v).replace(/[^1-9]/g,"").slice(0,1);
-            if(k2&&v) setGrade(st2,k2,v,true);
-          });
-        });
+        csatPasteMsg=pasteGrades(text, mine, ri, ci);
         pendingRender=false; render();
       };
       td.appendChild(i); row.push(i);
@@ -3098,7 +3167,7 @@ function noticeItems(st, days){
     var a=e.a;
     if(e.kind==="itv"){
       var vd=afterCsatApp(a)?examVerdict(st,a):null, vt="";
-      if(vd) vt=vd.v==="skip"?" → 수능최저 미충족(가채점 기준이면 확인), 응시하지 않아도 됩니다":vd.v==="edge"?" → 수능최저 아슬아슬, 응시하세요":vd.v==="check"?" → 수능최저 충족 여부 담임과 확인":a.mreq&&vd.why.indexOf("없음")<0?" → 수능최저 충족, 응시하세요":"";
+      if(vd) vt=vd.v==="skip"?" → 수능최저 미충족(가채점 기준이면 확인), 응시하지 않아도 됩니다":vd.v==="near"?" → 가채점으로는 수능최저가 한 등급 차이로 모자랍니다. 가채점은 틀릴 수 있으니 응시하세요":vd.v==="edge"?" → 수능최저 아슬아슬, 응시하세요":vd.v==="check"?" → 수능최저 충족 여부 담임과 확인":a.mreq&&vd.why.indexOf("없음")<0?" → 수능최저 충족, 응시하세요":"";
       add(e.when, (a.type==="논술"?"논술":a.type==="실기"?"실기":"면접·고사")+" — "+nm(a)+vt);
     }
     else if(e.kind==="ann") add(e.when, "합격자 발표 — "+nm(a));
