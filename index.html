@@ -4330,6 +4330,8 @@ function startFirebase(){
       if(!first) return; first=false;   // 처음 한 번만 길을 정한다. 그 뒤 로그인·로그아웃은 각 단추가 처리한다.
       var saved=""; try{ saved=localStorage.getItem(CODE_KEY)||""; }catch(e){}
       // 초대 링크(#join=코드)로 열었으면 코드를 채운 가입 화면으로. # 뒤는 서버로 가지 않는다. 주소창에서는 바로 지운다.
+      var lk=location.hash.match(/link=([0-9A-Za-z-]{8,})\.([0-9A-Za-z]{8,})/);
+      if(lk){ try{ history.replaceState(null,"",location.pathname+location.search); }catch(e){} linkJoin(lk[1],lk[2]); return; }
       var inv=location.hash.match(/join=([0-9A-Za-z-]{8,})/);
       if(inv){ try{ history.replaceState(null,"",location.pathname+location.search); }catch(e){} codeGate("","teacher",inv[1]); }
       else if(saved) enterCode(saved,{remember:true}); else codeGate();
@@ -4551,6 +4553,50 @@ function showNewCode(code,name){
   w.appendChild(go);
   g.appendChild(w);
 }
+/* ── 다른 컴퓨터 연결 ── 승인된 선생님이 링크를 만들면 새 컴퓨터는 가입 요청·승인 없이 같은 이름·반으로 들어온다.
+   링크 = 주소#link=학교코드.열쇠. 저장소에는 열쇠의 해시만(links/해시 = {cls, name, exp}), 24시간 뒤 못 쓴다. */
+function linkId(sid,key){ return crypto.subtle.digest("SHA-256",new TextEncoder().encode("jinhak-board/link/"+sid+"/"+key)).then(hexOf); }
+function makeLink(name,cls){
+  var key=newCode().replace(/-/g,"")+newCode().replace(/-/g,"");
+  return linkId(school.K.room,key).then(function(id){
+    return fb.S.setDoc(sRef(school.K.room,"links",id),{cls:+cls||0,name:String(name||"").slice(0,20),exp:Date.now()+86400000});
+  }).then(function(){ return location.origin+location.pathname+"#link="+fmtCode(school.code)+"."+key; });
+}
+function showLinkBox(name,cls){
+  var b=document.getElementById("banner"); b.className="banner"; b.hidden=false; b.innerHTML="";
+  b.appendChild(el("b",null,"다른 컴퓨터에서 열기 "));
+  var msg=el("span",null,"링크를 만드는 중…"); b.appendChild(msg);
+  makeLink(name,cls).then(function(url){
+    msg.textContent=(name||"선생님")+(cls?" ("+cls+"반)":"")+" — 아래 링크를 새 컴퓨터(집 노트북 등)에서 열면 가입·승인 없이 바로 들어갑니다. 24시간 동안만 쓸 수 있고, 학교 메신저나 내 메일로만 보내세요. ";
+    var cp=el("button","btn sec","링크 복사"); cp.onclick=function(){ copyText(url,function(){ flashBtn(cp,"복사됨 ✓"); }); }; b.appendChild(cp);
+    var x=el("button","linkbtn","닫기"); x.onclick=function(){ b.hidden=true; }; b.appendChild(x);
+  },function(e){ msg.textContent="링크를 만들지 못했습니다("+((e&&e.code)||"")+"). 관리자가 최신 Firestore 규칙을 붙여넣었는지 확인해 주세요."; });
+}
+function linkJoin(code,key){
+  setSync("","링크 확인 중");
+  var K, L, lid;
+  (fb.auth.currentUser?Promise.resolve():fb.U.signInAnonymously(fb.auth)).then(function(){ return codeKeys(code); }).then(function(k){
+    K=k; return fb.S.getDoc(sRef(K.room));
+  }).then(function(d){
+    if(!d.exists()) throw {code:"no-school"};
+    var info=d.data();
+    return linkId(K.room,key).then(function(id){ lid=id; return fb.S.getDoc(sRef(K.room,"links",id)); }).then(function(ld){
+      if(!ld.exists()) throw {code:"no-link"};
+      L=ld.data(); if(!(L.exp>Date.now())) throw {code:"old-link"};
+      var mref=sRef(K.room,"members",fb.auth.currentUser.uid);
+      return fb.S.getDoc(mref).then(function(md){ return md.exists()?null:fb.S.setDoc(mref,{name:L.name||"선생님",cls:+L.cls||0,at:new Date().toISOString(),ok:true,link:lid}); }).then(function(){
+        try{ localStorage.setItem(CODE_KEY,normCode(code)); if(L.name) localStorage.setItem("jh.myname",L.name); }catch(e){}
+        if(+L.cls){ setMyCls(+L.cls); setCls(+L.cls); }
+        waitApproval(K,code,info,mref);
+      });
+    });
+  }).catch(function(e){
+    var c=e&&e.code;
+    codeGate(c==="old-link"?"링크 유효 시간(24시간)이 지났습니다. 원래 컴퓨터에서 새 링크를 만들어 주세요.":
+      c==="no-link"||c==="permission-denied"?"쓸 수 없는 링크입니다. 원래 컴퓨터에서 새 링크를 만들거나, 초대 링크로 다시 가입해 주세요.":
+      c==="no-school"?"이 링크의 학교가 없습니다.":"들어가지 못했습니다"+(c?" ("+c+")":"")+". 인터넷 연결을 확인해 주세요.","teacher");
+  });
+}
 function enterCode(code,o){
   o=o||{};
   if(normCode(code).length<8){ codeGate("코드가 너무 짧습니다. 받은 코드를 다시 확인해 주세요.","teacher"); return; }
@@ -4607,6 +4653,7 @@ function enterSchool(K,code,info,admin,cls){
   var pend=el("button","btn sec"); pend.id="pendBtn"; pend.hidden=true;
   pend.onclick=function(){ switchTab("admin"); window.scrollTo(0,0); };
   document.getElementById("tabAdmin").hidden=!admin;
+  if(!admin&&cls){ var oc=el("button","ghost","다른 컴퓨터"); oc.title="집 노트북 등 다른 컴퓨터에서 가입·승인 없이 바로 열 수 있는 링크를 만듭니다"; oc.onclick=function(){ showLinkBox(myName(),school.cls); }; chip.appendChild(oc); }
   var out=el("button","ghost","나가기"); out.title="이 컴퓨터가 기억한 학교 코드를 지우고 시작 화면으로 갑니다(공용 컴퓨터에서 다 쓴 뒤, 다른 학교로 갈 때)";
   out.onclick=goHome;
   chip.appendChild(pend); chip.appendChild(out);
@@ -4655,7 +4702,8 @@ function renderSchoolPanel(){
   var put=function(m,cls,ok){ fb.S.setDoc(mref(m),{name:m.name||"",cls:+cls||0,at:m.at||"",ok:ok}).catch(fail); };
   var line=function(box,m,isWait){
     var r=el("div","uitem"); r.appendChild(el("b",null,m.name||"이름 없음"));
-    if(isWait) r.appendChild(el("span","sub",fmtWhen(m.at)+" 요청"));
+    if(isWait){ r.appendChild(el("span","sub",fmtWhen(m.at)+" 요청"));
+      if(ms.some(function(o){ return o.ok&&o.name===m.name&&(+o.cls)===(+m.cls); })) r.appendChild(el("span","pill s-go","이미 승인된 같은 이름·반 — 새 컴퓨터일 수 있음")); }
     var sp=el("span","sp"), cs=clsSelect(m.cls||0); cs.title="담당 반";
     if(!isWait) cs.onchange=function(){ if(cs.value!=="") put(m,cs.value,true); };
     sp.appendChild(cs);
@@ -4664,8 +4712,9 @@ function renderSchoolPanel(){
       var no=el("button","ghost","거절"); no.onclick=function(){ if(window.confirm((m.name||"")+" 요청을 거절합니다.")) fb.S.deleteDoc(mref(m)).catch(fail); };
       sp.appendChild(ap); sp.appendChild(no);
     } else {
-      var rm=el("button","ghost","빼기"); rm.onclick=function(){ if(window.confirm((m.name||"")+" 선생님을 뺍니다. 바로 자료를 볼 수 없게 됩니다.")) fb.S.deleteDoc(mref(m)).catch(fail); };
-      sp.appendChild(rm);
+      var lb=el("button","ghost","연결 링크"); lb.title="이 선생님이 다른 컴퓨터에서 바로 들어올 수 있는 24시간 링크를 만듭니다"; lb.onclick=function(){ showLinkBox(m.name,m.cls); window.scrollTo(0,0); };
+      var rm=el("button","ghost","빼기"); rm.onclick=function(){ if(window.confirm((m.name||"")+" 선생님을 뺍니다(이 컴퓨터만). 바로 자료를 볼 수 없게 됩니다.")) fb.S.deleteDoc(mref(m)).catch(fail); };
+      sp.appendChild(lb); sp.appendChild(rm);
     }
     r.appendChild(sp); box.appendChild(r);
   };
@@ -4770,7 +4819,7 @@ function start(){
   render();
   setSync("", "연결 중");
 
-  if(!window.claude||!window.claude.use){ if(useFirebase()&&(localMode()!=="local"||/join=/.test(location.hash))) startFirebase(); else startPractice(); return; }
+  if(!window.claude||!window.claude.use){ if(useFirebase()&&(localMode()!=="local"||/join=|link=/.test(location.hash))) startFirebase(); else startPractice(); return; }
 
   window.claude.use("user").then(function(u){
     userCap=u;

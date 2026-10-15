@@ -523,6 +523,16 @@ function buildTestPage() {
   check("관리자: 승인 기다리는 선생님(반 포함) 보임", /박담임/.test(await adm.innerText("#schoolPanel")) && await adm.$eval("#schoolPanel .uitem select", (e) => e.value), "2");
   await adm.click("#schoolPanel button >> text=승인"); await t2.waitForTimeout(2500);
   check("승인되면 담임 화면이 열리고 자기 반만", [await gateTitle(t2), await rowNames(t2), await t2.$eval("#classbar", (e) => e.hidden)], ["", ["김예시"], true]);
+  await t2.click("#whoChip button >> text=다른 컴퓨터"); await t2.waitForTimeout(800);
+  const linkUrl = await t2.evaluate(() => new Promise((ok) => { const o = navigator.clipboard && navigator.clipboard.writeText; window.__copied = null;
+    if (navigator.clipboard) navigator.clipboard.writeText = (v) => { window.__copied = v; return Promise.resolve(); };
+    document.querySelector("#banner .btn").click(); setTimeout(() => ok(window.__copied), 300); }));
+  check("다른 컴퓨터 링크: 학교 코드.열쇠, 저장소엔 해시만", [/#link=[0-9A-Z]{4}-[0-9A-Z]{4}\.[0-9A-Z]{16}$/.test(linkUrl || ""), Object.keys(KV).filter((k) => k.includes("/links/")).length], [true, 1]);
+  const t3 = await who({ hash: linkUrl ? linkUrl.slice(linkUrl.indexOf("#")) : "" }); await t3.waitForTimeout(2500);
+  check("링크로 연 새 컴퓨터: 가입·승인 없이 같은 반으로", [await gateTitle(t3), await rowNames(t3), /박담임/.test(await t3.innerText("#whoChip"))], ["", ["김예시"], true]);
+  const t4 = await who({ hash: "#link=" + lastCode + ".AAAAAAAAAAAAAAAA" }); await t4.waitForTimeout(1500);
+  check("틀린 링크는 못 씀", /쓸 수 없는 링크/.test(await t4.innerText("#banner")), true);
+  await t3.context().close(); await t4.context().close();
   await t2.click("#tabAll"); await t2.waitForTimeout(500);
   check("담임은 다른 반(5반) 학생이 안 보임", /박예시/.test(await t2.innerText("#viewAll")), false);
   await adm.click("#tabAll"); await adm.waitForTimeout(500);

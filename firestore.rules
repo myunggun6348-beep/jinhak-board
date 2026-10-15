@@ -3,6 +3,7 @@ rules_version = '2';
 // schools/{sid}: 학교 이름·관리자 이메일. sid 는 학교 코드에서 만든 40자라 코드를 모르면 찾을 수 없다.
 // schools/{sid}/private/join: 가입 암호 해시. 관리자만 읽고 쓴다. 가입 요청(members 생성)은 이 해시와 같은 pw 를 가져와야 한다.
 // schools/{sid}/members/{uid}: 선생님 가입(익명 로그인). ok·cls(담당 반)는 관리자만 바꾼다.
+// schools/{sid}/links/{해시}: 다른 컴퓨터 연결 링크 {cls, name, exp}. 승인된 담임(자기 반)·관리자가 만들고, 24시간 안에 그 링크로 만든 가입은 바로 승인된다.
 // schools/{sid}/students/{id}: 학교 코드로 암호화된 {v, iv, c, t} + 반 번호 cls. 담임은 자기 반만, 관리자는 전부.
 // schools/{sid}/minreq/{id}: 학교 공용 최저 기준표(암호화). 승인된 선생님 모두.
 // Firebase 콘솔 > Firestore Database > 규칙에 그대로 붙여넣고 게시한다.
@@ -37,9 +38,22 @@ service cloud.firestore {
         allow create: if signedIn() && request.auth.uid == uid && request.resource.data.ok == false
           && request.resource.data.keys().hasOnly(['name', 'cls', 'at', 'ok', 'pw']) && request.resource.data.name.size() <= 20
           && request.resource.data.cls is int
-          && request.resource.data.pw == get(/databases/$(database)/documents/schools/$(sid)/private/join).data.hash;
+          && request.resource.data.pw == get(/databases/$(database)/documents/schools/$(sid)/private/join).data.hash
+          || signedIn() && request.auth.uid == uid && request.resource.data.ok == true
+          && request.resource.data.keys().hasOnly(['name', 'cls', 'at', 'ok', 'link']) && request.resource.data.cls is int
+          && exists(/databases/$(database)/documents/schools/$(sid)/links/$(request.resource.data.link))
+          && get(/databases/$(database)/documents/schools/$(sid)/links/$(request.resource.data.link)).data.cls == request.resource.data.cls
+          && get(/databases/$(database)/documents/schools/$(sid)/links/$(request.resource.data.link)).data.exp > request.time.toMillis();
         allow update: if isAdmin(sid) && request.resource.data.cls is int;
         allow delete: if isAdmin(sid) || request.auth.uid == uid;
+      }
+
+      match /links/{id} {
+        allow get: if signedIn();
+        allow create: if request.resource.data.keys().hasOnly(['cls', 'name', 'exp']) && request.resource.data.cls is int
+          && request.resource.data.exp is int && request.resource.data.exp < request.time.toMillis() + 172800000
+          && (isAdmin(sid) || isMember(sid) && request.resource.data.cls == myCls(sid));
+        allow delete: if isAdmin(sid);
       }
 
       match /students/{id} {
