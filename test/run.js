@@ -437,6 +437,20 @@ function buildTestPage() {
   check("상담 기록: 줄 머리에 상담 수, 반 CSV 단추", await p.evaluate(() => [document.querySelector(".row .cnote") && document.querySelector(".row .cnote").textContent, !document.getElementById("btnNotesCsv").hidden]), ["상담 1", true]);
   await p.click(".row >> nth=0 >> .rowhead"); await p.waitForTimeout(100);
 
+  await p.click("#btnJungsi"); await p.waitForTimeout(300);
+  const jrow = await p.evaluate(() => { const b = document.querySelector("#jungsiPanel .jcadd"); if (!b) return null; const tr = b.closest("tr"); return [...document.querySelectorAll("#jungsiPanel tbody tr")].indexOf(tr); });
+  if (jrow === null) check("정시 후보: 후보 칸이 있음", false, true); else {
+    const R2 = (sel) => "#jungsiPanel tbody tr >> nth=" + jrow + " >> " + sel;
+    await p.click(R2(".jcadd")); await p.fill(R2(".jcin input"), "부경대학교 경영학부"); await p.click(R2(".jcin .btn")); await p.waitForTimeout(200);
+    const cand = await p.evaluate((i) => document.querySelectorAll("#jungsiPanel tbody tr")[i].querySelector(".jcand .t").textContent, jrow);
+    await p.click(R2(".jcand .btn >> text=확정")); await p.waitForTimeout(200);
+    const after = await p.evaluate((i) => { const tr = document.querySelectorAll("#jungsiPanel tbody tr")[i]; return [!!tr.querySelector(".jcand"), [...tr.querySelectorAll(".japp")].some((b) => /부경대 경영학부/.test(b.textContent)), tr.querySelector(".jfile") && tr.querySelector(".jfile").textContent]; }, jrow);
+    await p.click(R2(".jfile")); await p.waitForTimeout(200);
+    const filed = await p.evaluate(() => window.__dev.students().some((s) => (s.apps || []).some((a) => a.kind === "정시" && a.univ === "부경대학교" && a.major === "경영학부" && a.filed && a.group)));
+    check("정시 후보: 적고 → 확정하면 그 군 지원, 접수 ✓ 저장", [cand, after, filed], ["후보 · 부경대 경영학부", [false, true, "접수 전"], true]);
+  }
+  await p.click("#btnJungsi"); await p.waitForTimeout(100);
+
   /* ── 자료 지키기(백업 알림) ── */
   const bb = () => p.evaluate(() => { const b = document.getElementById("backupBar"); return [!b.hidden, b.classList.contains("due"), b.textContent]; });
   let B1 = await bb();
