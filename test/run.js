@@ -359,6 +359,10 @@ function buildTestPage() {
     return { st: I.map((x) => x.state), add: I[0].add, due: I[0].due, btn: div.querySelectorAll(".regapp .btn").length, text: /등록할 곳 정하기 1/.test(div.textContent) && /등록 완료 1/.test(div.textContent) && /모두 포기 1/.test(div.textContent) }; });
   check("수시 등록: 정하기·완료·모두 포기·해당 없음", rg.st, ["todo", "done", "gaveup", null]);
   check("수시 등록: 충원합이 있으면 충원 등록 마감, 합격마다 여기 등록 단추", [rg.add, rg.due, rg.btn, rg.text], [true, "2026-12-30", 2, true]);
+  const nx = await p.evaluate(() => { const d = window.__dev;
+    const st = { name: "가", apps: [{ kind: "수시", univ: "부산대학교", major: "경영학과", type: "학종", itv: "2026-11-28", status: "1단계합" }] };
+    return { withNote: d.noticeText(st, 400, 2, "수험표 챙기세요"), onlyNote: d.noticeText({ name: "나", apps: [] }, 400, 2, "수험표 챙기세요"), empty: d.noticeText({ name: "다", apps: [] }, 400, 2, "") }; });
+  check("일정 안내 문자: 덧붙일 말은 일정 뒤에, 일정 없어도 말만 보냄", [/면접·고사 — 부산대 경영학과 \(학종\)\n\n수험표 챙기세요\n※/.test(nx.withNote), /^\[3학년 2반\] 나 학생 대입 안내.*\n수험표 챙기세요$/.test(nx.onlyNote), nx.empty], [true, true, ""]);
   check("일정 안내 문자: 최저 미충족이면 응시 안 해도 됨", /논술 — 부산대 경영학과.*응시하지 않아도 됩니다/.test(ac.notice), true);
   check("학교장추천 현황: 대학별로 묶고 직접 끈 것·정시는 빼기", rec.g, ["부산대2", "부경대1"]);
   check("달력 줄 75바이트 안으로 접기", misc.foldMax <= 75 && misc.foldCont, true);
