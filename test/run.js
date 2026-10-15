@@ -384,6 +384,10 @@ function buildTestPage() {
   check("한눈에 보기: 결과 묶음·전형·지역·지원 장수", gl,
     JSON.stringify([{ ok: 1, wait: 1, go: 1, bad: 1, none: 0 }, { 학종: 1, 교과: 1, 논술: 1, 정시: 1 }, { 부산: 1, 서울: 2, 미상: 1 }, [1, 0, 0, 1, 0, 0, 0], 4]));
 
+  await p.click(".row >> nth=0 >> .rowhead"); await p.click("#tabAll"); await p.waitForTimeout(200);
+  await p.click("#brandHome"); await p.waitForTimeout(200);
+  check("제목 누르면 홈(우리 반 맨 위, 펼친 학생 닫힘)", await p.evaluate(() => [!document.getElementById("viewClass").hidden, document.querySelectorAll(".detail").length]), [true, 0]);
+
   /* ── 자료 지키기(백업 알림) ── */
   const bb = () => p.evaluate(() => { const b = document.getElementById("backupBar"); return [!b.hidden, b.classList.contains("due"), b.textContent]; });
   let B1 = await bb();
@@ -511,8 +515,8 @@ function buildTestPage() {
   await solo.click("#whoChip button >> text=학교 장부로"); await solo.waitForTimeout(900);
   check("혼자 쓰기 → 학교 장부로: 첫 화면", await gateTitle(solo), "진학 현황판");
   await solo.click("#banner .choice >> text=혼자 쓰기"); await solo.waitForTimeout(500);
-  await solo.click("#btnHome"); await solo.waitForTimeout(1200);
-  check("혼자 쓰기 → 처음 화면", [await gateTitle(solo), await solo.$eval("#btnHome", (e) => !e.hidden)], ["진학 현황판", true]);
+  await solo.click("#brandHome"); await solo.waitForTimeout(1200);
+  check("혼자 쓰기 → 제목 눌러 처음 화면", [await gateTitle(solo), await solo.$eval("#btnHome", (e) => !e.hidden)], ["진학 현황판", true]);
   for (const x of [adm, t2, other, wrong, solo]) await x.context().close();
   srv.close();
 

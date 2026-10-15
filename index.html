@@ -67,6 +67,8 @@ button{cursor:pointer}
 }
 .brand{display:flex; align-items:baseline; gap:9px; margin-right:auto}
 .brand h1{font-size:16px; font-weight:700; margin:0; letter-spacing:-.01em}
+.brand{cursor:pointer; border-radius:8px; padding:2px 4px; margin-left:-4px}
+.brand:hover h1{color:var(--accent)} .brand:focus-visible{outline:2px solid var(--accent-2); outline-offset:2px}
 .brand .yr{font-size:11px; color:var(--ink-3); letter-spacing:.06em}
 .tabs{display:flex; gap:3px; background:var(--surface-2); padding:3px; border-radius:8px}
 .tabs button{
@@ -534,7 +536,7 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
 </style>
 
 <div class="topbar">
-  <div class="brand">
+  <div class="brand" id="brandHome" role="button" tabindex="0" title="처음 화면으로">
     <h1>3학년 진학 현황판</h1>
     <span class="yr mono" id="yearLabel">2027학년도</span>
   </div>
@@ -3066,6 +3068,13 @@ function bindStatic(){
   document.getElementById("btnClassFile").onclick=classFile;
   document.getElementById("btnHelp").onclick=openHelp;
   document.getElementById("btnHome").onclick=goHome;
+  // 제목을 누르면 홈: 학교 장부를 쓰는 곳은 처음 화면, 아니면 우리 반 맨 위
+  var brand=document.getElementById("brandHome");
+  brand.onclick=function(){
+    if(!document.getElementById("btnHome").hidden||document.body.classList.contains("landing")){ goHome(); return; }
+    openId=null; editAppId=null; calSel=null; switchTab(true); render(); window.scrollTo(0,0);
+  };
+  brand.onkeydown=function(e){ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); brand.onclick(); } };
   document.getElementById("restoreFile").onchange=function(){
     var f=this.files&&this.files[0]; this.value="";
     if(!f) return;
