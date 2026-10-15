@@ -208,8 +208,8 @@ function buildTestPage() {
     const iso = soon.getFullYear() + "-" + String(soon.getMonth() + 1).padStart(2, "0") + "-" + String(soon.getDate()).padStart(2, "0") + "T18:00";
     return {
       six: c(mk(six)).map((w) => w.code),
-      itv: c(mk([{ kind: "수시", univ: "A", status: "1단계합", itv: "2026-11-28" }, { kind: "수시", univ: "B", status: "1단계합", itv: "2026-11-28" }])).map((w) => w.code),
-      itvSameUniv: c(mk([{ kind: "수시", univ: "A", jh: "교과", status: "지원완료", itv: "2026-10-17" }, { kind: "수시", univ: "A", jh: "종합", status: "지원완료", itv: "2026-10-17" }])).map((w) => w.code),
+      itv: c(mk([{ kind: "수시", univ: "A", status: "1단계합", itv: "2026-11-28", prep: { read: true, q: true, mock: true, go: true } }, { kind: "수시", univ: "B", status: "1단계합", itv: "2026-11-28", prep: { read: true, q: true, mock: true, go: true } }])).map((w) => w.code),
+      itvSameUniv: c(mk([{ kind: "수시", univ: "A", jh: "교과", status: "지원완료", itv: "2026-10-17", prep: { read: true, q: true, mock: true, go: true } }, { kind: "수시", univ: "A", jh: "종합", status: "지원완료", itv: "2026-10-17", prep: { read: true, q: true, mock: true, go: true } }])).map((w) => w.code),
       jungsi: c(mk([{ kind: "수시", univ: "A", status: "최초합" }, { kind: "정시", univ: "B", group: "가", status: "지원완료" }])).map((w) => w.code),
       jungsiGaveUp: c(mk([{ kind: "수시", univ: "A", status: "등록포기" }, { kind: "정시", univ: "B", group: "가", status: "지원완료" }])).map((w) => w.code),
       jungsiPass: c(mk([{ kind: "정시", univ: "A", group: "가", status: "최초합" }, { kind: "정시", univ: "B", group: "나", status: "지원완료" }])).map((w) => w.code),
@@ -343,6 +343,15 @@ function buildTestPage() {
     }; });
   check("수능 뒤 응시 판단: 아슬아슬·응시·안 가도 됨·최저 없음", [ac.edge, ac.go, ac.skip, ac.none], ["edge", "go", "skip", "go"]);
   check("수능 뒤 응시 판단: 등급 없으면 판단 안 함, 수능 전 고사·떨어진 지원은 빼기", [ac.noGrade, ac.before, ac.done], [null, false, false]);
+  const pr = await p.evaluate(() => { const d = window.__dev;
+    const a = { id: "x", kind: "수시", univ: "부산대학교", major: "경영학과", type: "학종", itv: "2026-11-28", status: "1단계합", prep: { read: true, mock: true } };
+    const b = JSON.parse(JSON.stringify(a)); b.prep.go = true;
+    return { list: [d.prepList(a).length, d.prepList({ type: "논술" }).length, d.prepList({ type: "실기" }).length], done: d.prepDone(a),
+      needs: [d.prepNeeds(a), d.prepNeeds({ ...a, status: "1단계불" }), d.prepNeeds({ ...a, itv: "" })],
+      log: d.diffLines({ name: "가", apps: [a] }, { name: "가", apps: [b] }) }; });
+  check("면접 준비: 면접 4·논술 3·실기 2 항목, 한 것 세기", [pr.list, pr.done], [[4, 3, 2], 2]);
+  check("면접 준비: 남은 면접만(떨어졌거나 날짜 없으면 빼기)", pr.needs, [true, false, false]);
+  check("변경 기록에 면접 준비", pr.log, ["부산대 경영학 — 면접 준비 2→3/4"]);
   check("일정 안내 문자: 최저 미충족이면 응시 안 해도 됨", /논술 — 부산대 경영학과.*응시하지 않아도 됩니다/.test(ac.notice), true);
   check("학교장추천 현황: 대학별로 묶고 직접 끈 것·정시는 빼기", rec.g, ["부산대2", "부경대1"]);
   check("달력 줄 75바이트 안으로 접기", misc.foldMax <= 75 && misc.foldCont, true);

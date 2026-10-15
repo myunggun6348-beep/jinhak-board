@@ -265,6 +265,12 @@ body.landing .gate{margin-top:10px}
 .pill.s-wait{background:var(--warn-soft); border-color:transparent; color:var(--warn); font-weight:700}
 .pill.s-bad{background:var(--bad-soft); border-color:transparent; color:var(--bad)}
 .pill.s-go{background:var(--accent-soft); border-color:transparent; color:var(--accent)}
+.prepc{display:flex; flex-wrap:wrap; gap:6px; flex-basis:100%; padding-left:2px}
+.prepc label{display:inline-flex; align-items:center; gap:5px; font-size:12px; padding:3px 10px; border:1px solid var(--line-2); border-radius:999px; cursor:pointer; background:var(--surface); color:var(--ink-2); user-select:none}
+.prepc label.on{background:var(--ok-soft); border-color:transparent; color:var(--ok); font-weight:700}
+.prepc input{margin:0; accent-color:var(--ok)}
+.prepc.ro label{cursor:default}
+.f.wide{grid-column:1/-1}
 .acwhy{flex-basis:100%; font-size:12px; color:var(--ink-3); padding-left:2px}
 .acsum{display:flex; flex-wrap:wrap; gap:6px; margin:4px 0 8px}
 .acnog{display:flex; flex-wrap:wrap; align-items:center; gap:6px 10px; margin-top:10px; padding:9px 12px; border-radius:10px; background:var(--surface-2); font-size:12.5px; color:var(--ink-2)}
@@ -647,6 +653,7 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
     <div class="stats" id="stats"></div>
     <div class="glance" id="glance"></div>
     <div class="sched" id="sched"></div>
+    <div class="sched" id="prep" hidden></div>
     <div class="sched" id="todo" hidden></div>
     <div class="sched" id="afterCsat" hidden></div>
 
@@ -718,6 +725,7 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
     <div class="stats" id="allStats"></div>
     <div class="glance" id="allGlance"></div>
     <div class="sched" id="allSched"></div>
+    <div class="sched" id="allPrep" hidden></div>
     <div class="sched" id="allTodo" hidden></div>
     <div class="sched" id="allAfterCsat" hidden></div>
     <div class="sched" id="allLog"></div>
@@ -841,6 +849,11 @@ function checkStudent(st){
       out.push({lv:"warn",code:"결과 미입력",msg:(a.univ||"한 곳")+" 발표일("+a.ann+")이 지났는데 상태가 ‘"+a.status+"’ 그대로입니다. 학생에게 결과를 확인해 주세요."});
     else if(ann1Late(a))
       out.push({lv:"warn",code:"결과 미입력",msg:(a.univ||"한 곳")+" 1단계 발표일("+a.ann1+")이 지났는데 상태가 ‘지원완료’ 그대로입니다. 1단계 합격·불합격을 넣어 주세요."});
+    if(prepNeeds(a)&&prepLeft(a).length){
+      var pd=daysTo(a.itv), pv=afterCsatApp(a)?examVerdict(st,a):null;
+      if(pd!==null&&pd>=0&&pd<=2&&!(pv&&pv.v==="skip"))
+        out.push({lv:"warn",code:"면접 준비",msg:(a.univ||"한 곳")+" "+(a.type==="논술"?"논술":a.type==="실기"?"실기":"면접")+"이 "+(pd===0?"오늘":pd===1?"내일":"모레")+"입니다("+mdw(a.itv)+"). 남은 준비: "+prepLeft(a).join(", ")+"."});
+    }
     if(a.status==="충원대기"&&a.due){
       var d=daysTo(a.due);
       if(d!==null&&d>=0&&d<=3)
@@ -1086,6 +1099,7 @@ function diffLines(p,s){
       var x=o[f[0]], y=a[f[0]]; if(lnorm(x)===lnorm(y)) return;
       ch.push(f[0]==="mreq"||f[0]==="note"? f[1]+" 바뀜" : f[1]+" "+lval(x)+" → "+lval(y));
     });
+    if(a.itv&&a.kind==="수시"&&prepDone(o)!==prepDone(a)) ch.push("면접 준비 "+prepDone(o)+"→"+prepDone(a)+"/"+prepList(a).length);
     if(ch.length) L.push(appName(a)+" — "+ch.join(", "));
   });
   (p.apps||[]).forEach(function(a){ if(!seen[a.id]) L.push("지원 삭제: "+appName(a)); });
@@ -1237,6 +1251,7 @@ function render(){
   renderGlance(document.getElementById("glance"), mine, false);
   document.getElementById("glance").hidden=!cls||!mine.length;
   renderSched(document.getElementById("sched"), mine, false);
+  renderPrep(document.getElementById("prep"), cls?mine:[], false);
   document.getElementById("sched").hidden=!cls;
   renderTodo(document.getElementById("todo"), cls?mine:[], false);
   renderAfterCsat(document.getElementById("afterCsat"), cls?mine:[], false);
@@ -1561,6 +1576,7 @@ function appEditor(st,a,w){
     if(a.kind==="수시") g.appendChild(field("최저 충족", sel(MINSTATES,a.mmet||"미정",function(v){a.mmet=v; save(st); render();})));
     g.appendChild(field("예비번호", txt(a.rank,"",function(v){a.rank=v; save(st);},"mono")));
     g.appendChild(field("메모", txt(a.note,"",function(v){a.note=v; save(st);})));
+    if(a.kind==="수시"&&a.itv){ var pf=field("면접 준비 ("+prepDone(a)+"/"+prepList(a).length+")", prepChips(st,a)); pf.classList.add("wide"); g.appendChild(pf); }
     if(a.kind==="수시"&&!a.jc){
       var cb=document.createElement("select");
       ["Y","N"].forEach(function(o){var op=document.createElement("option");op.value=o;op.textContent=o==="Y"?"포함":"제외";if((a.c6?"Y":"N")===o)op.selected=true;cb.appendChild(op);});
@@ -1637,6 +1653,7 @@ function renderAll(){
   renderGlance(document.getElementById("allGlance"), all, true);
   document.getElementById("allGlance").hidden=!all.length;
   renderSched(document.getElementById("allSched"), all, true);
+  renderPrep(document.getElementById("allPrep"), all, true);
   renderTodo(document.getElementById("allTodo"), all, true);
   renderAfterCsat(document.getElementById("allAfterCsat"), all, true);
   renderRecent(document.getElementById("allLog"), all);
@@ -2136,6 +2153,7 @@ function renderSched(host, arr, showClass){
     row.appendChild(who);
     row.appendChild(el("span","sub",[(a.jc?"전문대 ":"")+shortUniv(a.univ), shortMajor(a.major), a.kind==="정시"?(a.group&&!a.jc?a.group+"군":"정시"):jhText(a)].filter(Boolean).join(" · ")));
     if(e.kind==="due"&&a.rank) row.appendChild(el("span","pill s-wait","예비 "+a.rank));
+    if(e.kind==="itv"&&prepNeeds(a)){ var pn=prepDone(a), pm=prepList(a).length; row.appendChild(el("span","pill "+(pn===pm?"s-ok":e.d<=7?"s-bad":"empty"),"준비 "+pn+"/"+pm)); }
     if(e.kind==="itv"&&afterCsatApp(a)){ var vd=examVerdict(s,a); if(vd&&(vd.v!=="go"||a.mreq&&vd.why.indexOf("없음")<0)) row.appendChild(el("span","pill "+VERD[vd.v][1],VERD[vd.v][0])); }
     if(e.kind!=="itv"&&a.status&&a.status!=="지원완료") row.appendChild(el("span","pill "+statusClass(a.status),a.status));
     host.appendChild(row);
@@ -2193,6 +2211,55 @@ function renderTodo0(host, arr, showClass){
   }
 }
 function st0(s){ return students.get(s.id)||s; }
+/* ── 면접 준비 ── 면접·논술·실기가 남은 지원마다 할 일 몇 가지. 지원에 a.prep={항목:true} 로 남긴다 */
+var PREP={
+  면접:[["read","학생부 다시 읽기"],["q","예상 질문 답 준비"],["mock","모의면접"],["go","장소·시간·준비물 확인"]],
+  논술:[["past","기출 풀어 보기"],["mock","모의 논술·첨삭"],["go","장소·시간·준비물 확인"]],
+  실기:[["prac","실기 연습"],["go","장소·시간·준비물 확인"]]
+};
+function prepList(a){ return PREP[a.type==="논술"?"논술":a.type==="실기"?"실기":"면접"]; }
+function prepNeeds(a){ var s0=a.status||"지원완료"; return a.kind==="수시"&&!!a.itv&&(s0==="지원완료"||s0==="1단계합"); }
+function prepDone(a){ var p=a.prep||{}; return prepList(a).filter(function(x){ return p[x[0]]; }).length; }
+function prepLeft(a){ var p=a.prep||{}; return prepList(a).filter(function(x){ return !p[x[0]]; }).map(function(x){ return x[1]; }); }
+function prepChips(st,a){
+  var box=el("div","prepc"+(ro()?" ro":"")), p=a.prep||{};
+  prepList(a).forEach(function(x){
+    var l=el("label",p[x[0]]?"on":null), c=document.createElement("input"); c.type="checkbox"; c.checked=!!p[x[0]]; c.disabled=ro();
+    c.onchange=function(){ remember("수정"); var t=st0(st), aa=(t.apps||[]).filter(function(y){ return y.id===a.id; })[0]||a;
+      aa.prep=aa.prep||{}; if(c.checked) aa.prep[x[0]]=true; else delete aa.prep[x[0]]; save(t); render(); };
+    l.appendChild(c); l.appendChild(document.createTextNode(x[1])); box.appendChild(l);
+  });
+  return box;
+}
+var prepAll=false;
+function renderPrep(host, arr, showClass){
+  host.innerHTML="";
+  var items=[];
+  arr.forEach(function(st){ (st.apps||[]).forEach(function(a){
+    var d=daysTo(a.itv); if(!prepNeeds(a)||d===null||d<0) return;
+    var vd=afterCsatApp(a)?examVerdict(st,a):null; if(vd&&vd.v==="skip") return;   // 최저를 못 채워 안 가도 되는 고사는 뺀다
+    items.push({s:st,a:a,d:d});
+  }); });
+  host.hidden=!items.length; if(!items.length) return;
+  items.sort(function(x,y){ return String(x.a.itv).localeCompare(String(y.a.itv))||(x.s.cls-y.s.cls)||String(x.s.no||"").localeCompare(String(y.s.no||"")); });
+  var todo=items.filter(function(x){ return prepDone(x.a)<prepList(x.a).length; }).length;
+  var hd=el("div","schedhead"); hd.appendChild(el("h2",null,"면접·고사 준비"));
+  hd.appendChild(el("span","cnt",items.length+"건 · 준비 남음 "+todo+"건"));
+  host.appendChild(hd);
+  host.appendChild(el("div","shint","남은 면접·논술·실기마다 준비한 것을 누르세요. 7일 안인데 덜 된 것은 빨갛게 보입니다."));
+  var LIMIT=10;
+  items.slice(0,prepAll?items.length:LIMIT).forEach(function(x){
+    var s=x.s, a=x.a, n=prepDone(a), m=prepList(a).length, row=el("div","sitem");
+    row.appendChild(el("span","pill "+(n===m?"s-ok":x.d<=7?"s-bad":"s-go"),x.d===0?"오늘":"D-"+x.d));
+    var who=el("button","who",(showClass&&s.cls?s.cls+"반 ":"")+(s.no?s.no+" ":"")+(s.name||"")); who.title="이 학생 보기";
+    who.onclick=function(){ goStudent(s); }; row.appendChild(who);
+    row.appendChild(el("span","sub",[mdw(a.itv)+" "+(a.type==="논술"?"논술":a.type==="실기"?"실기":"면접"), (a.jc?"전문대 ":"")+shortUniv(a.univ), shortMajor(a.major), jhText(a)].filter(Boolean).join(" · ")));
+    row.appendChild(el("span","pill "+(n===m?"s-ok":"empty"),"준비 "+n+"/"+m));
+    row.appendChild(prepChips(s,a));
+    host.appendChild(row);
+  });
+  if(items.length>LIMIT){ var mo=el("button","ghost smore",prepAll?"접기":"나머지 "+(items.length-LIMIT)+"건 더 보기"); mo.onclick=function(){ prepAll=!prepAll; render(); }; host.appendChild(mo); }
+}
 /* ── 수능 뒤 응시 판단 ──
    수능 다음 날 가채점 등급을 넣으면, 수능 뒤에 있는 면접·논술·실기마다 최저를 따져 갈지 말지 보여 준다.
    아슬아슬 = 지금은 충족이지만 한 과목만 한 등급 내려가도 미충족(가채점은 경계에서 틀릴 수 있다). */
@@ -4693,7 +4760,7 @@ try{ if(location.protocol==="file:"||location.hostname==="localhost"){
     parseDelimited:parseDelimited, readApps:readApps, pdfTableRows:pdfTableRows, last:function(){ return lastRead; },
     checkStudent:checkStudent, parseMin:parseMin, judgeMin:judgeMin, rowsFromPdf:rowsFromPdf,
     univFound:univFound, univRegion:univRegion, outcomeOf:outcomeOf, resultsOf:resultsOf,
-    KEYDATES:KEYDATES, minGaps:minGaps, render:function(){ render(); }, leftText:leftText, normCode:normCode, codeKeys:codeKeys, sealDoc:sealDoc, openDoc:openDoc, mergeData:function(l){ var r=mergeData(l); render(); return r; }, students:function(){ return JSON.parse(JSON.stringify(Array.from(students.values()))); }, scoreSum:scoreSum, scoreOk:scoreOk, noticeText:noticeText, diffLines:diffLines, logs:function(){ var o=[]; students.forEach(function(x){ (x.log||[]).forEach(function(e){ o.push(e); }); }); return o; }, glanceData:glanceData, univKey:univKey, majorKey:majorKey, upcoming:upcoming, pending:pending, examVerdict:examVerdict, afterCsatApp:afterCsatApp, isRec:isRec, recGroups:recGroups, icsFold:icsFold, jungsiOf:jungsiOf};
+    KEYDATES:KEYDATES, minGaps:minGaps, render:function(){ render(); }, leftText:leftText, normCode:normCode, codeKeys:codeKeys, sealDoc:sealDoc, openDoc:openDoc, mergeData:function(l){ var r=mergeData(l); render(); return r; }, students:function(){ return JSON.parse(JSON.stringify(Array.from(students.values()))); }, scoreSum:scoreSum, scoreOk:scoreOk, noticeText:noticeText, diffLines:diffLines, logs:function(){ var o=[]; students.forEach(function(x){ (x.log||[]).forEach(function(e){ o.push(e); }); }); return o; }, glanceData:glanceData, univKey:univKey, majorKey:majorKey, upcoming:upcoming, pending:pending, examVerdict:examVerdict, afterCsatApp:afterCsatApp, prepList:prepList, prepDone:prepDone, prepNeeds:prepNeeds, isRec:isRec, recGroups:recGroups, icsFold:icsFold, jungsiOf:jungsiOf};
 } }catch(e){}
 
 /* 켜 둔 채로 시간이 흐르면 D-day·남은 시간·경고·결과 입력할 것을 1분마다 새로 그린다.
