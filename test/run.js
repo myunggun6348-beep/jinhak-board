@@ -381,6 +381,11 @@ function buildTestPage() {
     const st = { name: "가", apps: [{ kind: "수시", univ: "부산대학교", major: "경영학과", type: "학종", itv: "2026-11-28", status: "1단계합" }] };
     return { withNote: d.noticeText(st, 400, 2, "수험표 챙기세요"), onlyNote: d.noticeText({ name: "나", apps: [] }, 400, 2, "수험표 챙기세요"), empty: d.noticeText({ name: "다", apps: [] }, 400, 2, "") }; });
   check("일정 안내 문자: 덧붙일 말은 일정 뒤에, 일정 없어도 말만 보냄", [/면접·고사 — 부산대 경영학과 \(학종\)\n\n수험표 챙기세요\n※/.test(nx.withNote), /^\[3학년 2반\] 나 학생 대입 안내.*\n수험표 챙기세요$/.test(nx.onlyNote), nx.empty], [true, true, ""]);
+  const sg = await p.evaluate(() => { const r = []; const set = (k, v) => { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); };
+    const was = [localStorage.getItem("jh.myname"), localStorage.getItem("jh.sign")];
+    [["2반 김철수", null], ["3학년 2반 담임 김철수", null], ["김철수 선생님", null], ["2반 김철수", "박영희"], ["", null]].forEach((x) => { set("jh.myname", x[0] || null); set("jh.sign", x[1]); r.push(window.__dev.signGet()); });
+    set("jh.myname", was[0]); set("jh.sign", was[1]); return r; });
+  check("가정통신문 서명: 선생님 이름에서 'n반'·'선생님' 떼기, 따로 적은 서명이 먼저", sg, ["김철수", "김철수", "김철수", "박영희", ""]);
   check("일정 안내 문자: 최저 미충족이면 응시 안 해도 됨", /논술 — 부산대 경영학과.*응시하지 않아도 됩니다/.test(ac.notice), true);
   check("학교장추천 현황: 대학별로 묶고 직접 끈 것·정시는 빼기", rec.g, ["부산대2", "부경대1"]);
   check("달력 줄 75바이트 안으로 접기", misc.foldMax <= 75 && misc.foldCont, true);

@@ -294,7 +294,8 @@ body.landing .gate{margin-top:10px}
 .reghint{flex-basis:100%; font-size:12px; color:var(--ink-3); padding-left:2px}
 .nnote{display:flex; flex-direction:column; gap:4px; margin:8px 0 10px}
 .nnote label{font-size:12px; font-weight:700; color:var(--ink-2)}
-.nnote textarea{border:1px solid var(--line-2); background:var(--surface); color:var(--ink); border-radius:8px; padding:8px 10px; font:inherit; font-size:13px; resize:vertical}
+.nnote textarea, .nnote input{border:1px solid var(--line-2); background:var(--surface); color:var(--ink); border-radius:8px; padding:8px 10px; font:inherit; font-size:13px; resize:vertical}
+.nnote input{max-width:220px}
 .acwhy{flex-basis:100%; font-size:12px; color:var(--ink-3); padding-left:2px}
 .acsum{display:flex; flex-wrap:wrap; gap:6px; margin:4px 0 8px}
 .acnog{display:flex; flex-wrap:wrap; align-items:center; gap:6px 10px; margin-top:10px; padding:9px 12px; border-radius:10px; background:var(--surface-2); font-size:12.5px; color:var(--ink-2)}
@@ -3196,11 +3197,16 @@ function noticeText(st, days, cls, extra){
 // 반마다 덧붙일 말(이 브라우저에 기억)
 function nnoteGet(cls){ try{ return localStorage.getItem("jh.nnote."+cls)||""; }catch(e){ return ""; } }
 function nnoteSet(cls,v){ try{ if(v) localStorage.setItem("jh.nnote."+cls,v); else localStorage.removeItem("jh.nnote."+cls); }catch(e){} }
+// 가정통신문 서명 이름(이 브라우저에 기억). 없으면 선생님 이름에서 앞의 'n반'을 떼어 쓴다
+function signGet(){ try{ var v=localStorage.getItem("jh.sign"); if(v) return v; }catch(e){} return myName().replace(/^\s*(3학년\s*)?\d+\s*반\s*(담임)?\s*/,"").replace(/\s*(선생님|담임)$/,"").trim(); }
+function signSet(v){ try{ if(v) localStorage.setItem("jh.sign",v.trim().slice(0,20)); else localStorage.removeItem("jh.sign"); }catch(e){} }
 // 가정통신문: 학생마다 A4 한 장(일정 표 + 덧붙일 말 + 담임). 일정도 덧붙일 말도 없으면 뺀다
 function printLetters(mine, cls, days, extra){
   var now=new Date(), ds=now.getFullYear()+"년 "+(now.getMonth()+1)+"월 "+now.getDate()+"일", sch=(school&&school.name)||"";
   var pages=mine.map(function(st){ return {st:st, items:noticeItems(st,days)}; }).filter(function(x){ return x.items.length||extra; });
   if(!pages.length){ alert("안내할 일정이 있는 학생이 없습니다."); return; }
+  var sign=signGet();
+  if(!sign){ var n=window.prompt("가정통신문 서명에 넣을 담임 선생님 이름을 적어 주세요(예: 김○○). 이 컴퓨터에만 기억합니다.",""); if(n&&n.trim()){ signSet(n); sign=signGet(); } }
   var o=['<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="color-scheme" content="light"><title>'+h(YEAR+"학년도 3학년 "+cls+"반 가정통신문")+'</title><style>'+
     '@page{size:A4;margin:16mm}html{background:#fff}body{background:#fff;font-family:"Malgun Gothic","Apple SD Gothic Neo",sans-serif;font-size:10.5pt;color:#111;margin:0}'+
     '.pg{page-break-after:always;min-height:240mm}.pg:last-child{page-break-after:auto}.top{display:flex;justify-content:space-between;color:#555;font-size:9pt;border-bottom:2px solid #333;padding-bottom:4px}'+
@@ -3216,7 +3222,7 @@ function printLetters(mine, cls, days, extra){
     if(x.items.length) o.push('<table><tr><th>날짜</th><th>내용</th></tr>'+x.items.map(function(i){ var dd=mdw(i.when), tt=i.t, m=tt.match(/^~ (\d+\/\d+\([^)]\))\s(.*)$/); if(m){ dd+=" ~ "+m[1]; tt=m[2]; } return '<tr><td class="d">'+h(dd)+'</td><td>'+h(tt)+'</td></tr>'; }).join("")+'</table>');
     else o.push('<p class="na">안내할 남은 일정이 없습니다.</p>');
     if(extra) o.push('<div class="note"><b>담임 선생님 말씀</b>'+h(extra)+'</div>');
-    o.push('<div class="sign">'+h(ds)+'<br>3학년 '+h(cls)+'반 담임 '+h(myName()||"")+' 드림</div>');
+    o.push('<div class="sign">'+h(ds)+'<br>3학년 '+h(cls)+'반 담임'+(sign?' '+h(sign):'')+' 드림</div>');
     o.push('<div class="foot">※ 이 안내는 '+h(ds)+' 기준입니다. 일정이 바뀌거나 결과가 나오면 담임에게 꼭 알려 주세요.</div></section>');
   });
   o.push('<script>window.onload=function(){ setTimeout(function(){ window.print(); },300); };<\/script></body></html>');
@@ -3249,7 +3255,10 @@ function renderNotice(mine, cls){
   var nb=el("div","nnote"), na=document.createElement("textarea"); na.name="nnote"; na.rows=2; na.maxLength=400; na.value=note;
   na.placeholder="모든 학생에게 덧붙일 말 (예: 수능 수험표·신분증은 전날 미리 챙기세요. 궁금한 점은 담임에게 연락 주세요.)";
   na.onchange=function(){ nnoteSet(cls,na.value.trim()); render(); };
-  nb.appendChild(el("label",null,"덧붙일 말 (이 반 문자·가정통신문 모두에)")); nb.appendChild(na); host.appendChild(nb);
+  nb.appendChild(el("label",null,"덧붙일 말 (이 반 문자·가정통신문 모두에)")); nb.appendChild(na);
+  var si=document.createElement("input"); si.name="sign"; si.id="signInput"; si.maxLength=20; si.value=signGet(); si.placeholder="예: 김○○";
+  si.onchange=function(){ signSet(si.value); };
+  var sl=el("label",null,"가정통신문 서명 (3학년 "+cls+"반 담임 ○○○ 드림)"); sl.htmlFor="signInput"; nb.appendChild(sl); nb.appendChild(si); host.appendChild(nb);
   host.appendChild(el("div","shint","학생마다 '복사'를 눌러 문자·메신저에 붙여 보내세요. 결과가 난 지원(합격·불합격)의 면접·발표는 빠집니다. 날짜는 입력된 지원 현황 기준이니 보내기 전에 한 번 확인해 주세요."));
   texts.forEach(function(x){
     var c=el("div","ncard"), h=el("div","nh");
@@ -5146,7 +5155,7 @@ try{ if(location.protocol==="file:"||location.hostname==="localhost"){
     parseDelimited:parseDelimited, readApps:readApps, pdfTableRows:pdfTableRows, last:function(){ return lastRead; },
     checkStudent:checkStudent, parseMin:parseMin, judgeMin:judgeMin, rowsFromPdf:rowsFromPdf,
     univFound:univFound, univRegion:univRegion, outcomeOf:outcomeOf, resultsOf:resultsOf,
-    KEYDATES:KEYDATES, minGaps:minGaps, render:function(){ render(); }, leftText:leftText, normCode:normCode, codeKeys:codeKeys, sealDoc:sealDoc, openDoc:openDoc, mergeData:function(l){ var r=mergeData(l); render(); return r; }, students:function(){ return JSON.parse(JSON.stringify(Array.from(students.values()))); }, scoreSum:scoreSum, scoreOk:scoreOk, noticeText:noticeText, diffLines:diffLines, logs:function(){ var o=[]; students.forEach(function(x){ (x.log||[]).forEach(function(e){ o.push(e); }); }); return o; }, glanceData:glanceData, univKey:univKey, majorKey:majorKey, upcoming:upcoming, pending:pending, noticeItems:noticeItems, jungsiUnfiled:jungsiUnfiled, regInfo:regInfo, renderReg:renderReg, examVerdict:examVerdict, afterCsatApp:afterCsatApp, prepList:prepList, prepDone:prepDone, prepNeeds:prepNeeds, isRec:isRec, recGroups:recGroups, icsFold:icsFold, jungsiOf:jungsiOf};
+    KEYDATES:KEYDATES, minGaps:minGaps, render:function(){ render(); }, leftText:leftText, normCode:normCode, codeKeys:codeKeys, sealDoc:sealDoc, openDoc:openDoc, mergeData:function(l){ var r=mergeData(l); render(); return r; }, students:function(){ return JSON.parse(JSON.stringify(Array.from(students.values()))); }, scoreSum:scoreSum, scoreOk:scoreOk, noticeText:noticeText, diffLines:diffLines, logs:function(){ var o=[]; students.forEach(function(x){ (x.log||[]).forEach(function(e){ o.push(e); }); }); return o; }, glanceData:glanceData, univKey:univKey, majorKey:majorKey, upcoming:upcoming, pending:pending, noticeItems:noticeItems, jungsiUnfiled:jungsiUnfiled, regInfo:regInfo, renderReg:renderReg, examVerdict:examVerdict, afterCsatApp:afterCsatApp, prepList:prepList, prepDone:prepDone, prepNeeds:prepNeeds, isRec:isRec, recGroups:recGroups, icsFold:icsFold, jungsiOf:jungsiOf, signGet:signGet};
 } }catch(e){}
 
 /* 켜 둔 채로 시간이 흐르면 D-day·남은 시간·경고·결과 입력할 것을 1분마다 새로 그린다.
