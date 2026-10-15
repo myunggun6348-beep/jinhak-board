@@ -321,6 +321,13 @@ function buildTestPage() {
   check("결과 입력할 것: 지난 발표·1단계 발표·충원 마감", misc.pending, ["bann", "gann1", "edue"]);
   check("일정 안내 문자에 1단계 발표", /1단계 합격자 발표 — F/.test(misc.notice), true);
   check("파일 읽기: 1단계 발표일·최종 발표일 따로", misc.ann1Read, ["2026-11-20", "2026-12-12"]);
+  const rec = await p.evaluate(() => { const d = window.__dev;
+    const r = d.readApps([["이름", "대학", "전형명", "학교장추천"], ["김", "부산대학교", "학생부교과(학교장추천)", ""], ["이", "경북대학교", "지역인재", "Y"], ["박", "동아대학교", "학생부교과(학교장추천)", "N"]]).apps.map((x) => d.isRec(x.app));
+    const g = d.recGroups([{ cls: 2, no: "1", name: "가", apps: [{ kind: "수시", univ: "부산대학교", jh: "학생부교과(학교장추천)" }, { kind: "수시", univ: "부경대학교", jh: "교과", rec: true }, { kind: "정시", univ: "부산대학교", jh: "학교장추천" }] },
+      { cls: 3, no: "2", name: "나", apps: [{ kind: "수시", univ: "부산대학교(부산)", jh: "학생부교과(학교장추천)", rec: false }, { kind: "수시", univ: "부산대학교", jh: "지역인재(학교추천)" }] }]);
+    return { r, g: g.map((x) => x.univ + x.list.length) }; });
+  check("학교장추천: 전형명에서 저절로, 칸이 있으면 그 값", rec.r, [true, true, false]);
+  check("학교장추천 현황: 대학별로 묶고 직접 끈 것·정시는 빼기", rec.g, ["부산대2", "부경대1"]);
   check("달력 줄 75바이트 안으로 접기", misc.foldMax <= 75 && misc.foldCont, true);
   check("정시 현황: 수시 합격·가군·전문대 구분", misc.jungsi, "1,1,1");
 
