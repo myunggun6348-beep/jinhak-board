@@ -896,6 +896,8 @@ function checkStudent(st){
       out.push({lv:"warn",code:"결과 미입력",msg:(a.univ||"한 곳")+" 발표일("+a.ann+")이 지났는데 상태가 ‘"+a.status+"’ 그대로입니다. 학생에게 결과를 확인해 주세요."});
     else if(ann1Late(a))
       out.push({lv:"warn",code:"결과 미입력",msg:(a.univ||"한 곳")+" 1단계 발표일("+a.ann1+")이 지났는데 상태가 ‘지원완료’ 그대로입니다. 1단계 합격·불합격을 넣어 주세요."});
+    else if(annOver(a))
+      out.push({lv:"warn",code:"결과 미입력",msg:(a.univ||"한 곳")+" 발표일이 없는데 수시 합격자 발표 마감("+mdw(kdOf("s-ann").s)+")이 지났고 상태가 ‘"+(a.status||"지원완료")+"’ 그대로입니다. 학생에게 결과를 확인해 주세요."});
     if(prepNeeds(a)&&prepLeft(a).length){
       var pd=daysTo(a.itv), pv=afterCsatApp(a)?examVerdict(st,a):null;
       if(pd!==null&&pd>=0&&pd<=2&&!(pv&&pv.v==="skip"))
@@ -906,6 +908,13 @@ function checkStudent(st){
       if(d!==null&&d>=0&&d<=3)
         out.push({lv:"crit",code:"충원마감",msg:a.univ+" 충원 마감이 "+(d===0?"오늘"+leftText(a.due):d+"일 뒤")+"입니다("+fmtDue(a.due)+"). 전화를 받을 수 있어야 합니다."});
     }
+    if(a.status==="충원대기"){
+      var ae=a.due||addEnd(a);
+      if(ae&&new Date(ae.replace(" ","T")).getTime()<Date.now())
+        out.push({lv:"warn",code:"결과 미입력",msg:(a.univ||"한 곳")+" "+(a.due?"충원 마감("+fmtDue(a.due)+")":(a.kind==="정시"?"정시":"수시")+" 충원 합격 통보 마감("+fmtDue(ae)+")")+"이 지났는데 아직 충원 대기입니다. 충원 합격 연락이 없었으면 불합격으로 바꿔 주세요."});
+      else if(!a.due&&ae)
+        out.push({lv:"warn",code:"충원 마감 미입력",msg:(a.univ||"한 곳")+" 충원 대기인데 충원 마감 일시가 없습니다. 대학 공지의 충원 일정(전화·문자 통보 마감)을 넣으면 마감 임박을 알려 드립니다. "+(a.kind==="정시"?"정시":"수시")+" 충원 통보는 늦어도 "+fmtDue(ae)+"에 끝납니다."});
+    }
   });
   var kja=kdOf("j-app");
   if(kja){ var jd=daysTo(kja.e), uf=jungsiUnfiled(st), cands=GUN.filter(function(g){ return jcandOf(st,g).length; });
@@ -915,6 +924,12 @@ function checkStudent(st){
     }
   }
   var ri=regInfo(st);
+  if(ri.state==="move"){
+    var md=daysTo(ri.due);
+    out.push({lv:md<=1?"crit":"warn",code:"충원 합격",msg:"이미 "+ri.reg.map(function(a){ return shortUniv(a.univ); }).join(", ")+"에 등록했는데 "+ri.pass.map(function(a){ return shortUniv(a.univ); }).join(", ")+" 충원 합격이 왔습니다. 옮길지 충원 등록 마감("+mdw(ri.due)+") 전에 정하세요. 옮기려면 지금 등록한 곳을 먼저 포기해야 합니다."});
+  }
+  if(ri.state==="todo"&&daysTo(ri.due)!==null&&daysTo(ri.due)<0)
+    out.push({lv:"warn",code:"등록 확인",msg:(ri.add?"수시 충원":"수시")+" 등록 마감("+mdw(ri.due)+")이 지났는데 등록 여부가 없습니다("+ri.pass.map(function(a){ return shortUniv(a.univ); }).join(", ")+"). 등록했으면 ‘여기 등록’, 안 했으면 ‘포기’로 바꿔 주세요."});
   if(ri.state==="todo"){
     var rd=daysTo(ri.due);
     if(rd!==null&&rd>=0&&rd<=3) out.push({lv:rd<=1?"crit":"warn",code:"등록 마감",msg:(ri.add?"수시 충원":"수시")+" 등록 마감이 "+(rd===0?"오늘":rd+"일 뒤")+"("+mdw(ri.due)+")인데 등록할 대학을 정하지 않았습니다("+ri.pass.map(function(a){ return shortUniv(a.univ); }).join(", ")+" 합격). 한 곳만 등록하세요."});
@@ -929,12 +944,16 @@ function appWarn(st,a){
   if(a.itv&&apps.some(function(x){return x.itv===a.itv&&x.univ!==a.univ;})) return "면접·고사일 중복";
   if(a.status==="등록완료"&&apps.filter(function(x){return x.status==="등록완료";}).length>1) return "이중등록";
   if(a.status==="충원대기"&&a.due){var d=daysTo(a.due); if(d!==null&&d>=0&&d<=3) return "충원 마감 임박";}
-  if(a.ann&&AWAIT[a.status]&&daysTo(a.ann)<0||ann1Late(a)) return "결과 미입력";
+  if(a.ann&&AWAIT[a.status]&&daysTo(a.ann)<0||ann1Late(a)||annOver(a)) return "결과 미입력";
   return "";
 }
 // 1단계 발표: 아직 지원완료(1단계 결과 전)일 때만 의미가 있다
 function ann1Wait(a){ return !!a.ann1&&(a.status||"지원완료")==="지원완료"; }
 function ann1Late(a){ return ann1Wait(a)&&daysTo(a.ann1)<0; }
+// 발표일을 안 넣은 수시 지원: 수시 합격자 발표 마감이 지나면 결과가 있어야 한다
+function annOver(a){ var k=kdOf("s-ann"); return a.kind==="수시"&&!a.ann&&!!AWAIT[a.status||"지원완료"]&&!!k&&daysTo(k.s)<0; }
+// 충원 마감을 안 넣은 충원 대기의 끝: 수시·정시 충원 합격 통보 마감
+function addEnd(a){ var k=kdOf(a.kind==="정시"?"j-add":"s-add"); return k?k.s+"T"+(k.time||"23:59"):""; }
 var KINDNAME={itv:"면접·고사", ann1:"1단계 발표", ann:"발표", due:"충원 마감"};
 function kindName(e,withTime){ return e.kind==="due"&&withTime?"충원 마감 "+fmtDue(e.a.due).split(" ")[1]:KINDNAME[e.kind]; }
 
@@ -2256,7 +2275,8 @@ function pending(arr){
   arr.forEach(function(s){ (s.apps||[]).forEach(function(a){
     if(a.ann&&AWAIT[a.status||"지원완료"]&&daysTo(a.ann)<0) out.push({s:s,a:a,kind:"ann",when:a.ann,late:-daysTo(a.ann)});
     else if(ann1Late(a)) out.push({s:s,a:a,kind:"ann1",when:a.ann1,late:-daysTo(a.ann1)});
-    else if(a.due&&a.status==="충원대기"&&new Date(a.due).getTime()<now) out.push({s:s,a:a,kind:"due",when:a.due,late:Math.max(0,-daysTo(a.due))});
+    else if(annOver(a)){ var sa=kdOf("s-ann").s; out.push({s:s,a:a,kind:"annx",when:sa,late:-daysTo(sa)}); }
+    else if(a.status==="충원대기"){ var du=a.due||addEnd(a); if(du&&new Date(du).getTime()<now) out.push({s:s,a:a,kind:"due",when:du,late:Math.max(0,-daysTo(du)),noDue:!a.due}); }
   }); });
   return out.sort(function(x,y){ return String(x.when).localeCompare(String(y.when))||(x.s.cls-y.s.cls)||String(x.s.no||"").localeCompare(String(y.s.no||"")); });
 }
@@ -2273,11 +2293,11 @@ function renderTodo0(host, arr, showClass){
   hd.appendChild(el("h2",null,"결과 입력할 것"));
   hd.appendChild(el("span","cnt",list.length+"건"));
   host.appendChild(hd);
-  host.appendChild(el("div","shint","발표일(1단계 발표·충원 마감)이 지났는데 결과가 들어오지 않은 지원입니다. 오른쪽에서 결과를 고르면 목록에서 빠집니다."));
+  host.appendChild(el("div","shint","발표일(1단계 발표·충원 마감)이 지났는데 결과가 들어오지 않은 지원입니다. 발표일을 넣지 않은 수시 지원은 수시 합격자 발표 마감이, 충원 마감을 넣지 않은 충원 대기는 충원 합격 통보 마감이 지나면 여기 나옵니다. 오른쪽에서 결과를 고르면 목록에서 빠집니다."));
   var LIMIT=12;
   list.slice(0,todoAll?list.length:LIMIT).forEach(function(e){
     var row=el("div","sitem"), s=e.s, a=e.a;
-    row.appendChild(el("span","sk late",e.kind==="ann"?"발표 "+mmdd(a.ann):e.kind==="ann1"?"1단계 발표 "+mmdd(a.ann1):"충원 마감 "+mmdd(a.due)));
+    row.appendChild(el("span","sk late",e.kind==="ann"?"발표 "+mmdd(a.ann):e.kind==="annx"?"발표 마감 "+mmdd(e.when):e.kind==="ann1"?"1단계 발표 "+mmdd(a.ann1):(e.noDue?"충원 통보 마감 ":"충원 마감 ")+mmdd(e.when)));
     var who=el("button","who",(showClass&&s.cls?s.cls+"반 ":"")+(s.no?s.no+" ":"")+(s.name||""));
     who.title="이 학생 보기";
     who.onclick=function(){ goStudent(s); };
@@ -2301,11 +2321,15 @@ function kdOf(id){ return KEYDATES.filter(function(x){ return x.id===id; })[0]; 
 function regInfo(st){
   var su=(st.apps||[]).filter(function(a){ return a.kind==="수시"; }), by=function(v){ return su.filter(function(a){ return a.status===v; }); };
   var pass=su.filter(function(a){ return a.status==="최초합"||a.status==="충원합"; }), reg=by("등록완료"), gave=by("등록포기"), wait=by("충원대기");
-  var add=pass.some(function(a){ return a.status==="충원합"; }), k=kdOf(add?"s-addr":"s-reg");
-  return {pass:pass, reg:reg, gave:gave, wait:wait, add:add, due:k?(k.e||k.s):"",
-    state:reg.length?"done":pass.length?"todo":gave.length?"gaveup":null};
+  var add=pass.some(function(a){ return a.status==="충원합"; }), k=kdOf(add?"s-addr":"s-reg"), due=k?(k.e||k.s):"";
+  // 이미 등록했는데 충원 합격이 온 경우: 충원 등록 마감까지 옮길지 정한다
+  var moveTo=reg.length?pass.filter(function(a){ return a.status==="충원합"; }):[];
+  var move=moveTo.length>0&&daysTo(due)!==null&&daysTo(due)>=0;
+  return {pass:move?moveTo:pass, reg:reg, gave:gave, wait:wait, add:add, due:due,
+    state:move?"move":reg.length?"done":pass.length?"todo":gave.length?"gaveup":null};
 }
-var REGST={todo:["등록할 곳 정하기","s-wait"],done:["등록 완료","s-ok"],gaveup:["모두 포기","empty"]};
+var REGST={todo:["등록할 곳 정하기","s-wait"],move:["옮길지 정하기","s-wait"],done:["등록 완료","s-ok"],gaveup:["모두 포기","empty"]};
+var REGORD=["todo","move","done","gaveup"];
 function renderReg(host, arr, showClass){
   host.innerHTML="";
   var rows=[];
@@ -2318,9 +2342,9 @@ function renderReg(host, arr, showClass){
   host.appendChild(hd);
   var cnt={}; rows.forEach(function(x){ cnt[x.r.state]=(cnt[x.r.state]||0)+1; });
   var sum=el("div","acsum");
-  ["todo","done","gaveup"].forEach(function(k){ if(cnt[k]) sum.appendChild(el("span","pill "+REGST[k][1],REGST[k][0]+" "+cnt[k])); });
+  REGORD.forEach(function(k){ if(cnt[k]) sum.appendChild(el("span","pill "+REGST[k][1],REGST[k][0]+" "+cnt[k])); });
   host.appendChild(sum);
-  rows.sort(function(x,y){ return ["todo","done","gaveup"].indexOf(x.r.state)-["todo","done","gaveup"].indexOf(y.r.state)||(x.s.cls-y.s.cls)||String(x.s.no||"").localeCompare(String(y.s.no||"")); });
+  rows.sort(function(x,y){ return REGORD.indexOf(x.r.state)-REGORD.indexOf(y.r.state)||(x.s.cls-y.s.cls)||String(x.s.no||"").localeCompare(String(y.s.no||"")); });
   var nm=function(a){ return (a.jc?"전문대 ":"")+shortUniv(a.univ)+" "+shortMajor(a.major); };
   rows.forEach(function(x){
     var s=x.s, r=x.r, row=el("div","sitem");
@@ -2341,6 +2365,25 @@ function renderReg(host, arr, showClass){
       });
       row.appendChild(box);
       row.appendChild(el("span","reghint",r.pass.length>1?"합격한 곳 중 한 곳만 등록합니다. 나머지는 등록하지 않으면 됩니다(이중등록은 입학 취소).":"등록 기간에 등록금(예치금)을 내야 합격이 확정됩니다."));
+    } else if(r.state==="move"){
+      var dm=daysTo(r.due); row.appendChild(el("span","sub","등록: "+r.reg.map(nm).join(", ")+" · 충원 등록 마감 "+mdw(r.due)+(dm!==null&&dm>=0?" · D-"+dm:"")));
+      var mb=el("div","regapps");
+      r.pass.forEach(function(a){
+        var c=el("span","regapp"); c.appendChild(el("span",null,nm(a)+" · 충원합"));
+        if(!ro()){
+          var go=el("button","btn sec","여기로 옮기기"); go.onclick=function(){
+            var old=r.reg.map(nm).join(", ");
+            if(!window.confirm(old+" 등록을 포기하고 "+nm(a)+"에 등록한 것으로 바꿉니다.\n\n먼저 "+old+"에 등록 포기(환불) 신청을 했는지 확인하세요. 포기하지 않고 새로 등록하면 이중등록으로 입학이 취소됩니다.")) return;
+            remember("등록"); var t=st0(s);
+            (t.apps||[]).forEach(function(y){ if(y.id===a.id) y.status="등록완료"; else if(y.status==="등록완료") y.status="등록포기"; });
+            save(t); render(); };
+          var no=el("button","ghost","안 옮김"); no.onclick=function(){ if(!window.confirm(nm(a)+" 충원 합격을 등록포기로 바꿉니다(지금 등록한 곳에 그대로 다닙니다).")) return; remember("등록"); var t=st0(s), aa=(t.apps||[]).filter(function(y){ return y.id===a.id; })[0]; if(!aa) return; aa.status="등록포기"; save(t); render(); };
+          c.appendChild(go); c.appendChild(no);
+        }
+        mb.appendChild(c);
+      });
+      row.appendChild(mb);
+      row.appendChild(el("span","reghint","충원 합격한 곳으로 옮기려면 지금 등록한 곳에 먼저 등록 포기(환불) 신청을 한 뒤 충원 등록 마감 안에 새로 등록합니다. 둘 다 등록하면 이중등록으로 입학이 취소됩니다."));
     } else if(r.state==="done"){
       row.appendChild(el("span","sub","등록: "+r.reg.map(nm).join(", ")));
       if(r.wait.length) row.appendChild(el("span","reghint","충원 대기 "+r.wait.length+"곳("+r.wait.map(function(a){ return shortUniv(a.univ); }).join(", ")+"). 충원 합격해서 옮기려면 먼저 지금 등록한 곳을 포기해야 합니다."));

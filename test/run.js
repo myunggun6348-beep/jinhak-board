@@ -692,6 +692,40 @@ function buildTestPage() {
     check("표준점수 붙여넣기: 머리줄 없어도 학번으로 맞춤", r2.sort(), [["30201", "130", "92"], ["30202", "120", "83"]]);
     await c.close();
   }
+  /* 12월 수시 발표·충원·등록: 발표일·충원 마감을 안 넣은 지원도 마감이 지나면 잡고, 등록 뒤 충원 합격은 옮길지 묻는다 */
+  console.log("\n[수시 발표·충원·등록 기간]");
+  {
+    const A = (o) => Object.assign({ kind: "수시", status: "지원완료", c6: true, mmet: "미정" }, o);
+    const seed = [
+      { id: "30201", cls: 2, no: "30201", name: "가나", apps: [A({ id: "a1", univ: "부경대학교", major: "전자공학과" }), A({ id: "a2", univ: "부산대학교", major: "경영학과", status: "충원대기", rank: "12" })] },
+      { id: "30202", cls: 2, no: "30202", name: "다라", apps: [A({ id: "b1", univ: "부산대학교", major: "수학교육과", status: "충원합" }), A({ id: "b2", univ: "동아대학교", major: "수학과", status: "등록완료" })] },
+      { id: "30203", cls: 2, no: "30203", name: "마바", apps: [A({ id: "c1", univ: "동아대학교", major: "기계공학과", status: "최초합" })] },
+    ];
+    const at = async (when) => {
+      const c = await browser.newContext({ viewport: { width: 1200, height: 900 } });
+      const x = await c.newPage(); x.on("pageerror", (e) => errors.push(String(e))); x.on("dialog", (d) => d.accept());
+      await x.clock.install({ time: new Date(when) });
+      await x.addInitScript((s) => { if (sessionStorage.getItem("seeded")) return; sessionStorage.setItem("seeded", "1");
+        localStorage.setItem("jh.local.students", JSON.stringify(s)); localStorage.setItem("jh.cls", "2"); localStorage.setItem("jh.mycls", "2"); localStorage.setItem("jh.mode", "local"); }, seed);
+      await x.goto("file://" + page404); await x.waitForTimeout(500);
+      const r = await x.evaluate(() => { const d = window.__dev, S = d.students();
+        return { codes: S.map((s) => d.checkStudent(s).map((w) => w.code)), pend: d.pending(S).map((e) => e.s.no + ":" + e.kind), reg: S.map((s) => d.regInfo(s).state) }; });
+      return { c, x, r };
+    };
+    let t = await at("2026-12-14T09:00:00+09:00");
+    check("12/14: 발표일 없는 지원은 아직 안 잡음, 충원 마감 없는 충원 대기는 알림", [t.r.codes[0], t.r.pend], [["충원 마감 미입력"], []]);
+    await t.c.close();
+    t = await at("2026-12-19T09:00:00+09:00");
+    check("12/19: 수시 발표 마감이 지났는데 발표일 없이 지원완료면 결과 입력할 것", [t.r.codes[0].includes("결과 미입력"), t.r.pend], [true, ["30201:annx"]]);
+    check("등록했는데 충원 합격: 옮길지 정하기 + 경고", [t.r.reg[1], t.r.codes[1]], ["move", ["충원 합격"]]);
+    await t.x.click("#reg button:has-text('여기로 옮기기')"); await t.x.waitForTimeout(300);
+    const moved = await t.x.evaluate(() => window.__dev.students().find((s) => s.no === "30202").apps.map((a) => a.univ + ":" + a.status));
+    check("여기로 옮기기: 새 곳 등록완료, 원래 곳 등록포기(이중등록 없음)", moved, ["부산대학교:등록완료", "동아대학교:등록포기"]);
+    await t.c.close();
+    t = await at("2026-12-30T09:00:00+09:00");
+    check("12/30: 충원 통보 마감 지난 충원 대기·등록 마감 지난 미정은 확인 요청", [t.r.pend.includes("30201:due"), t.r.codes[2], t.r.reg[1]], [true, ["등록 확인"], "move"]);   // 12/30은 충원 등록 마감 당일이라 아직 옮길지 정할 수 있다
+    await t.c.close();
+  }
   check("자바스크립트 오류 없음", errors, []);
   await browser.close();
   fs.unlinkSync(page404);
