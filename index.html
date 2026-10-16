@@ -4862,6 +4862,13 @@ function codeGate(err,mode,preset){
     gi.onclick=function(){ googleIn().then(function(){ codeGate("","admin"); },function(e){ if(e&&e.msg) say(e.msg); }); };
     s1.appendChild(gi);
   }
+  // 내 학교: 구글 로그인만으로 열기를 켠 학교는 바로 [열기]
+  var s0=el("div","step done"); s0.hidden=true;
+  if(mail) myQuickSchools().then(function(L){
+    if(!L.length) return;
+    s0.hidden=false; s0.innerHTML=""; s0.appendChild(el("b",null,"내 학교 — 구글 로그인만으로 열기"));
+    L.forEach(function(x){ var b=el("button","btn",(x.name||"학교")+" 열기 →"); b.onclick=function(){ enterCode(x.code,{remember:true}); }; s0.appendChild(b); });
+  });
   // 칸마다 왜 필요한지 바로 밑에 적는다(처음 쓰는 분이 '정확히 써야 하나?' 망설이지 않게)
   var s2=el("div","step"+(mail?"":" off")); s2.appendChild(el("b",null,"② 새 학교 만들기 (처음 한 번만)"));
   var sn=inp("school","학교 이름 (예: 성지고 3학년)"), sp=inp("joinpw","가입 암호 새로 만들기 (4자 이상, 예: sj2027)"), mk=el("button","btn sec","학교 만들기");
@@ -4884,12 +4891,26 @@ function codeGate(err,mode,preset){
   ag.onclick=function(){ if(normCode(ac.value).length<8){ say("학교 코드를 넣어 주세요."); return; } enterCode(ac.value,{remember:true}); };
   ac.onkeydown=function(e){ if(e.key==="Enter") ag.onclick(); };
   s3.appendChild(tg); s3.appendChild(ac); s3.appendChild(ag); s3.appendChild(why);
-  [s1,s2,s3,note,back].forEach(function(x){ f.appendChild(x); });
+  [s1,s0,s2,s3,note,back].forEach(function(x){ f.appendChild(x); });
   showGate("관리자: 학교 만들기·관리","구글로 로그인하고, 처음이면 학교 이름과 가입 암호만 정하면 됩니다. 크롬·엣지에서 하세요(Claude 앱 안의 창에서는 로그인이 막힙니다). 관리자는 모든 반을 보고, 선생님 가입을 승인합니다.",[f]);
   render();
 }
 // 관리자가 새 학교를 만든다: 학교 이름 → 새 코드(화면에 보여 줌)
 // 가입 암호는 원문 대신 학교마다 다른 해시만 둔다(관리자만 읽는 private/join). 규칙이 가입 요청의 해시와 맞춰 본다.
+// 내가 관리자인 학교 중 '구글 로그인만으로 열기'를 켠 곳: [{name, code}]
+function myQuickSchools(){
+  var m=myMail(); if(!m||!fb.S.getDocs) return Promise.resolve([]);
+  return fb.S.getDocs(fb.S.query(fb.S.collection(fb.fs,"schools"),fb.S.where("admins","array-contains",m))).then(function(q){
+    return Promise.all(q.docs.map(function(d){
+      return fb.S.getDoc(sRef(d.id,"private","code")).then(function(c){ return c.exists()&&c.data().code?{name:d.data().name,code:c.data().code}:null; },function(){ return null; });
+    }));
+  }).then(function(L){ return L.filter(Boolean); },function(){ return []; });
+}
+function setQuick(on){
+  var r=sRef(school.K.room,"private","code");
+  (on?fb.S.setDoc(r,{code:normCode(school.code),at:new Date().toISOString()}):fb.S.deleteDoc(r)).then(function(){ school.quick=on; renderSchoolPanel(); },
+    function(e){ alert("바꾸지 못했습니다("+((e&&e.code)||"")+"). 관리자가 최신 Firestore 규칙을 붙여넣었는지 확인해 주세요."); renderSchoolPanel(); });
+}
 function joinHash(sid,pw){
   return crypto.subtle.digest("SHA-256",new TextEncoder().encode("jinhak-board/join/"+sid+"/"+String(pw||"").trim())).then(hexOf);
 }
@@ -5051,6 +5072,7 @@ function enterSchool(K,code,info,admin,cls){
     else setSync("off","연결이 끊어졌습니다"+(e&&e.code?" ("+e.code+")":"")+" — 새로고침해 주세요");
   });
   if(admin) fb.S.getDoc(sRef(K.room,"private","join")).then(function(d){ school.pwSet=d.exists(); renderSchoolPanel(); },function(){});
+  if(admin) fb.S.getDoc(sRef(K.room,"private","code")).then(function(d){ school.quick=d.exists(); renderSchoolPanel(); },function(){});
   if(admin) membersWatch=fb.S.onSnapshot(fb.S.collection(fb.fs,"schools",K.room,"members"),function(q){
     school.members=q.docs.map(function(d){ var x=d.data(); x.uid=d.id; return x; }); renderSchoolPanel();
   },function(){});
@@ -5159,6 +5181,15 @@ function renderSchoolPanel(){
   var nb=el("button","ghost","이름 바꾸기");
   nb.onclick=function(){ var v=nin.value.trim(); if(!v||v===school.name) return; renameSchool(v); };
   nr.appendChild(el("span","k","학교 이름")); nr.appendChild(nin); nr.appendChild(nb); it.appendChild(nr);
+  var qr=el("div","astep"), ql=el("label","ckrow"), qc=document.createElement("input"); qc.type="checkbox"; qc.name="quick"; qc.checked=!!school.quick;
+  ql.appendChild(qc); ql.appendChild(document.createTextNode(" 구글 로그인만으로 열기"));
+  qc.onchange=function(){
+    if(qc.checked&&!window.confirm("학교 코드를 관리자만 읽을 수 있는 칸에 보관합니다. 관리자는 다른 컴퓨터에서도 구글 로그인만 하면 학교가 열립니다.\n대신 저장소(구글)가 원리상 코드와 자료를 함께 갖게 됩니다. 켤까요?")){ qc.checked=false; return; }
+    setQuick(qc.checked);
+  };
+  qr.appendChild(el("span","k","빠른 열기")); qr.appendChild(ql);
+  qr.appendChild(el("span","shint",school.quick?"켜짐: 관리자는 새 컴퓨터에서 구글 로그인만 하면 ‘내 학교’에 이 학교가 뜹니다. 끄면 보관한 코드를 바로 지웁니다.":"꺼짐(기본): 새 컴퓨터에서는 학교 코드를 한 번 넣어야 합니다. 학생 자료는 코드를 아는 사람만 열 수 있습니다."));
+  it.appendChild(qr);
 }
 function setAdmins(list){
   fb.S.getDoc(sRef(school.K.room)).then(function(d){

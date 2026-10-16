@@ -14,6 +14,7 @@ window.__fbMock = (function () {
   // 규칙: op = get|list|write|delete. where = 목록 조건 {f, v}. old = 지금 문서
   var allow = function (op, path, data, where) {
     var p = seg(path), u = auth.currentUser;
+    if (op === "list" && p.length === 2 && p[0] === "schools") return Promise.resolve(!!mail() && !!where && where.op === "array-contains" && where.f === "admins" && where.v === mail());
     if (!u || p[0] !== "schools" || !p[1] || p[1].length !== 40) return Promise.resolve(false);
     var sid = p[1];
     if (p.length === 2) {
@@ -63,7 +64,10 @@ window.__fbMock = (function () {
     initializeFirestore: function () { return {}; },
     doc: function () { return { path: [].slice.call(arguments, 1).join("/"), doc: true }; },
     collection: function () { return { path: [].slice.call(arguments, 1).join("/") }; },
-    where: function (f, op, v) { return { f: f, v: v }; },
+    where: function (f, op, v) { return { f: f, op: op, v: v }; },
+    getDocs: function (q) { return allow("list", q.path + "/x", null, q.where).then(function (ok) { if (!ok) return deny();
+      return window.__kv("list", q.path).then(function (d) { d = d.filter(function (x) { var v = x.data[q.where.f]; return q.where.op === "array-contains" ? Array.isArray(v) && v.indexOf(q.where.v) >= 0 : v === q.where.v; });
+        return { docs: d.map(function (x) { return { id: seg(x.path).pop(), data: function () { return x.data; } }; }) }; }); }); },
     query: function (ref, w) { return { path: ref.path, where: w }; },
     getDoc: function (r) { return allow("get", r.path).then(function (ok) { if (!ok) return deny();
       return get(r.path).then(function (d) { return { id: seg(r.path).pop(), exists: function () { return !!d; }, data: function () { return d; } }; }); }); },
