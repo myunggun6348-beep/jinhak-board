@@ -478,7 +478,7 @@ function buildTestPage() {
   }
   await p.click("#btnJungsi"); await p.waitForTimeout(100);
 
-  check("설치 기능 없음(설치 단추·manifest 없음, 예전 서비스 워커는 스스로 지움)", [await p.evaluate(() => !document.querySelector("link[rel=manifest]") && !document.getElementById("btnInstall")), fs.existsSync(path.join(ROOT, "manifest.webmanifest")), /unregister/.test(fs.readFileSync(path.join(ROOT, "sw.js"), "utf8"))], [true, false, true]);
+  check("앱 흔적 없음(설치 단추·manifest·아이콘·서비스 워커 파일 없음, 남은 서비스 워커는 앱이 지움)", [await p.evaluate(() => !document.querySelector("link[rel=manifest],link[rel=icon],link[rel=apple-touch-icon]") && !document.getElementById("btnInstall")), ["manifest.webmanifest", "sw.js", "icons"].some((f) => fs.existsSync(path.join(ROOT, f))), /getRegistrations[\s\S]*unregister/.test(fs.readFileSync(path.join(ROOT, "index.html"), "utf8"))], [true, false, true]);
 
   /* ── 자료 지키기(백업 알림) ── */
   const bb = () => p.evaluate(() => { const b = document.getElementById("backupBar"); return [!b.hidden, b.classList.contains("due"), b.textContent]; });
