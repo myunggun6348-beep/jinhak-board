@@ -78,6 +78,10 @@ button{cursor:pointer}
   padding:6px 13px; border-radius:6px; font-size:13px; font-weight:500;
 }
 .recb{display:inline-block; margin-left:6px; padding:0 6px; border-radius:5px; background:var(--accent-soft); color:var(--accent); font-size:11px; font-weight:700; line-height:18px; white-space:nowrap; vertical-align:1px}
+.dzone{background:var(--bad-soft); border-radius:10px; padding:10px 12px!important; border-top:0!important}
+.dzone .dzt{flex-basis:100%; font-size:12.5px; color:var(--bad); font-weight:700; line-height:1.6}
+.btn.del{background:var(--bad); border-color:var(--bad); color:#fff}
+.btn.del:disabled{opacity:.45}
 .tbadge{display:inline-block; min-width:18px; margin-left:5px; padding:0 5px; border-radius:9px; background:var(--bad); color:#fff; font-size:11px; font-weight:700; line-height:18px; text-align:center}
 .adminpage .ahead{display:flex; align-items:baseline; flex-wrap:wrap; gap:4px 10px; margin-bottom:12px}
 .adminpage .ahead h2{font-size:18px; margin:0}
@@ -5175,6 +5179,37 @@ function renderSchoolPanel(){
   qr.appendChild(el("span","k","빠른 열기")); qr.appendChild(ql);
   qr.appendChild(el("span","shint",school.quick?"켜짐: 관리자는 새 컴퓨터에서 구글 로그인만 하면 ‘내 학교’에 이 학교가 뜹니다. 끄면 보관한 코드를 바로 지웁니다.":"꺼짐(기본): 새 컴퓨터에서는 학교 코드를 한 번 넣어야 합니다. 학생 자료는 코드를 아는 사람만 열 수 있습니다."));
   it.appendChild(qr);
+  // 학교 지우기: 학교 이름을 그대로 쳐야 단추가 켜진다
+  var dz=el("div","astep"), dzb=el("button","ghost","이 학교 지우기…");
+  dz.appendChild(el("span","k","학교 지우기")); dz.appendChild(dzb);
+  dz.appendChild(el("span","shint","잘못 만든 학교나 다 쓴 학교를 지웁니다. 모든 반 학생 자료·상담 기록·선생님 가입이 영구히 지워지고 되돌릴 수 없습니다."));
+  dzb.onclick=function(){
+    dz.innerHTML=""; dz.className="astep dzone";
+    dz.appendChild(el("span","dzt","정말 ‘"+school.name+"’ 학교를 지울까요? 모든 반 학생 자료·상담 기록·담임 선생님 가입·관리자 정보가 영구히 지워집니다. 먼저 백업을 받아 두세요."));
+    var bk=el("button","btn sec","전체 백업 받기"); bk.onclick=doBackup; dz.appendChild(bk);
+    var di=document.createElement("input"); di.name="delname"; di.placeholder="지우려면 학교 이름 ‘"+school.name+"’ 입력"; dz.appendChild(di);
+    var go=el("button","btn del","영구 삭제"); go.disabled=true; dz.appendChild(go);
+    var no=el("button","ghost","그만두기"); no.onclick=function(){ renderSchoolPanel(); }; dz.appendChild(no);
+    di.oninput=function(){ go.disabled=di.value.trim()!==school.name; };
+    go.onclick=function(){ go.disabled=true; go.textContent="지우는 중…"; deleteSchool(); };
+    di.focus();
+  };
+  it.appendChild(dz);
+}
+// 학교 통째로 지우기: 하위 문서를 다 지운 뒤 학교 문서(관리자 확인에 쓰이므로 맨 마지막)
+function deleteSchool(){
+  var sid=school.K.room, name=school.name;
+  stopWatch(); setSync("","학교 지우는 중");
+  var del=function(c){ return fb.S.getDocs(fb.S.collection(fb.fs,"schools",sid,c)).then(function(q){ return Promise.all(q.docs.map(function(d){ return fb.S.deleteDoc(sRef(sid,c,d.id)); })); }); };
+  Promise.all(["students","minreq","links","members"].map(del)).then(function(){
+    return Promise.all(["join","code"].map(function(id){ return fb.S.deleteDoc(sRef(sid,"private",id)).catch(function(){}); }));
+  }).then(function(){ return fb.S.deleteDoc(sRef(sid)); }).then(function(){
+    try{ localStorage.removeItem(CODE_KEY); }catch(e){}
+    codeGate("‘"+name+"’ 학교를 지웠습니다.","admin");
+  },function(e){
+    alert("학교를 다 지우지 못했습니다("+((e&&e.code)||"")+"). 관리자가 최신 Firestore 규칙을 붙여넣었는지 확인한 뒤 다시 해 주세요.");
+    location.reload();
+  });
 }
 function setAdmins(list){
   fb.S.getDoc(sRef(school.K.room)).then(function(d){

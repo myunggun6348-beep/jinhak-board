@@ -29,6 +29,7 @@ service cloud.firestore {
       allow list: if google() && mail() in resource.data.admins;
       allow create: if google() && sid.size() == 40 && okSchool(request.resource.data) && request.resource.data.admins == [mail()];
       allow update: if isAdmin(sid) && okSchool(request.resource.data);
+      allow delete: if isAdmin(sid);
 
       match /private/{doc} {
         allow read, write: if isAdmin(sid);
@@ -52,6 +53,7 @@ service cloud.firestore {
 
       match /links/{id} {
         allow get: if signedIn();
+        allow list: if isAdmin(sid);
         allow create: if request.resource.data.keys().hasOnly(['cls', 'name', 'exp']) && request.resource.data.cls is int
           && request.resource.data.exp is int && request.resource.data.exp < request.time.toMillis() + 172800000
           && (isAdmin(sid) || isMember(sid) && request.resource.data.cls == myCls(sid));

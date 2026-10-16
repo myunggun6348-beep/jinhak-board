@@ -20,6 +20,7 @@ window.__fbMock = (function () {
     if (p.length === 2) {
       if (op === "get") return Promise.resolve(true);
       if (op === "write") return get(path).then(function (s) { return s ? isAdmin(sid) : !!mail() && data.admins.length === 1 && data.admins[0] === mail(); });
+      if (op === "delete") return isAdmin(sid);
       return Promise.resolve(false);
     }
     var lp = p[2] === "members" && data && data.ok === true && data.link ? get("schools/" + sid + "/links/" + data.link) : null;
@@ -28,7 +29,7 @@ window.__fbMock = (function () {
       if (p[2] === "private") return adm;
       if (p[2] === "links") {
         if (op === "get") return true;
-        if (op === "delete") return adm;
+        if (op === "delete" || op === "list") return adm;
         if (op !== "write" || old) return false;
         return typeof data.cls === "number" && typeof data.exp === "number" && data.exp < Date.now() + 172800000 && (adm || (!!m && data.cls === m.cls));
       }
@@ -66,7 +67,7 @@ window.__fbMock = (function () {
     collection: function () { return { path: [].slice.call(arguments, 1).join("/") }; },
     where: function (f, op, v) { return { f: f, op: op, v: v }; },
     getDocs: function (q) { return allow("list", q.path + "/x", null, q.where).then(function (ok) { if (!ok) return deny();
-      return window.__kv("list", q.path).then(function (d) { d = d.filter(function (x) { var v = x.data[q.where.f]; return q.where.op === "array-contains" ? Array.isArray(v) && v.indexOf(q.where.v) >= 0 : v === q.where.v; });
+      return window.__kv("list", q.path).then(function (d) { if (q.where) d = d.filter(function (x) { var v = x.data[q.where.f]; return q.where.op === "array-contains" ? Array.isArray(v) && v.indexOf(q.where.v) >= 0 : v === q.where.v; });
         return { docs: d.map(function (x) { return { id: seg(x.path).pop(), data: function () { return x.data; } }; }) }; }); }); },
     query: function (ref, w) { return { path: ref.path, where: w }; },
     getDoc: function (r) { return allow("get", r.path).then(function (ok) { if (!ok) return deny();

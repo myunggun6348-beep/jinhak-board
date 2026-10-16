@@ -597,6 +597,13 @@ function buildTestPage() {
   const other = await who({ email: "other@x.com", school: "다른고" });
   await other.makeSchool(); await other.waitForTimeout(500);
   check("다른 학교는 서로 안 보임", [Object.keys(KV).filter((k) => /^schools\/[0-9a-f]{40}$/.test(k)).length, (await rowNames(other)).includes("김예시")], [2, false]);
+  const otherSid = Object.keys(KV).find((k) => /^schools\/[0-9a-f]{40}$/.test(k) && KV[k].name === "다른고").split("/")[1];
+  await other.click("#tabAdmin"); await other.waitForTimeout(400);
+  await other.click("#schoolPanel button >> text=이 학교 지우기"); await other.fill("#schoolPanel input[name=delname]", "다른");
+  const offWhenWrong = await other.$eval("#schoolPanel .btn.del", (b) => b.disabled);
+  await other.fill("#schoolPanel input[name=delname]", "다른고"); await other.click("#schoolPanel .btn.del"); await other.waitForTimeout(2500);
+  check("학교 지우기: 이름을 그대로 쳐야 지워지고, 학교의 모든 문서가 사라짐", [offWhenWrong, Object.keys(KV).filter((k) => k.includes(otherSid)).length, /지웠습니다/.test(await other.innerText("#banner"))], [true, 0, true]);
+  check("학교 지우기: 다른 학교는 그대로", Object.keys(KV).some((k) => /^schools\/[0-9a-f]{40}$/.test(k) && KV[k].name !== "다른고"), true);
   const adm2 = await who({ email: "admin@x.com" });
   await adm2.click("#banner .choice >> text=관리자입니다"); await adm2.click("#banner .btn >> text=구글로 로그인"); await adm2.waitForTimeout(300);
   const codeHidden = await adm2.$eval("#banner input[name=code]", (e) => e.hidden);
