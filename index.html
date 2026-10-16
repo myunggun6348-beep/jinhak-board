@@ -4908,7 +4908,7 @@ function googleIn(){
     if(/popup-closed|cancelled-popup/.test(c)) throw {code:"cancel"};
     throw {code:"google", msg:"구글 로그인을 하지 못했습니다 ("+c+")."+
       (/popup-blocked|operation-not-supported/.test(c)?" 이 창이 로그인 팝업을 막고 있습니다. 크롬·엣지 같은 일반 브라우저로 열어 주세요(주소창 오른쪽에서 팝업 허용).":
-       /unauthorized-domain/.test(c)?" Firebase 콘솔 > Authentication > 설정 > 승인된 도메인에 이 주소를 추가해야 합니다.":
+       /unauthorized-domain/.test(c)?(location.hostname!=="jinhak-board.vercel.app"?" 지금 주소("+location.hostname+")에서는 구글 로그인이 안 됩니다. https://jinhak-board.vercel.app 으로 열어 주세요(또는 Firebase 콘솔 > Authentication > 설정 > 승인된 도메인에 이 주소 추가).":" Firebase 콘솔 > Authentication > 설정 > 승인된 도메인에 jinhak-board.vercel.app 을 추가해야 합니다."):
        /operation-not-allowed/.test(c)?" Firebase 콘솔 > Authentication > 로그인 방법에서 Google 을 사용 설정해야 합니다.":"")};
   });
 }
