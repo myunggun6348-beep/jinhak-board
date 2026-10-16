@@ -761,6 +761,30 @@ function buildTestPage() {
     check("12/30: 충원 통보 마감 지난 충원 대기·등록 마감 지난 미정은 확인 요청", [t.r.pend.includes("30201:due"), t.r.codes[2], t.r.reg[1]], [true, ["등록 확인"], "move"]);   // 12/30은 충원 등록 마감 당일이라 아직 옮길지 정할 수 있다
     await t.c.close();
   }
+  console.log("\n[화면 정리]");
+  {
+    const c = await browser.newContext({ viewport: { width: 1200, height: 900 } });
+    const x = await c.newPage(); x.on("pageerror", (e) => errors.push(String(e)));
+    await x.addInitScript(() => localStorage.setItem("jh.cls", "2"));
+    await x.goto("file://" + page404); await x.waitForTimeout(500);
+    const shown = (id) => x.$eval("#" + id, (e) => getComputedStyle(e).display !== "none");
+    const g0 = await shown("glance");
+    await x.click("#btnView"); await x.uncheck("#viewPanel input[name=view-glance]"); await x.waitForTimeout(100);
+    const g1 = await shown("glance");
+    await x.reload(); await x.waitForTimeout(500);
+    check("보기 설정: 칸 숨기기, 다시 열어도 기억", [g0, g1, await shown("glance")], [true, false, false]);
+    const menu = await x.evaluate(() => { const d = document.querySelector(".tmenu"); return [!d.open, ["btnClassFile", "btnCsv", "btnPrint"].every((id) => d.contains(document.getElementById(id)))]; });
+    await x.click(".tmenu > summary"); const opened = await x.$eval(".tmenu", (d) => d.open);
+    await x.click("#listTitle"); const closed = await x.$eval(".tmenu", (d) => !d.open);
+    check("받기·인쇄 메뉴: 단추를 한 메뉴에, 바깥 누르면 닫힘", [menu, opened, closed], [[true, true], true, true]);
+    await c.close();
+    const m = await browser.newContext({ viewport: { width: 390, height: 800 } });
+    const y = await m.newPage(); y.on("pageerror", (e) => errors.push(String(e)));
+    await y.addInitScript(() => localStorage.setItem("jh.cls", "2"));
+    await y.goto("file://" + page404); await y.waitForTimeout(500);
+    check("휴대폰: 처음엔 숫자 요약·한눈에 보기·일정 목록을 숨김", await y.evaluate(() => ["stats", "glance", "sched"].map((id) => getComputedStyle(document.getElementById(id)).display === "none")), [true, true, true]);
+    await m.close();
+  }
   console.log("\n[결과 한꺼번에 · 오늘 할 일]");
   {
     const c = await browser.newContext({ viewport: { width: 1200, height: 900 } });

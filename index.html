@@ -309,6 +309,18 @@ body.landing .gate{margin-top:10px}
 .bulkrow .bsp{margin-left:auto; display:flex; gap:6px; align-items:center}
 .bulkpick{min-width:240px; border:1px solid var(--line-2); background:var(--surface); color:var(--ink); border-radius:8px; padding:5px 8px; font-size:13px; font-family:inherit; max-width:100%}
 .whochip select.schoolsw{font-size:12px; border:1px solid var(--line-2); background:var(--surface); color:var(--ink); border-radius:6px; padding:2px 4px; max-width:12em; font-family:inherit}
+body.hide-today #today,body.hide-today #allToday,body.hide-alerts #alerts,body.hide-alerts #allAlerts,body.hide-stats #stats,body.hide-stats #allStats,body.hide-glance #glance,body.hide-glance #allGlance,body.hide-sched #sched,body.hide-sched #allSched,body.hide-prep #prep,body.hide-prep #allPrep,body.hide-todo #todo,body.hide-todo #allTodo,body.hide-afterCsat #afterCsat,body.hide-afterCsat #allAfterCsat,body.hide-reg #reg,body.hide-reg #allReg{display:none!important}
+.tmenu{position:relative}
+.tmenu>summary{list-style:none; cursor:pointer; user-select:none}
+.tmenu>summary::-webkit-details-marker{display:none}
+.tmenu[open]>summary{background:var(--accent-soft); color:var(--accent)}
+.tmenu-list{position:absolute; right:0; top:calc(100% + 4px); z-index:20; display:flex; flex-direction:column; align-items:stretch; gap:4px; min-width:170px; padding:6px; border:1px solid var(--line); border-radius:10px; background:var(--surface); box-shadow:0 10px 28px rgba(16,24,40,.14)}
+.tmenu-list .ghost{text-align:left; border-color:transparent}
+.tmenu-list .ghost:hover{background:var(--surface-2)}
+.vchecks{display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:6px 14px; margin:6px 0 4px}
+.vchecks label{display:flex; align-items:center; gap:7px; font-size:13px; cursor:pointer}
+.vchecks input{accent-color:var(--accent)}
+.listhead .sp{flex-wrap:wrap; justify-content:flex-end}
 .acwhy{flex-basis:100%; font-size:12px; color:var(--ink-3); padding-left:2px}
 .acsum{display:flex; flex-wrap:wrap; gap:6px; margin:4px 0 8px}
 .acnog{display:flex; flex-wrap:wrap; align-items:center; gap:6px 10px; margin-top:10px; padding:9px 12px; border-radius:10px; background:var(--surface-2); font-size:12.5px; color:var(--ink-2)}
@@ -718,13 +730,17 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
         <button class="ghost" id="btnBulkRes" title="대학이나 발표일을 고르면 그 지원 학생들의 결과를 한 화면에서 넣습니다">결과 한꺼번에</button>
         <button class="ghost" id="btnNotice" title="학생마다 남은 면접·발표·충원 마감 일정을 문자로 보내기 좋은 글로 만들어 복사합니다">일정 안내 문자</button>
         <button class="ghost" id="btnCsat" title="반 학생 전체의 수능(가채점) 등급을 표 한 장에 넣고 최저 충족을 바로 봅니다">수능 성적 넣기</button>
+        <details class="tmenu"><summary class="ghost">받기·인쇄 ▾</summary><div class="tmenu-list">
         <button class="ghost" id="btnClassFile" title="이 반 학생·지원 자료를 파일 하나로 받습니다. 학교 메신저·공유 폴더로 다른 선생님과 주고받으세요">우리 반 파일 받기</button>
         <button class="ghost" id="btnCsv">CSV 내려받기</button>
         <button class="ghost" id="btnNotesCsv" hidden title="이 반 학생들의 상담 기록을 엑셀(CSV)로 받습니다">상담 기록 받기</button>
         <button class="ghost" id="btnPrint" title="이 반의 지원·결과를 A4 로 인쇄합니다">인쇄</button>
+        </div></details>
+        <button class="ghost" id="btnView" title="반 화면에 보일 칸을 고릅니다">보기 설정</button>
         <button class="ghost" id="btnClearLocal" hidden title="이 브라우저에 저장된 자료만 지웁니다">이 브라우저 자료 지우기</button>
       </span>
     </div>
+    <div class="sched" id="viewPanel" hidden></div>
     <div class="sched" id="jungsiPanel" hidden></div>
     <div class="sched" id="bulkPanel" hidden></div>
     <div class="sched" id="csatPanel" hidden></div>
@@ -1371,6 +1387,7 @@ function render(){
   renderCsat(cls?mine:[]);
   renderJungsi(cls?mine:[]);
   renderBulk(document.getElementById("bulkPanel"), cls?mine:[], false, bulkC, "btnBulkRes");
+  renderView();
   renderNotice(cls?mine:[], cls);
   renderUndo();
   document.getElementById("btnClearLocal").hidden=!(practice&&!demo);
@@ -2331,6 +2348,31 @@ function renderTodo0(host, arr, showClass){
   }
 }
 function st0(s){ return students.get(s.id)||s; }
+/* ── 보기 설정 ── 반 화면(전체 현황 포함)에 보일 칸. 이 컴퓨터에 기억, 휴대폰은 처음에 그래프·숫자·일정 목록을 숨긴다(오늘 할 일이 대신) */
+var VIEWS=[["today","오늘 할 일"],["alerts","경고"],["stats","숫자 요약"],["glance","한눈에 보기(그래프·달력)"],["sched","다가오는 일정"],["prep","면접·고사 준비"],["todo","결과 입력할 것"],["afterCsat","수능 뒤 응시 판단"],["reg","수시 합격·등록"]], viewOpen=false;
+var MOBILE_HIDE=["stats","glance","sched"];
+function viewHidden(){ var v=lsGet("jh.hide"); if(v){ try{ return JSON.parse(v); }catch(e){} } return window.innerWidth<640?MOBILE_HIDE.slice():[]; }
+function applyView(){ var h=viewHidden(); VIEWS.forEach(function(v){ document.body.classList.toggle("hide-"+v[0], h.indexOf(v[0])>=0); }); }
+function renderView(){
+  var host=document.getElementById("viewPanel"); host.hidden=!viewOpen;
+  document.getElementById("btnView").setAttribute("aria-pressed",String(viewOpen));
+  applyView();
+  if(!viewOpen) return;
+  host.innerHTML="";
+  var hd=el("div","schedhead"); hd.appendChild(el("h2",null,"보기 설정"));
+  var df=el("button","ghost","처음대로"); df.style.marginLeft="auto"; df.onclick=function(){ lsSet("jh.hide",null); render(); }; hd.appendChild(df);
+  var x=el("button","ghost","닫기"); x.onclick=function(){ viewOpen=false; render(); }; hd.appendChild(x);
+  host.appendChild(hd);
+  host.appendChild(el("div","shint","체크한 칸만 반 화면과 전체 현황에 보입니다. 이 컴퓨터에만 기억합니다. 체크해도 지금 시기에 내용이 없는 칸(예: 수능 뒤 응시 판단)은 저절로 숨습니다."));
+  var box=el("div","vchecks"), h=viewHidden();
+  VIEWS.forEach(function(v){
+    var l=el("label"), c=document.createElement("input"); c.type="checkbox"; c.name="view-"+v[0]; c.checked=h.indexOf(v[0])<0;
+    c.onchange=function(){ var cur=viewHidden().filter(function(k){ return k!==v[0]; }); if(!c.checked) cur.push(v[0]); lsSet("jh.hide",JSON.stringify(cur)); applyView(); };
+    l.appendChild(c); l.appendChild(document.createTextNode(v[1])); box.appendChild(l);
+  });
+  host.appendChild(box);
+  if(window.innerWidth<640&&!lsGet("jh.hide")) host.appendChild(el("div","shint","휴대폰에서는 처음에 숫자 요약·한눈에 보기·다가오는 일정을 숨겨 두었습니다(맨 위 ‘오늘 할 일’이 대신 보여 줍니다)."));
+}
 /* ── 결과 한꺼번에 넣기 ── 대학(또는 발표일)을 고르면 그 지원들만 모아 상태를 바로 고른다 */
 var bulkC={open:false, mode:"univ", sel:""}, bulkA={open:false, mode:"univ", sel:""};
 function renderBulk(host, arr, showClass, S, btnId){
@@ -3876,6 +3918,10 @@ function bindStatic(){
   document.getElementById("btnMerge").onclick=function(){ document.getElementById("mergeFile").click(); };
   document.getElementById("mergeFile").onchange=function(){ var fl=[].slice.call(this.files||[]); this.value=""; if(fl.length) mergeFiles(fl); };
   document.getElementById("btnClassFile").onclick=classFile;
+  document.getElementById("btnView").onclick=function(){ viewOpen=!viewOpen; render(); if(viewOpen) document.getElementById("viewPanel").scrollIntoView({block:"nearest"}); };
+  // 받기·인쇄 메뉴: 고르면 닫고, 바깥을 누르면 닫는다
+  document.querySelectorAll(".tmenu").forEach(function(m){ m.addEventListener("click",function(e){ if(e.target.closest(".tmenu-list button")) m.open=false; }); });
+  document.addEventListener("click",function(e){ document.querySelectorAll(".tmenu[open]").forEach(function(m){ if(!m.contains(e.target)) m.open=false; }); });
   document.getElementById("btnBulkRes").onclick=function(){ bulkC.open=!bulkC.open; render(); if(bulkC.open) document.getElementById("bulkPanel").scrollIntoView({block:"start"}); };
   document.getElementById("btnBulkAll").onclick=function(){ bulkA.open=!bulkA.open; renderAll(); };
   document.getElementById("btnNotesCsv").onclick=function(){ var c=getCls(); notesCsv(c?byClass(c):[], YEAR+"_상담기록_"+c+"반.csv"); };
