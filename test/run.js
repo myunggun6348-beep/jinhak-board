@@ -594,6 +594,14 @@ function buildTestPage() {
   await (await t2.$$(".detail select"))[ti].selectOption("최초합"); await adm.waitForTimeout(2500);
   await adm.click("#tabClass"); await adm.waitForTimeout(300);
   check("담임이 고친 결과가 관리자 화면에 실시간", await adm.evaluate(() => document.querySelector(".row .pills").textContent.includes("최초합")), true);
+  await adm.click(".row >> nth=0 >> .rowhead"); await adm.waitForTimeout(200);
+  await adm.fill(".detail textarea[name=note]", "학교 장부 상담"); await adm.click(".detail .btn >> text=기록 추가"); await t2.waitForTimeout(2500);
+  check("학교 장부: 상담 기록도 저장되어 담임 화면에 보임", await t2.evaluate(() => { const c = document.querySelector(".row .cnote"); return c && c.textContent; }), "상담 1");
+  await adm.click(".row >> nth=0 >> .rowhead"); await adm.waitForTimeout(100);
+  const bb1 = await adm.$eval("#backupBar", (b) => [!b.hidden, b.classList.contains("due"), /학교 장부 전체 백업/.test(b.textContent)]);
+  await adm.click("#backupBar button >> text=전체 백업 받기"); await adm.waitForTimeout(300);
+  check("관리자 백업 알림: 처음엔 주황 경고, 받으면 마지막 백업 날짜", [bb1, await adm.$eval("#backupBar", (b) => [b.classList.contains("due"), /마지막 전체 백업/.test(b.textContent)])], [[true, true, true], [false, true]]);
+  check("담임에게는 백업 알림 없음(자료는 학교 장부에)", await t2.$eval("#backupBar", (b) => b.hidden), true);
   const other = await who({ email: "other@x.com", school: "다른고" });
   await other.makeSchool(); await other.waitForTimeout(500);
   check("다른 학교는 서로 안 보임", [Object.keys(KV).filter((k) => /^schools\/[0-9a-f]{40}$/.test(k)).length, (await rowNames(other)).includes("김예시")], [2, false]);
@@ -619,6 +627,18 @@ function buildTestPage() {
   await nob.click("#banner .choice >> text=관리자입니다"); await nob.click("#banner .btn >> text=구글로 로그인"); await nob.waitForTimeout(800);
   check("빠른 열기: 관리자가 아니면 목록이 안 보임", await nob.evaluate(() => !document.querySelector("#banner .btn") || ![...document.querySelectorAll("#banner .btn")].some((b) => /열기 →/.test(b.textContent))), true);
   await nob.context().close();
+  const multi = await who({ email: "multi@x.com", school: "가고" });
+  await multi.makeSchool(); await multi.click("#tabAdmin"); await multi.waitForTimeout(300); await multi.check("#schoolPanel input[name=quick]"); await multi.waitForTimeout(400);
+  await multi.click("#whoChip button >> text=나가기"); await multi.waitForTimeout(1500);
+  await multi.click("#banner .choice >> text=관리자입니다"); await multi.click("#banner .btn >> text=구글로 로그인"); await multi.waitForTimeout(300);
+  await multi.fill("#banner input[name=school]", "나고"); await multi.fill("#banner input[name=joinpw]", "1234"); await multi.click("#banner .btn >> text=학교 만들기"); await multi.waitForTimeout(3500);
+  await multi.click("#banner .btn >> text=들어가기"); await multi.waitForTimeout(1500);
+  await multi.click("#tabAdmin"); await multi.waitForTimeout(300); await multi.check("#schoolPanel input[name=quick]"); await multi.waitForTimeout(400);
+  await multi.reload(); await multi.waitForTimeout(1500);
+  const swOpts = await multi.evaluate(() => { const s = document.querySelector("#whoChip select.schoolsw"); return s ? [...s.options].map((o) => o.textContent) : null; });
+  if (swOpts) { await multi.selectOption("#whoChip select.schoolsw", { label: "가고" }); await multi.waitForTimeout(1500); }
+  check("관리자 학교 바꾸기: 빠른 열기 학교끼리 위쪽에서 바로 옮김", [swOpts, await multi.evaluate(() => { const s = document.querySelector("#whoChip select.schoolsw"); return s && s.options[0].textContent; })], [["나고 · 관리자", "가고", "다른 학교 코드로…"], "가고 · 관리자"]);
+  await multi.context().close();
   const wrong = await who({});
   await join(wrong, "AAAA-BBBB-CCCC-DDDD", "누구", 1);
   check("틀린 코드: 학교 없음", /이 코드의 학교가 없습니다/.test(await wrong.innerText("#banner")), true);
@@ -740,6 +760,34 @@ function buildTestPage() {
     t = await at("2026-12-30T09:00:00+09:00");
     check("12/30: 충원 통보 마감 지난 충원 대기·등록 마감 지난 미정은 확인 요청", [t.r.pend.includes("30201:due"), t.r.codes[2], t.r.reg[1]], [true, ["등록 확인"], "move"]);   // 12/30은 충원 등록 마감 당일이라 아직 옮길지 정할 수 있다
     await t.c.close();
+  }
+  console.log("\n[결과 한꺼번에 · 오늘 할 일]");
+  {
+    const c = await browser.newContext({ viewport: { width: 1200, height: 900 } });
+    const x = await c.newPage(); x.on("pageerror", (e) => errors.push(String(e)));
+    await x.clock.install({ time: new Date("2026-11-24T08:30:00+09:00") });
+    const A = (id, u, st, ann, itv) => ({ id, kind: "수시", univ: u, major: "경영학과", type: "학종", status: st, ann: ann || "", itv: itv || "", c6: true });
+    await x.addInitScript((s) => { if (sessionStorage.getItem("seeded")) return; sessionStorage.setItem("seeded", "1");
+      localStorage.setItem("jh.local.students", JSON.stringify(s)); localStorage.setItem("jh.cls", "2"); localStorage.setItem("jh.mode", "local"); }, [
+      { id: "s1", cls: 2, no: "30201", name: "가나", apps: [A("a1", "부산대학교", "면접완료", "2026-11-24"), A("a2", "경북대학교", "1단계합", "2026-12-10", "2026-11-25")] },
+      { id: "s2", cls: 2, no: "30202", name: "다라", apps: [A("b1", "부산대학교(부산)", "지원완료", "2026-11-24"), A("b2", "동아대학교", "최초합")] },
+      { id: "s3", cls: 2, no: "30203", name: "마바", apps: [A("c1", "부경대학교", "지원완료", "2026-11-30")] }]);
+    await x.goto("file://" + page404); await x.waitForTimeout(600);
+    const td = await x.evaluate(() => { const h = document.getElementById("today"); const cols = [...h.querySelectorAll(".tcol")].map((c) => c.innerText); return [!h.hidden, cols[0], cols[1]]; });
+    check("오늘 할 일: 오늘 발표 2건, 내일 면접", [td[0], /발표[\s\S]*가나[\s\S]*발표[\s\S]*다라/.test(td[1]), /면접·고사[\s\S]*가나[\s\S]*경북대/.test(td[2])], [true, true, true]);
+    await x.click("#btnBulkRes"); await x.waitForTimeout(200);
+    const pick = await x.$eval("#bulkPanel select.bulkpick", (s) => [s.value, s.options[s.selectedIndex].textContent]);
+    const names = await x.$$eval("#bulkPanel .bulkrow .who", (b) => b.map((e) => e.textContent));
+    check("결과 한꺼번에: 기다리는 대학 먼저, 캠퍼스 표기 달라도 같은 대학으로", [/부산대 — 결과 기다림 2 \/ 2건/.test(pick[1]), names], [true, ["30201 가나", "30202 다라"]]);
+    await x.selectOption("#bulkPanel .bulkrow >> nth=0 >> select", "최초합"); await x.waitForTimeout(150);
+    await x.selectOption("#bulkPanel .bulkrow >> nth=1 >> select", "충원대기"); await x.waitForTimeout(150);
+    await x.fill("#bulkPanel .bulkrow >> nth=1 >> input", "7"); await x.press("#bulkPanel .bulkrow >> nth=1 >> input", "Tab"); await x.waitForTimeout(150);
+    const saved = await x.evaluate(() => window.__dev.students().map((s) => s.apps[0].status + (s.apps[0].rank ? ":" + s.apps[0].rank : "")));
+    check("결과 한꺼번에: 고르면 바로 저장, 충원대기는 예비 번호", saved, ["최초합", "충원대기:7", "지원완료"]);
+    await x.click("#bulkPanel .seg button >> text=발표일별"); await x.waitForTimeout(150);
+    const dpick = await x.$eval("#bulkPanel select.bulkpick", (s) => s.options[s.selectedIndex].textContent);
+    check("결과 한꺼번에(발표일별): 오늘과 가까운 발표일을 먼저", /^11\/30\(월\) 발표|^11\/24\(화\) 발표/.test(dpick), true);
+    await c.close();
   }
   check("자바스크립트 오류 없음", errors, []);
   await browser.close();
