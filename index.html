@@ -4936,7 +4936,13 @@ function googleIn(){
 }
 function inp(name,ph,val){
   var i=document.createElement("input"); i.name=name; i.placeholder=ph; if(val) i.value=val; i.autocomplete="off"; i.spellcheck=false;
-  if(name==="code") i.oninput=function(){ var v=fmtCode(normCode(i.value).slice(0,16)); if(v!==i.value) i.value=v; };
+  // 초대 링크(…#join=코드)나 다른 컴퓨터 링크(…#link=코드.열쇠)를 통째로 붙여넣어도 알아듣는다
+  if(name==="code") i.oninput=function(){
+    var lk=i.value.match(/#link=([0-9A-Za-z-]{8,}\.[0-9A-Za-z]{8,})/);
+    if(lk){ location.hash="link="+lk[1]; location.reload(); return; }
+    var jm=i.value.match(/join=([0-9A-Za-z-]{8,})/), raw=jm?jm[1]:/^\s*https?:/i.test(i.value)?"":i.value;
+    var v=fmtCode(normCode(raw).slice(0,16)); if(v!==i.value) i.value=v;
+  };
   return i;
 }
 function clsSelect(val){
