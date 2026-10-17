@@ -598,8 +598,17 @@ function buildTestPage() {
   await t10.context().close();
   const t11 = await who({ email: "stranger@x.com" });
   await t11.click("#banner .choice >> text=선생님입니다"); await t11.click("#banner .btn >> text=구글로 들어가기"); await t11.waitForTimeout(1200);
-  check("연결 안 한 구글 계정은 안내만", /연결된 가입이 없습니다/.test(await t11.innerText("#banner")), true);
+  check("처음 구글로 누르면 그 계정으로 가입 칸", [/가입한 학교가 아직 없습니다/.test(await t11.innerText("#banner")), /stranger@x.com 로 가입합니다/.test(await t11.innerText("#banner"))], [true, true]);
+  await t11.fill("#banner input[name=code]", firstCode); await t11.waitForTimeout(1200);
+  await t11.fill("#banner input[name=name]", "구담임"); await t11.selectOption("#banner select[name=cls]", "3"); await t11.fill("#banner input[name=pw]", "1234"); await t11.click("#banner .codeform .btn"); await t11.waitForTimeout(1500);
+  await adm.click("#tabAdmin"); await adm.waitForTimeout(600); await adm.click("#schoolPanel button >> text=승인"); await t11.waitForTimeout(2500);
+  await adm.click("#tabClass"); await adm.waitForTimeout(200);
+  const g11 = await gateTitle(t11);
   await t11.context().close();
+  const t12 = await who({ email: "stranger@x.com" });
+  await t12.click("#banner .choice >> text=선생님입니다"); await t12.click("#banner .btn >> text=구글로 들어가기"); await t12.waitForTimeout(2000);
+  check("구글로 가입·승인되면 다른 컴퓨터에서 구글로 바로(링크·코드 없이)", [g11, await gateTitle(t12), /3반/.test(await t12.innerText("#whoChip"))], ["", "", true]);
+  await t12.context().close();
   await t2.click("#tabAll"); await t2.waitForTimeout(500);
   check("담임은 다른 반(5반) 학생이 안 보임", /박예시/.test(await t2.innerText("#viewAll")), false);
   await adm.click("#tabAll"); await adm.waitForTimeout(500);

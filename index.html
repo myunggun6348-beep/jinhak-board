@@ -5019,13 +5019,16 @@ function codeGate(err,mode,preset){
     if(preset) ci.hidden=true;
     var pi=inp("pw","가입 암호 (관리자에게 받은 것)"); pi.type="password"; pi.hidden=true;   // 코드를 넣고 그 학교가 암호를 쓸 때만 보인다
     var toAdm=el("button","linkbtn","관리자이신가요? 학교를 만들거나 관리하려면 여기를 누르세요"); toAdm.onclick=function(){ codeGate("","admin"); };
-    var gIn=el("div","step done"); gIn.appendChild(el("b",null,"전에 가입하고 구글을 연결했나요?"));
-    var gb=el("button","btn","구글로 들어가기"); gIn.appendChild(gb);
-    gIn.appendChild(el("span","shint","초대 링크·코드 없이 바로 우리 반으로 들어갑니다. 처음 가입하는 분은 위에 적고 가입을 요청하세요."));
+    // 구글로: 이미 이 구글로 가입했으면 바로 들어가고, 처음이면 이 구글 계정으로 로그인된 채 위 칸에 적어 가입 요청
+    var gIn=el("div","step done"), gm=myMail()&&lsGet("jh.role")==="teacher"?myMail():"";
+    gIn.appendChild(el("b",null,gm?"✓ "+gm+" 로 가입합니다":"구글 계정으로 가입·입장 (추천)"));
+    var gb=el("button","btn","구글로 들어가기"); if(!gm) gIn.appendChild(gb);
+    gIn.appendChild(el("span","shint",gm?"위에 학교 코드(또는 초대 링크로 열기)·이름·담당 반을 넣고 가입을 요청하세요. 승인되면 다음부터는 어느 컴퓨터에서든 ‘구글로 들어가기’만 누르면 됩니다.":
+      "이미 구글로 가입했으면 바로 우리 반으로 들어갑니다. 처음이면 구글로 로그인한 뒤 위 칸을 채워 가입하세요. 다음부터 어느 컴퓨터에서든 초대 링크 없이 들어옵니다."));
     gb.onclick=function(){
-      googleIn().then(function(){ return myLinkedSchool(); }).then(function(x){
-        if(x){ lsSet("jh.role","teacher"); enterCode(x.code,{remember:true}); return; }
-        var m=myMail(); fb.U.signOut(fb.auth).then(function(){ codeGate((m||"이 구글 계정")+" 으로 연결된 가입이 없습니다. 위에서 초대 링크(코드)로 가입한 뒤, 위쪽 ‘구글 연결’을 한 번 눌러 두세요.","teacher"); });
+      googleIn().then(function(){ lsSet("jh.role","teacher"); return myLinkedSchool(); }).then(function(x){
+        if(x){ enterCode(x.code,{remember:true}); return; }
+        codeGate("‘"+myMail()+"’ 계정으로 가입한 학교가 아직 없습니다. 위에 학교 코드·이름·담당 반을 넣고 가입을 요청하세요(이 구글 계정으로 가입됩니다).","teacher",normCode(ci.value).length>=8?ci.value:undefined);
       },function(e){ if(e&&e.msg) say(e.msg); });
     };
     var rl=el("label","ckrow"), rc=document.createElement("input"); rc.type="checkbox"; rc.checked=true;
@@ -5326,7 +5329,8 @@ function enterSchool(K,code,info,admin,cls){
   pend.onclick=function(){ switchTab("admin"); window.scrollTo(0,0); };
   document.getElementById("tabAdmin").hidden=!admin;
   if(!admin&&cls&&fb.auth.currentUser&&fb.auth.currentUser.isAnonymous){ var lg=el("button","btn sec","구글 연결"); lg.title="한 번 연결해 두면 어느 컴퓨터에서든 구글 로그인만으로 초대 링크 없이 들어옵니다"; lg.onclick=function(){ linkGoogle(lg); }; chip.appendChild(lg); }
-  if(!admin&&cls&&myMail()) lsSet("jh.role","teacher");
+  if(!admin&&cls&&myMail()){ lsSet("jh.role","teacher");
+    var cu=fb.auth.currentUser; fb.S.setDoc(fb.S.doc(fb.fs,"users",cu.uid),{code:normCode(code),name:school.name||"",at:new Date().toISOString()}).catch(function(){}); }
   if(!admin&&cls){ var oc=el("button","ghost","다른 컴퓨터"); oc.title="집 노트북 등 다른 컴퓨터에서 가입·승인 없이 바로 열 수 있는 링크를 만듭니다"; oc.onclick=function(){ showLinkBox(myName(),school.cls); }; chip.appendChild(oc); }
   var out=el("button","ghost","나가기"); out.title="이 컴퓨터가 기억한 학교 코드를 지우고 시작 화면으로 갑니다(공용 컴퓨터에서 다 쓴 뒤, 다른 학교로 갈 때)";
   out.onclick=goHome;
