@@ -114,6 +114,21 @@ button{cursor:pointer}
 .tcard.g{order:-1; background:var(--accent-soft); border-color:transparent}
 .tcard .gbtn{font-size:15px; padding:12px; white-space:pre}
 @media (max-width:760px){ .thow,.tjoin{grid-template-columns:1fr} }
+.whochip .whoid{display:inline-flex; align-items:center; gap:7px; max-width:none; padding:3px 10px 3px 3px; border:1px solid var(--line-2); border-radius:999px; background:var(--surface)}
+.whochip .wrole{background:var(--accent); color:var(--on-accent,#fff); border-radius:999px; padding:2px 9px; font-size:11.5px; white-space:nowrap}
+.whochip .wname{max-width:17em; overflow:hidden; text-overflow:ellipsis; color:var(--ink); font-weight:600}
+.whochip .wsch{max-width:10em; overflow:hidden; text-overflow:ellipsis; color:var(--ink-3)}
+@media (max-width:640px){ .whochip .wname{max-width:9em} .whochip .wsch{display:none} }
+.aphead{display:flex; align-items:baseline; flex-wrap:wrap; gap:4px 10px; margin-bottom:10px}
+.aphead h3{margin:0!important; font-size:16px!important}
+.aphead span{font-size:12.5px; color:var(--ink-3)}
+.apsteps{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-bottom:12px}
+.apsteps>div{display:grid; grid-template-columns:24px 1fr; gap:2px 9px; padding:10px 12px; border-radius:12px; background:var(--surface-2); font-size:12.5px; color:var(--ink-2); line-height:1.5}
+.apsteps .n{grid-row:span 2; width:22px; height:22px; border-radius:50%; background:var(--accent); color:var(--on-accent,#fff); display:grid; place-items:center; font-weight:800; font-size:12px}
+.apsteps b{color:var(--ink); font-size:13px}
+.drop .dor{font-size:12px; color:var(--ink-3)}
+.drop #btnPick{font-size:14px; padding:9px 18px}
+@media (max-width:760px){ .apsteps{grid-template-columns:1fr} }
 .tbadge{display:inline-block; min-width:18px; margin-left:5px; padding:0 5px; border-radius:9px; background:var(--bad); color:#fff; font-size:11px; font-weight:700; line-height:18px; text-align:center}
 .adminpage .ahead{display:flex; align-items:baseline; flex-wrap:wrap; gap:4px 10px; margin-bottom:12px}
 .adminpage .ahead h2{font-size:18px; margin:0}
@@ -780,27 +795,33 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
     <div class="rows" id="rows"></div>
 
     <div class="panel" id="addPanel">
-      <h3>명단·지원 현황 넣기</h3>
+      <div class="aphead"><h3>학생·지원 대학 넣기</h3><span>처음 한 번만 넣으면, 그다음엔 결과만 고치면 됩니다</span></div>
+      <div class="apsteps">
+        <div><span class="n">1</span><b>지원 현황 파일 그대로 넣기</b><span>학교 진학 프로그램에서 받은 지원 현황(PDF·엑셀·한글)을 아래 칸에 끌어다 놓으세요. 학생·대학·전형·면접일을 알아서 읽습니다.</span></div>
+        <div><span class="n">2</span><b>잘 들어갔는지 보기</b><span>읽은 결과가 바로 아래에 요약됩니다. 잘못 들어갔으면 ‘되돌리기’를 누르세요.</span></div>
+        <div><span class="n">3</span><b>그다음엔 결과만</b><span>발표가 나면 학생을 눌러(또는 ‘결과 한꺼번에’) 합격·불합격만 고치면 됩니다.</span></div>
+      </div>
       <div class="subtabs" role="tablist">
-        <button role="tab" id="stFile" aria-selected="true">파일에서</button>
-        <button role="tab" id="stPaste" aria-selected="false">붙여넣기</button>
-        <button role="tab" id="stOne" aria-selected="false">한 명씩</button>
+        <button role="tab" id="stFile" aria-selected="true">파일 넣기 (추천)</button>
+        <button role="tab" id="stPaste" aria-selected="false">엑셀에서 복사·붙여넣기</button>
+        <button role="tab" id="stOne" aria-selected="false">한 명씩 직접</button>
       </div>
 
       <div id="paneFile">
         <div class="drop" id="drop">
-          <b>명단이나 지원 현황 파일을 여기에 끌어다 놓으세요</b>
-          <button class="btn sec" id="btnPick">파일 선택</button>
+          <b>여기에 파일을 끌어다 놓으세요</b>
+          <span class="dor">또는</span>
+          <button class="btn" id="btnPick">내 컴퓨터에서 파일 고르기</button>
           <input type="file" id="file" accept=".pdf,.csv,.tsv,.txt,.xlsx,.xls,.hwpx,.hwp,.json" multiple hidden>
-          <span class="hint">PDF · CSV · 엑셀 · 한글(.hwpx)을 읽습니다. 표를 복사해 Ctrl+V 로 붙여넣어도 됩니다. 다른 선생님이 보낸 반 파일(.json)은 여러 개를 한꺼번에 넣으면 합쳐집니다.</span>
+          <span class="hint"><b>지원 현황</b>(학생마다 대학·학과·전형) 파일이 가장 좋습니다. <b>명단</b>(학번·이름)만 있는 파일도 됩니다. 다른 선생님이 보낸 반 파일(.json)을 넣으면 합쳐집니다.</span>
           <span class="fmts" id="fmts"></span>
         </div>
       </div>
 
       <div id="panePaste" hidden>
-        <p class="hint">한 줄에 한 명. 학번과 이름 사이는 띄어쓰기, 탭, 쉼표 무엇이든 됩니다. 한글 표를 복사해 붙여넣어도 읽습니다.</p>
-        <textarea id="bulk" placeholder="30201 김민수&#10;30202 이서연&#10;30203 박지훈"></textarea>
-        <div style="margin-top:8px"><button class="btn" id="btnBulk">읽어 보기</button></div>
+        <p class="hint">엑셀·한글 표에서 칸을 드래그해 복사(Ctrl+C)한 뒤 아래에 붙여넣으세요(Ctrl+V). 맨 윗줄 제목(학번·이름·대학·학과…)까지 함께 복사하면 지원 현황으로 읽고, 학번·이름만 있으면 명단으로 읽습니다.</p>
+        <textarea id="bulk" placeholder="예) 명단만:&#10;30201 김민수&#10;30202 이서연&#10;&#10;예) 지원 현황: 맨 윗줄 제목까지&#10;학번	이름	대학	모집단위	전형명	면접일"></textarea>
+        <div style="margin-top:8px"><button class="btn" id="btnBulk">넣기</button></div>
       </div>
 
       <div id="paneOne" hidden>
@@ -812,10 +833,10 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
       </div>
 
       <div class="tmpl">
-        <span class="tl">서식이 필요하시면</span>
-        <button class="ghost" id="btnTmplRoster">명단 서식</button>
-        <button class="ghost" id="btnTmplApps">지원 현황 서식</button>
-        <span class="tn">지원 현황은 상태·전형 값이 정해져 있어 서식을 쓰시는 편이 안전합니다.</span>
+        <span class="tl">넣을 파일이 없나요?</span>
+        <button class="ghost" id="btnTmplApps">지원 현황 서식 받기 (추천)</button>
+        <button class="ghost" id="btnTmplRoster">명단 서식 받기 (학번·이름만)</button>
+        <span class="tn">서식(엑셀에서 열리는 CSV)을 받아 채운 뒤 위 칸에 넣으세요. 예시 줄은 지우고 쓰면 됩니다.</span>
       </div>
       <div id="importMsg"></div>
     </div>
@@ -4763,7 +4784,7 @@ function setLocalMode(v){ try{ if(v) localStorage.setItem("jh.mode",v); else loc
 function showLocalChip(){
   if(!useFirebase()) return;
   var chip=document.getElementById("whoChip"); chip.hidden=false; chip.innerHTML="";
-  chip.appendChild(el("span",null,"혼자 쓰기 · 이 컴퓨터에만 저장"));
+  var lw=el("span","whoid"); lw.appendChild(el("b","wrole","혼자 쓰기")); lw.appendChild(el("span","wname","로그인 없음 · 이 컴퓨터에만 저장")); chip.appendChild(lw);
   var go=el("button","ghost","학교 장부로");
   go.title="학교 코드로 들어가 다른 선생님과 함께 씁니다. 이 브라우저 자료는 들어갈 때 올릴지 묻습니다";
   go.onclick=function(){ setLocalMode(""); location.reload(); };
@@ -5349,7 +5370,12 @@ function enterSchool(K,code,info,admin,cls){
   school={K:K, code:normCode(code), name:info.name||"", admins:info.admins||[], admin:admin, cls:cls||0, pwOff:!!info.pwOff};
   if(!admin&&cls){ setMyCls(cls); setCls(cls); }
   var chip=document.getElementById("whoChip"); chip.hidden=false; chip.innerHTML="";
-  chip.appendChild(el("span",null,(school.name||"학교")+" · "+(admin?"관리자":(cls?cls+"반 ":"")+(myName()||"선생님"))));
+  var acct=myMail(), wid=el("span","whoid");
+  wid.appendChild(el("b","wrole",admin?"관리자":(cls?cls+"반 담임":"담임")));
+  wid.appendChild(el("span","wname",admin?(acct||"관리자"):(myName()||"선생님")+(acct?" · "+acct:"")));
+  wid.appendChild(el("span","wsch",school.name||"학교"));
+  wid.title="학교: "+(school.name||"")+"\n역할: "+(admin?"관리자(모든 반)":(cls?cls+"반 담임":"담임"))+"\n로그인: "+(acct?acct+" (구글)":"이 컴퓨터(구글 연결 안 함)");
+  chip.appendChild(wid);
   var pend=el("button","btn sec"); pend.id="pendBtn"; pend.hidden=true;
   pend.onclick=function(){ switchTab("admin"); window.scrollTo(0,0); };
   document.getElementById("tabAdmin").hidden=!admin;
@@ -5368,7 +5394,7 @@ function enterSchool(K,code,info,admin,cls){
     [["",(school.name||"학교")+" · 관리자"]].concat(others.map(function(x){ return [x.code,x.name||"학교"]; }),[["__code","다른 학교 코드로…"]]).forEach(function(o){
       var op=document.createElement("option"); op.value=o[0]; op.textContent=o[1]; sw.appendChild(op); });
     sw.onchange=function(){ var v=sw.value; if(!v) return; leaveSchool(); if(v==="__code") codeGate("","admin"); else enterCode(v,{remember:true}); };
-    var nm=chip.querySelector("span"); if(nm) chip.replaceChild(sw,nm);
+    var nm=chip.querySelector(".wsch"); if(nm) nm.replaceWith(sw);
   });
   var b=document.getElementById("banner"); b.hidden=true; b.className="banner";
   if(!admin&&!cls) showGate("담당 반이 정해지지 않았습니다","관리자에게 담당 반을 정해 달라고 하세요. 정해지면 이 화면이 저절로 바뀝니다.",[]);
@@ -5549,7 +5575,7 @@ function setAdmins(list){
 function renameSchool(name){
   fb.S.getDoc(sRef(school.K.room)).then(function(d){
     var x=d.data(); return fb.S.setDoc(sRef(school.K.room),schoolDoc(x,{name:name.slice(0,40)})).then(function(){
-      school.name=name.slice(0,40); var c=document.querySelector("#whoChip span"); if(c) c.textContent=school.name+" · 관리자"; renderSchoolPanel(); });
+      school.name=name.slice(0,40); var c=document.querySelector("#whoChip .wsch"); if(c) c.textContent=school.name; renderSchoolPanel(); });
   }).catch(function(e){ alert("이름을 바꾸지 못했습니다. ("+((e&&e.code)||"")+")"); });
 }
 /* 사용 설명서 */

@@ -692,6 +692,7 @@ function buildTestPage() {
   const wrong = await who({});
   await join(wrong, "AAAA-BBBB-CCCC-DDDD", "누구", 1);
   check("틀린 코드: 학교 없음", /이 코드의 학교가 없습니다/.test(await wrong.innerText("#banner")), true);
+  check("위쪽에 누가 로그인했는지(역할·이름·학교)", [await adm.$eval("#whoChip .wrole", (e) => e.textContent), await t2.$eval("#whoChip .wrole", (e) => e.textContent), /박담임/.test(await t2.$eval("#whoChip .wname", (e) => e.textContent))], ["관리자", "2반 담임", true]);
   check("담임에게는 학교 관리 탭이 없음", await t2.$eval("#tabAdmin", (e) => e.hidden), true);
   await adm.click("#tabAdmin"); await adm.waitForTimeout(500);
   await adm.click("#schoolPanel button >> text=빼기"); await t2.waitForTimeout(2500);
