@@ -24,6 +24,12 @@ service cloud.firestore {
         && d.c is string && d.c.size() < 1000000 && d.iv is string && d.iv.size() < 40;
     }
 
+    // 담임이 구글을 연결하면 어느 학교로 들어갈지(코드·이름) 본인만 읽고 쓴다
+    match /users/{uid} {
+      allow read, delete: if signedIn() && request.auth.uid == uid;
+      allow create, update: if signedIn() && request.auth.uid == uid && request.resource.data.keys().hasOnly(['code', 'name', 'at']);
+    }
+
     match /schools/{sid} {
       allow get: if signedIn() && sid.size() == 40;
       allow list: if google() && mail() in resource.data.admins;

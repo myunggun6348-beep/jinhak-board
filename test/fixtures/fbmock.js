@@ -14,6 +14,7 @@ window.__fbMock = (function () {
   // 규칙: op = get|list|write|delete. where = 목록 조건 {f, v}. old = 지금 문서
   var allow = function (op, path, data, where) {
     var p = seg(path), u = auth.currentUser;
+    if (p[0] === "users") return Promise.resolve(!!u && p[1] === u.uid);
     if (op === "list" && p.length === 2 && p[0] === "schools") return Promise.resolve(!!mail() && !!where && where.op === "array-contains" && where.f === "admins" && where.v === mail());
     if (!u || p[0] !== "schools" || !p[1] || p[1].length !== 40) return Promise.resolve(false);
     var sid = p[1];
@@ -59,7 +60,10 @@ window.__fbMock = (function () {
     onAuthStateChanged: function (a, cb) { setTimeout(function () { cb(auth.currentUser); }); return function () {}; },
     signInAnonymously: function () { setMe({ uid: "anon_" + Math.random().toString(36).slice(2, 8), isAnonymous: true }); return Promise.resolve(); },
     GoogleAuthProvider: function () { this.setCustomParameters = function () {}; },
-    signInWithPopup: function () { var e = window.__fbEmail || "admin@x.com"; setMe({ uid: "g_" + e.split("@")[0], email: e, isAnonymous: false }); return Promise.resolve(); },
+    signInWithPopup: function () { var e = window.__fbEmail || "admin@x.com"; return window.__kv("get", "authmap/" + e).then(function (a) { setMe({ uid: a ? a.uid : "g_" + e.split("@")[0], email: e, isAnonymous: false }); }); },
+    linkWithPopup: function (u) { var e = window.__fbEmail || "teacher@x.com"; return window.__kv("get", "authmap/" + e).then(function (a) {
+      if (a && a.uid !== u.uid) return Promise.reject({ code: "auth/credential-already-in-use" });
+      return window.__kv("set", "authmap/" + e, { uid: u.uid }).then(function () { setMe({ uid: u.uid, email: e, isAnonymous: false }); }); }); },
     signOut: function () { setMe(null); return Promise.resolve(); },
   };
   var S = {

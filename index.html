@@ -4897,7 +4897,9 @@ function startFirebase(){
       if(lk){ try{ history.replaceState(null,"",location.pathname+location.search); }catch(e){} linkJoin(lk[1],lk[2]); return; }
       var inv=location.hash.match(/join=([0-9A-Za-z-]{8,})/);
       if(inv){ try{ history.replaceState(null,"",location.pathname+location.search); }catch(e){} codeGate("","teacher",inv[1]); }
-      else if(saved) enterCode(saved,{remember:true}); else codeGate();
+      else if(saved) enterCode(saved,{remember:true});
+      else if(myMail()) myLinkedSchool().then(function(x){ if(x) enterCode(x.code,{remember:true}); else codeGate(); });
+      else codeGate();
     });
   }).catch(function(){
     setSync("off","공용 장부에 연결하지 못했습니다");
@@ -5005,7 +5007,7 @@ function inviteLink(code){ return location.origin+location.pathname+"#join="+fmt
 function codeGate(err,mode,preset){
   leaveSchool();
   setSync("","시작 전");
-  if(mode===undefined) mode=myMail()?"admin":"";
+  if(mode===undefined) mode=myMail()&&lsGet("jh.role")!=="teacher"?"admin":"";
   var f=el("div","codeform"), note=el("p","shint",err||""); if(err) note.style.color="var(--bad)";
   var say=function(t){ note.textContent=t; note.style.color="var(--bad)"; };
   var back=el("button","linkbtn","← 처음으로"); back.onclick=function(){ codeGate(); };
@@ -5017,6 +5019,15 @@ function codeGate(err,mode,preset){
     if(preset) ci.hidden=true;
     var pi=inp("pw","가입 암호 (관리자에게 받은 것)"); pi.type="password"; pi.hidden=true;   // 코드를 넣고 그 학교가 암호를 쓸 때만 보인다
     var toAdm=el("button","linkbtn","관리자이신가요? 학교를 만들거나 관리하려면 여기를 누르세요"); toAdm.onclick=function(){ codeGate("","admin"); };
+    var gIn=el("div","step done"); gIn.appendChild(el("b",null,"전에 가입하고 구글을 연결했나요?"));
+    var gb=el("button","btn","구글로 들어가기"); gIn.appendChild(gb);
+    gIn.appendChild(el("span","shint","초대 링크·코드 없이 바로 우리 반으로 들어갑니다. 처음 가입하는 분은 위에 적고 가입을 요청하세요."));
+    gb.onclick=function(){
+      googleIn().then(function(){ return myLinkedSchool(); }).then(function(x){
+        if(x){ lsSet("jh.role","teacher"); enterCode(x.code,{remember:true}); return; }
+        var m=myMail(); fb.U.signOut(fb.auth).then(function(){ codeGate((m||"이 구글 계정")+" 으로 연결된 가입이 없습니다. 위에서 초대 링크(코드)로 가입한 뒤, 위쪽 ‘구글 연결’을 한 번 눌러 두세요.","teacher"); });
+      },function(e){ if(e&&e.msg) say(e.msg); });
+    };
     var rl=el("label","ckrow"), rc=document.createElement("input"); rc.type="checkbox"; rc.checked=true;
     rl.appendChild(rc); rl.appendChild(document.createTextNode(" 이 컴퓨터에 코드 기억(여럿이 쓰는 컴퓨터면 끄세요)"));
     var go=el("button","btn","가입 요청 · 들어가기");
@@ -5029,7 +5040,7 @@ function codeGate(err,mode,preset){
       enterCode(ci.value,{remember:rc.checked, pw:pi.value});
     };
     [ci,ni,pi].forEach(function(x){ x.onkeydown=function(e){ if(e.key==="Enter") go.onclick(); }; });
-    [toAdm,ci,ni,ks,pi,rl,go,note,back].forEach(function(x){ f.appendChild(x); });
+    [toAdm,ci,ni,ks,pi,rl,go,gIn,note,back].forEach(function(x){ f.appendChild(x); });
     showGate(preset?"선생님: 초대 링크로 가입하기":"선생님: 학교 코드로 가입하기",
       preset?"학교 코드는 이미 들어가 있습니다. 이름·담당 반과 관리자에게 따로 받은 가입 암호를 넣고 가입을 요청하세요. 관리자가 승인하면 화면이 저절로 열리고, 담당 반 학생만 보입니다.":
       "관리자가 보낸 초대 링크를 누르면 코드를 칠 필요가 없습니다. 코드로 가입하려면 학교 코드·이름·담당 반을 넣고 가입을 요청하세요. 가입 암호가 필요한 학교면 코드를 넣을 때 칸이 나옵니다.",[f]);
@@ -5058,7 +5069,7 @@ function codeGate(err,mode,preset){
     var lo=el("button","linkbtn","로그아웃"); lo.onclick=function(){ fb.U.signOut(fb.auth).then(function(){ codeGate("","admin"); }); }; s1.appendChild(lo);
   } else {
     var gi=el("button","btn","구글로 로그인");
-    gi.onclick=function(){ googleIn().then(function(){ codeGate("","admin"); },function(e){ if(e&&e.msg) say(e.msg); }); };
+    gi.onclick=function(){ googleIn().then(function(){ lsSet("jh.role","admin"); codeGate("","admin"); },function(e){ if(e&&e.msg) say(e.msg); }); };
     s1.appendChild(gi);
   }
   // 내 학교: 구글 로그인만으로 열기를 켠 학교는 바로 [열기]
@@ -5236,6 +5247,27 @@ function linkJoin(code,key){
       c==="no-school"?"이 링크의 학교가 없습니다.":"들어가지 못했습니다"+(c?" ("+c+")":"")+". 인터넷 연결을 확인해 주세요.","teacher");
   });
 }
+/* ── 담임 구글 연결 ── */
+function myLinkedSchool(){
+  var u=fb.auth.currentUser; if(!u||u.isAnonymous) return Promise.resolve(null);
+  return fb.S.getDoc(fb.S.doc(fb.fs,"users",u.uid)).then(function(d){ return d.exists()&&d.data().code?d.data():null; },function(){ return null; });
+}
+function linkGoogle(btn){
+  var u=fb.auth.currentUser; if(!u||!school) return;
+  var pv=new fb.U.GoogleAuthProvider(); pv.setCustomParameters({prompt:"select_account"});
+  btn.disabled=true;
+  fb.U.linkWithPopup(u,pv).then(function(){
+    lsSet("jh.role","teacher");
+    return fb.S.setDoc(fb.S.doc(fb.fs,"users",u.uid),{code:normCode(school.code),name:school.name||"",at:new Date().toISOString()});
+  }).then(function(){
+    alert("구글 계정을 연결했습니다("+myMail()+").\n이제 다른 컴퓨터에서도 ‘선생님입니다 → 구글로 들어가기’만 누르면 초대 링크 없이 우리 반으로 들어옵니다.");
+    btn.remove();
+  },function(e){
+    btn.disabled=false; var c=(e&&e.code)||"";
+    alert(/credential-already-in-use|email-already-in-use/.test(c)?"이 구글 계정은 이미 다른 곳(관리자 계정 등)에 쓰이고 있습니다. 다른 구글 계정으로 연결해 주세요.":
+      /popup-closed|cancelled-popup/.test(c)?"연결을 취소했습니다.":"구글 계정을 연결하지 못했습니다("+c+"). 최신 Firestore 규칙을 붙여넣었는지도 확인해 주세요.");
+  });
+}
 function enterCode(code,o){
   o=o||{};
   if(normCode(code).length<8){ codeGate("코드가 너무 짧습니다. 받은 코드를 다시 확인해 주세요.","teacher"); return; }
@@ -5293,6 +5325,8 @@ function enterSchool(K,code,info,admin,cls){
   var pend=el("button","btn sec"); pend.id="pendBtn"; pend.hidden=true;
   pend.onclick=function(){ switchTab("admin"); window.scrollTo(0,0); };
   document.getElementById("tabAdmin").hidden=!admin;
+  if(!admin&&cls&&fb.auth.currentUser&&fb.auth.currentUser.isAnonymous){ var lg=el("button","btn sec","구글 연결"); lg.title="한 번 연결해 두면 어느 컴퓨터에서든 구글 로그인만으로 초대 링크 없이 들어옵니다"; lg.onclick=function(){ linkGoogle(lg); }; chip.appendChild(lg); }
+  if(!admin&&cls&&myMail()) lsSet("jh.role","teacher");
   if(!admin&&cls){ var oc=el("button","ghost","다른 컴퓨터"); oc.title="집 노트북 등 다른 컴퓨터에서 가입·승인 없이 바로 열 수 있는 링크를 만듭니다"; oc.onclick=function(){ showLinkBox(myName(),school.cls); }; chip.appendChild(oc); }
   var out=el("button","ghost","나가기"); out.title="이 컴퓨터가 기억한 학교 코드를 지우고 시작 화면으로 갑니다(공용 컴퓨터에서 다 쓴 뒤, 다른 학교로 갈 때)";
   out.onclick=goHome;
