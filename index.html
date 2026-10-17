@@ -414,6 +414,7 @@ body.hide-today #today,body.hide-today #allToday,body.hide-alerts #alerts,body.h
 .apptable select:disabled{background:var(--surface-3); color:var(--ink-3)}
 .apptable .act{text-align:right; white-space:nowrap}
 .apptable .w{color:var(--bad); font-weight:700; font-size:12px; margin-right:8px}
+.apptable .clash{color:var(--bad); font-weight:800; background:var(--bad-soft); border-radius:5px; padding:1px 6px; white-space:nowrap}
 .apptable .edit{color:var(--ink-3); font-size:12px}
 .apptable td.editcell{background:var(--surface-2); padding:10px}
 .apptable td.editcell .app{background:var(--surface)}
@@ -1687,14 +1688,23 @@ function detail(st){
     heads.forEach(function(h){
       var th=document.createElement("th"); th.textContent=h; hr.appendChild(th); });
     var tb=t.createTBody();
+    // 면접·고사일이 겹치는 날마다 번호(①②…)를 붙여, 어느 지원끼리 겹치는지 한눈에
+    var CIRC="①②③④⑤⑥⑦⑧⑨", clashNo={};
+    apps.map(function(a){ return a.itv; }).filter(function(d,i,arr){ return d&&arr.indexOf(d)===i&&apps.some(function(x){ return x.itv===d&&apps.some(function(y){ return y.itv===d&&y.univ!==x.univ; }); }); })
+      .sort().forEach(function(d,i){ clashNo[d]=CIRC[i]||"("+(i+1)+")"; });
     apps.forEach(function(a){
-      var w=appWarn(st,a), open=(editAppId===a.id);
+      var w=appWarn(st,a), open=(editAppId===a.id), cn=a.itv&&clashNo[a.itv];
       var tr=tb.insertRow(); tr.className="arow"+(w?" warn":"")+(open?" open":"");
       tr.insertCell().appendChild(el("span","kind"+(a.jc?" jc":""),(a.jc?"전문대 ":"")+(a.kind==="정시"?(a.group&&!a.jc?a.group+"군":"정시"):"수시")));
       tr.insertCell().textContent=a.univ||"미입력";
       tr.insertCell().textContent=a.major||"";
       var jc=tr.insertCell(); jc.textContent=a.jh||a.type||""; if(isRec(a)) jc.appendChild(el("span","recb","학교장추천"));
-      tr.insertCell().textContent=[a.ann1?mmdd(a.ann1)+" 1단계":"", a.itv?mmdd(a.itv)+" 면접":"", a.ann?mmdd(a.ann)+" 발표":""].filter(Boolean).join(" · ")||"—";
+      var dc=tr.insertCell(), parts=[];
+      if(a.ann1) parts.push(document.createTextNode(mmdd(a.ann1)+" 1단계"));
+      if(a.itv) parts.push(cn?el("span","clash",cn+" "+mmdd(a.itv)+" 면접"):document.createTextNode(mmdd(a.itv)+" 면접"));
+      if(a.ann) parts.push(document.createTextNode(mmdd(a.ann)+" 발표"));
+      if(!parts.length) dc.textContent="—";
+      parts.forEach(function(p,i){ if(i) dc.appendChild(document.createTextNode(" · ")); dc.appendChild(p); });
       var mc=tr.insertCell();
       mc.textContent=a.kind==="수시"?(minShort(a.mreq)||"—"):"—";
       if(a.mreq) mc.title=a.mreq+(a.msrc?"\n출처: "+a.msrc:"");
@@ -1703,7 +1713,10 @@ function detail(st){
       s.onclick=function(e){ e.stopPropagation(); };
       tr.insertCell().appendChild(s);
       var ec=tr.insertCell(); ec.className="act";
-      if(w) ec.appendChild(el("span","w",w));
+      if(w==="면접·고사일 중복"&&cn){
+        var mates=apps.filter(function(x){ return x!==a&&x.itv===a.itv&&x.univ!==a.univ; }).map(function(x){ return shortUniv(x.univ); });
+        var cw=el("span","w",cn+" "+mates.join("·")+"와 같은 날"); cw.title=mmdd(a.itv)+" 면접·고사가 "+mates.join(", ")+"와(과) 같은 날입니다. 시간이 겹치는지 확인하세요."; ec.appendChild(cw);
+      } else if(w) ec.appendChild(el("span","w",w));
       ec.appendChild(el("span","edit",open?"닫기 ▲":"고치기 ▼"));
       [].forEach.call(tr.cells,function(c,i){ if(heads[i]) c.setAttribute("data-l",heads[i]); });
       tr.onclick=function(){ editAppId=open?null:a.id; render(); };

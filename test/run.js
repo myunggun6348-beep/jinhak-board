@@ -485,6 +485,18 @@ function buildTestPage() {
 
   check("앱 흔적 없음(설치 단추·manifest·아이콘·서비스 워커 파일 없음, 남은 서비스 워커는 앱이 지움)", [await p.evaluate(() => !document.querySelector("link[rel=manifest],link[rel=icon],link[rel=apple-touch-icon]") && !document.getElementById("btnInstall")), ["manifest.webmanifest", "sw.js", "icons"].some((f) => fs.existsSync(path.join(ROOT, f))), /getRegistrations[\s\S]*unregister/.test(fs.readFileSync(path.join(ROOT, "index.html"), "utf8"))], [true, false, true]);
 
+  {
+    const c = await browser.newContext({ viewport: { width: 1200, height: 900 } }); const x = await c.newPage(); x.on("pageerror", (e) => errors.push(String(e)));
+    const A = (id, u, d) => ({ id, kind: "수시", univ: u, major: "국어국문학과", type: "논술", itv: d, status: "지원완료", c6: true });
+    await x.addInitScript((s) => { if (sessionStorage.getItem("seeded")) return; sessionStorage.setItem("seeded", "1"); localStorage.setItem("jh.local.students", JSON.stringify(s)); localStorage.setItem("jh.cls", "2"); localStorage.setItem("jh.mode", "local"); },
+      [{ id: "s1", cls: 2, no: "30201", name: "가나", apps: [A("a", "부산대학교", "2026-11-28"), A("b", "건국대학교", "2026-11-21"), A("c", "숭실대학교", "2026-11-21"), A("d", "경북대학교", "2026-11-28"), A("e", "아주대학교", "2026-12-06")] }]);
+    await x.goto("file://" + page404); await x.waitForTimeout(500);
+    await x.click(".row >> nth=0 >> .rowhead"); await x.waitForTimeout(200);
+    const ws = await x.$$eval(".apptable tbody tr.arow", (rs) => rs.map((r) => (r.querySelector(".w") || {}).textContent || ""));
+    check("면접 겹침: 같은 날끼리 번호와 상대 대학", ws, ["② 경북대와 같은 날", "① 숭실대와 같은 날", "① 건국대와 같은 날", "② 부산대와 같은 날", ""]);
+    await c.close();
+  }
+
   /* ── 자료 지키기(백업 알림) ── */
   const bb = () => p.evaluate(() => { const b = document.getElementById("backupBar"); return [!b.hidden, b.classList.contains("due"), b.textContent]; });
   let B1 = await bb();
