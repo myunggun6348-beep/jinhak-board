@@ -4992,7 +4992,7 @@ function codeGate(err,mode,preset){
   if(mode==="teacher"){
     var ci=inp("code","학교 코드 (예: K7QM-3XPA)",preset?fmtCode(preset):""), ni=inp("name","선생님 이름 (예: 김○○)",myName()), ks=clsSelect(getMyCls()||"");
     if(preset) ci.hidden=true;
-    var pi=inp("pw","가입 암호 (관리자에게 받은 것 — 받지 않았으면 비워 두세요)"); pi.type="password";
+    var pi=inp("pw","가입 암호 (관리자에게 받은 것)"); pi.type="password"; pi.hidden=true;   // 코드를 넣고 그 학교가 암호를 쓸 때만 보인다
     var toAdm=el("button","linkbtn","관리자이신가요? 학교를 만들거나 관리하려면 여기를 누르세요"); toAdm.onclick=function(){ codeGate("","admin"); };
     var rl=el("label","ckrow"), rc=document.createElement("input"); rc.type="checkbox"; rc.checked=true;
     rl.appendChild(rc); rl.appendChild(document.createTextNode(" 이 컴퓨터에 코드 기억(여럿이 쓰는 컴퓨터면 끄세요)"));
@@ -5009,12 +5009,13 @@ function codeGate(err,mode,preset){
     [toAdm,ci,ni,ks,pi,rl,go,note,back].forEach(function(x){ f.appendChild(x); });
     showGate(preset?"선생님: 초대 링크로 가입하기":"선생님: 학교 코드로 가입하기",
       preset?"학교 코드는 이미 들어가 있습니다. 이름·담당 반과 관리자에게 따로 받은 가입 암호를 넣고 가입을 요청하세요. 관리자가 승인하면 화면이 저절로 열리고, 담당 반 학생만 보입니다.":
-      "관리자가 보낸 초대 링크를 누르면 코드를 칠 필요가 없습니다. 코드로 가입하려면 학교 코드·이름·담당 반을 넣고(가입 암호를 받았으면 함께) 가입을 요청하세요.",[f]);
+      "관리자가 보낸 초대 링크를 누르면 코드를 칠 필요가 없습니다. 코드로 가입하려면 학교 코드·이름·담당 반을 넣고 가입을 요청하세요. 가입 암호가 필요한 학교면 코드를 넣을 때 칸이 나옵니다.",[f]);
     // 코드가 다 들어오면 그 학교가 가입 암호를 쓰는지 보고 암호 칸을 보이거나 숨긴다
     var lastChk="", pwCheck=function(code){
       code=normCode(code); if(code.length<8||code===lastChk) return; lastChk=code;
       (fb.auth.currentUser?Promise.resolve():fb.U.signInAnonymously(fb.auth)).then(function(){ return codeKeys(code); }).then(function(K){ return fb.S.getDoc(sRef(K.room)); }).then(function(d){
-        if(code!==lastChk||!d.exists()) return;
+        if(code!==lastChk) return;
+        if(!d.exists()){ pi.hidden=false; return; }
         var off=!!d.data().pwOff; pi.hidden=off; if(off) pi.value="";
         pi.placeholder="가입 암호 (관리자에게 받은 것)";
         var gp=document.querySelector("#banner > p");
