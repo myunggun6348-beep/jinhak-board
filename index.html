@@ -136,6 +136,8 @@ button{cursor:pointer}
 .pvt{font-size:12px} .pvt td,.pvt th{white-space:nowrap; padding:4px 8px} .pvt tr.bad td{color:var(--bad)} .pvt td.na{color:var(--ink-3); font-style:italic}
 .pvnames{display:flex; flex-wrap:wrap; gap:5px; margin:6px 0}
 .pvb{display:flex; gap:8px; margin-top:10px} .pvb .doimport{font-size:14px; padding:9px 16px}
+.progt{font-size:12.5px} .progt th,.progt td{padding:6px 10px; white-space:nowrap} .progt td.num{text-align:right; font-variant-numeric:tabular-nums}
+.progt tr.need td:first-child{font-weight:800; color:var(--warn)}
 .tbadge{display:inline-block; min-width:18px; margin-left:5px; padding:0 5px; border-radius:9px; background:var(--bad); color:#fff; font-size:11px; font-weight:700; line-height:18px; text-align:center}
 .adminpage .ahead{display:flex; align-items:baseline; flex-wrap:wrap; gap:4px 10px; margin-bottom:12px}
 .adminpage .ahead h2{font-size:18px; margin:0}
@@ -1454,6 +1456,7 @@ function render(){
   curCls=null;
   fillNames(document.getElementById("rows"));
   if(!document.getElementById("viewAll").hidden) renderAll();
+  if(school&&school.admin&&!document.getElementById("viewAdmin").hidden) renderSchoolPanel();
 }
 function renderClassbar(cls){
   var bar=document.getElementById("classbar");
@@ -5533,6 +5536,29 @@ function renderSchoolPanel(){
   if(!wait.length) w.appendChild(el("div","gempty","없습니다. 가입 요청이 오면 여기와 위쪽 탭에 숫자가 뜹니다."));
   wait.forEach(function(m){ line(w,m,true); });
 
+  // 반별 진행 현황: 반마다 담임·자료·결과 입력이 어디까지 왔는지
+  var pg=tile("반별 진행 현황","어느 반을 챙겨야 할지 한눈에","wide");
+  var all=demo?[]:list(), byC={};   // 아직 자료가 없으면 예시 학생은 세지 않는다
+  CLASSES.forEach(function(c){ byC[c]={st:[],t:[]}; });
+  all.forEach(function(st){ var c=+st.cls||0; (byC[c]=byC[c]||{st:[],t:[]}).st.push(st); });
+  ok.forEach(function(m){ var c=+m.cls||0; if(byC[c]) byC[c].t.push(m.name||"이름 없음"); });
+  var ptw=el("div","tablewrap"), pt=document.createElement("table"); pt.className="progt";
+  var phr=pt.createTHead().insertRow(); ["반","담임","학생","지원","결과 난 지원","결과 넣을 것","경고","챙길 것"].forEach(function(h){ phr.appendChild(el("th",null,h)); });
+  var ptb=pt.createTBody(), need=0;
+  Object.keys(byC).map(Number).sort(function(a,b){ return a-b; }).forEach(function(c){
+    var x=byC[c]; if(!c&&!x.st.length) return;
+    var apps=0, done=0, warn=0; x.st.forEach(function(st){ (st.apps||[]).forEach(function(a){ apps++; if(!LIVE[a.status||"지원완료"]) done++; }); warn+=checkStudent(st).length; });
+    var pend=x.st.length?pending(x.st).length:0;
+    var todo=!x.t.length?"담임 가입 전":!x.st.length?"학생 자료 없음":!apps?"지원 자료 없음":pend?"결과 입력":"";
+    if(todo) need++;
+    var r=ptb.insertRow(); if(todo) r.className="need";
+    r.insertCell().textContent=c?c+"반":"반 없음";
+    r.insertCell().textContent=x.t.length?x.t.join(", "):"—";
+    [x.st.length, apps, apps?done+" / "+apps:"—", pend||"—", warn||"—"].forEach(function(v){ var td=r.insertCell(); td.className="num"; td.textContent=v; });
+    var tc=r.insertCell(); tc.appendChild(el("span","pill "+(todo?"s-wait":"s-ok"),todo||"✓ 잘 되고 있음"));
+  });
+  ptw.appendChild(pt); pg.appendChild(ptw);
+  var pgh=pg.querySelector(".gsub"); if(pgh) pgh.textContent=need?"챙길 반 "+need+"곳":"모든 반이 잘 되고 있습니다";
   // 선생님 초대: ① 가입 암호 ② 초대 링크 (③ 학교 코드)
   var inv=tile("선생님 초대",school.pwOff?"초대 링크만 보내면 됩니다(승인은 관리자가)":"초대 링크와 가입 암호를 따로 보내세요");
   var step=function(n,k){ var r=el("div","astep"); r.appendChild(el("span","n",n)); r.appendChild(el("span","k",k)); inv.appendChild(r); return r; };
