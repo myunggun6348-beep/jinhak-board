@@ -100,11 +100,15 @@ function buildTestPage() {
 
   /* ── 4. 파일에서 명단 읽기 ─────────────────── */
   console.log("\n[파일에서 명단 읽기]");
-  /* 파일을 넣으면 확인 단계 없이 바로 들어간다. 읽은 결과는 __dev.last() 로, 안내는 #importMsg 로 본다. */
+  /* 파일을 넣으면 미리 보기가 뜨고 [넣기]를 눌러야 들어간다. 읽은 결과는 __dev.last() 로, 안내는 #importMsg 로 본다. */
+  let previewSeen = 0, previewLeak = 0;
   async function importFile(file) {
     await p.locator("#stFile").click();
     await p.locator("#file").setInputFiles(file);
     await p.waitForTimeout(900);
+    const pv = await p.locator("#importMsg .doimport").count();
+    const before = await p.evaluate(() => window.__dev.students().length);
+    if (pv) { previewSeen++; if (await p.evaluate(() => window.__dev.students().length) !== before) previewLeak++; await p.click("#importMsg .doimport"); await p.waitForTimeout(400); }
     const msg = (await p.locator("#importMsg").textContent()).trim();
     const last = await p.evaluate(() => window.__dev.last());
     return { ok: /^넣었습니다/.test(msg), msg: msg, last: last };
@@ -137,6 +141,7 @@ function buildTestPage() {
   check("‘탈락’ → 불합격", apps[3] && apps[3].app.status, "불합격");
   check("못 알아본 상태는 원문을 안내에 같이 보여줌", /붙음?/.test(r.msg), true);
 
+  check("파일을 넣으면 먼저 미리 보기, [넣기]를 눌러야 들어감", [previewSeen >= 4, previewLeak], [true, 0]);
   /* 학교마다 다른 표 모양. 파일 대신 읽은 줄을 바로 넣어 본다. */
   console.log("\n[여러 가지 표 모양]");
   const shapes = await p.evaluate(() => {

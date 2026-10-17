@@ -129,6 +129,13 @@ button{cursor:pointer}
 .drop .dor{font-size:12px; color:var(--ink-3)}
 .drop #btnPick{font-size:14px; padding:9px 18px}
 @media (max-width:760px){ .apsteps{grid-template-columns:1fr} }
+.pv{border:1px solid var(--accent-2); border-left:4px solid var(--accent); border-radius:var(--radius); background:var(--surface); padding:12px 14px; margin-top:12px}
+.pvh{display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 10px; margin-bottom:6px}
+.pvh b{font-size:14.5px} .pvh span{font-size:12px; color:var(--ink-3)}
+.pvw{font-size:12.5px; color:var(--warn); background:var(--warn-soft); border-radius:8px; padding:6px 10px; margin:6px 0}
+.pvt{font-size:12px} .pvt td,.pvt th{white-space:nowrap; padding:4px 8px} .pvt tr.bad td{color:var(--bad)} .pvt td.na{color:var(--ink-3); font-style:italic}
+.pvnames{display:flex; flex-wrap:wrap; gap:5px; margin:6px 0}
+.pvb{display:flex; gap:8px; margin-top:10px} .pvb .doimport{font-size:14px; padding:9px 16px}
 .tbadge{display:inline-block; min-width:18px; margin-left:5px; padding:0 5px; border-radius:9px; background:var(--bad); color:#fff; font-size:11px; font-weight:700; line-height:18px; text-align:center}
 .adminpage .ahead{display:flex; align-items:baseline; flex-wrap:wrap; gap:4px 10px; margin-bottom:12px}
 .adminpage .ahead h2{font-size:18px; margin:0}
@@ -4236,13 +4243,13 @@ function showError(title, how){
 }
 function clearMsg(){ document.getElementById("importMsg").innerHTML=""; }
 
-/* 넣으면 바로 반영한다. 확인 단계 대신 결과를 요약해 보여주고, 잘못 들어갔으면 되돌리기로 무른다. */
+/* 읽은 결과를 먼저 미리 보여 주고 [넣기]를 누르면 반영한다. 넣은 뒤에도 '이번에 넣은 것 취소'로 무를 수 있다. */
 var lastRead=null;
 function route(rows, cls, source){
   clearMsg();
   var res=readApps(rows);
   lastRead={kind:"apps", res:res};
-  if(res.apps.length){ commitApps(byStudentOf(res.apps), cls, res, source); return afterImport(); }
+  if(res.apps.length){ previewApps(res, cls, source); return; }
   var ros=pickStudents(rows,cls);
   lastRead={kind:"roster", res:ros};
   if(!ros.list.length){
@@ -4250,6 +4257,69 @@ function route(rows, cls, source){
       "학번(5자리)이나 이름, 지원 대학이 보이는 표여야 읽을 수 있습니다. 사진을 찍은 PDF는 글자가 없어 읽지 못합니다. 표를 복사해 Ctrl+V 로 붙여넣어 보세요.");
     return;
   }
+  previewRoster(ros, cls, source);
+}
+// 이미 있는 학생인지(학번, 없으면 같은 반 같은 이름)
+function findStudent(no,name,cls){
+  var id=String(no||"").replace(/[^0-9A-Za-z_.~:@+-]/g,""), st=id?students.get(id):null;
+  if(!st&&name) students.forEach(function(v){ if(!st&&v.name===name&&v.cls===cls&&(!v.no||!no||v.no===no)) st=v; });
+  return st&&!(demo&&!practice)&&!/^d\d$/.test(st.id)?st:null;
+}
+function pvBox(title,sub){
+  var host=document.getElementById("importMsg"); host.innerHTML="";
+  var d=el("div","pv"), h=el("div","pvh"); h.appendChild(el("b",null,title)); if(sub) h.appendChild(el("span",null,sub)); d.appendChild(h);
+  host.appendChild(d); host.scrollIntoView({block:"nearest"}); return d;
+}
+function pvButtons(d,label,go){
+  var r=el("div","pvb"), ok=el("button","btn doimport",label), no=el("button","ghost","취소");
+  ok.onclick=function(){ ok.disabled=true; go(); afterImport(); };
+  no.onclick=function(){ clearMsg(); afterImport(); };
+  r.appendChild(ok); r.appendChild(no); d.appendChild(r);
+}
+function previewApps(res, cls, source){
+  var by=byStudentOf(res.apps), keys=Object.keys(by), fresh=0, classes={};
+  keys.forEach(function(k){ var g=by[k], c=g.cls||cls; classes[c]=1; if(!findStudent(g.no,g.name,c)) fresh++; });
+  var d=pvBox("읽은 결과를 확인하고 [넣기]를 누르세요", source);
+  var sum=el("div","acsum");
+  sum.appendChild(el("span","pill s-go","학생 "+keys.length+"명"+(fresh?" (새 학생 "+fresh+"명)":"")));
+  sum.appendChild(el("span","pill s-go","지원 "+res.apps.length+"건"));
+  var cl=Object.keys(classes).sort(function(p,q){ return p-q; });
+  sum.appendChild(el("span","pill empty",cl.map(function(x){ return x+"반"; }).join("·")+"에 넣음"));
+  d.appendChild(sum);
+  var warn=[];
+  if(res.notes.status) warn.push("상태를 알아보지 못해 ‘지원완료’로 둘 것 "+res.notes.status+"건 — "+res.notes.statusRaw.slice(0,3).join(", "));
+  if(res.notes.oldDate) warn.push(YEAR+"학년도 일정 밖의 날짜 "+res.notes.oldDate+"개 — 지난해 자료가 섞였는지 확인: "+res.notes.oldRaw.join(", "));
+  if(res.skipped.length) warn.push("읽지 못한 줄 "+res.skipped.length+"개 — 예: "+res.skipped.slice(0,3).join(" / "));
+  warn.forEach(function(w){ d.appendChild(el("div","pvw","⚠ "+w)); });
+  var tw=el("div","tablewrap"), t=document.createElement("table"); t.className="pvt";
+  var hr=t.createTHead().insertRow(); ["반","학번","이름","구분","대학","모집단위","전형","면접·고사","발표","상태"].forEach(function(x){ hr.appendChild(el("th",null,x)); });
+  var tb=t.createTBody(), LIM=15;
+  res.apps.forEach(function(x,i){
+    var a=x.app, r=tb.insertRow(); if(i>=LIM) r.hidden=true;
+    if(!a.univ) r.className="bad";
+    [x.cls||cls, x.no||"", x.name||"", a.kind+(a.jc?"·전문대":""), a.univ||"(대학 없음)", a.major||"", a.jh||a.type||"", mmdd(a.itv), mmdd(a.ann)].forEach(function(v){ r.insertCell().textContent=v; });
+    var sc=r.insertCell(); sc.textContent=a.status; if(!x.given.status){ sc.className="na"; sc.title="파일에 상태가 없어 지원완료로 둡니다"; }
+  });
+  tw.appendChild(t); d.appendChild(tw);
+  if(res.apps.length>LIM){ var mo=el("button","ghost smore","나머지 "+(res.apps.length-LIM)+"건 더 보기"); mo.onclick=function(){ [].forEach.call(tb.rows,function(r){ r.hidden=false; }); mo.remove(); }; d.appendChild(mo); }
+  d.appendChild(el("div","shint","이미 있는 학생은 같은 대학·학과면 날짜·상태를 고치고, 새 지원은 더합니다. 넣은 뒤에도 ‘이번에 넣은 것 취소’로 되돌릴 수 있습니다."));
+  pvButtons(d,"넣기 — 학생 "+keys.length+"명 · 지원 "+res.apps.length+"건",function(){ commitApps(by, cls, res, source); });
+}
+function previewRoster(ros, cls, source){
+  var fresh=ros.list.filter(function(o){ return !findStudent(o.no,o.name,cls); }).length;
+  var d=pvBox("읽은 명단을 확인하고 [넣기]를 누르세요", source+" · "+cls+"반");
+  var sum=el("div","acsum");
+  sum.appendChild(el("span","pill s-go","학생 "+ros.list.length+"명"+(fresh?" (새 학생 "+fresh+"명)":"")));
+  d.appendChild(sum);
+  if(ros.skipped.length) d.appendChild(el("div","pvw","⚠ 읽지 못한 줄 "+ros.skipped.length+"개 — 예: "+ros.skipped.slice(0,3).join(" / ")));
+  var box=el("div","pvnames");
+  ros.list.slice(0,60).forEach(function(o){ box.appendChild(el("span","pill"+(o.made?" empty":""),o.no+" "+o.name)); });
+  if(ros.list.length>60) box.appendChild(el("span","pill empty","외 "+(ros.list.length-60)+"명"));
+  d.appendChild(box);
+  if(ros.list.some(function(o){ return o.made; })) d.appendChild(el("div","shint","점선 학번은 반·번호로 만든 것입니다."));
+  pvButtons(d,"넣기 — 학생 "+ros.list.length+"명",function(){ commitRoster(ros, cls, source); });
+}
+function commitRoster(ros, cls, source){
   remember("명단 넣기");
   var fresh=0, filled=0;
   ros.list.forEach(function(o){
@@ -4260,7 +4330,6 @@ function route(rows, cls, source){
   doneMsg(source+" · 명단 "+ros.list.length+"명",
     "새 학생 "+fresh+"명"+(filled?", 학번 채움 "+filled+"명":"")+(ros.list.length-fresh-filled?", 이미 있던 학생 "+(ros.list.length-fresh-filled)+"명":"")+".",
     ros.skipped.length?["읽지 못한 줄 "+ros.skipped.length+"개 — 예: "+ros.skipped.slice(0,3).join(" / ")]:[]);
-  afterImport();
 }
 function afterImport(){
   document.getElementById("bulk").value="";
