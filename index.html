@@ -102,6 +102,18 @@ button{cursor:pointer}
 .myschool .msh{font-size:12px; color:var(--ink-3)}
 .myschool .btn{font-size:13px; padding:6px 12px}
 .myschool .msdel{font-size:12px; color:var(--bad); border-color:var(--bad-soft)}
+.codeform.wide{max-width:880px}
+.thow{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin-bottom:6px}
+.thi{display:flex; gap:10px; align-items:flex-start; padding:12px; border-radius:12px; background:var(--surface-2); font-size:12.5px; color:var(--ink-2); line-height:1.5}
+.thi .n{flex:none; width:24px; height:24px; border-radius:50%; background:var(--accent); color:var(--on-accent,#fff); display:grid; place-items:center; font-weight:800; font-size:12px}
+.thi b{display:block; color:var(--ink); font-size:13.5px; margin-bottom:2px}
+.tjoin{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; align-items:start}
+.tcard{display:flex; flex-direction:column; gap:8px; border:1px solid var(--line); border-radius:16px; padding:18px; background:var(--surface)}
+.tcard h3{margin:0; font-size:17px}
+.tcard p{margin:0 0 4px; font-size:13px; color:var(--ink-2); line-height:1.6}
+.tcard.g{order:-1; background:var(--accent-soft); border-color:transparent}
+.tcard .gbtn{font-size:15px; padding:12px; white-space:pre}
+@media (max-width:760px){ .thow,.tjoin{grid-template-columns:1fr} }
 .tbadge{display:inline-block; min-width:18px; margin-left:5px; padding:0 5px; border-radius:9px; background:var(--bad); color:#fff; font-size:11px; font-weight:700; line-height:18px; text-align:center}
 .adminpage .ahead{display:flex; align-items:baseline; flex-wrap:wrap; gap:4px 10px; margin-bottom:12px}
 .adminpage .ahead h2{font-size:18px; margin:0}
@@ -4898,7 +4910,7 @@ function startFirebase(){
       var inv=location.hash.match(/join=([0-9A-Za-z-]{8,})/);
       if(inv){ try{ history.replaceState(null,"",location.pathname+location.search); }catch(e){} codeGate("","teacher",inv[1]); }
       else if(saved) enterCode(saved,{remember:true});
-      else if(myMail()) myLinkedSchool().then(function(x){ if(x) enterCode(x.code,{remember:true}); else codeGate(); });
+      else if(myMail()) myLinkedSchool().then(function(x){ if(x&&x.code) enterCode(x.code,{remember:true}); else codeGate(); });
       else codeGate();
     });
   }).catch(function(){
@@ -5019,23 +5031,20 @@ function codeGate(err,mode,preset){
     if(preset) ci.hidden=true;
     var pi=inp("pw","가입 암호 (관리자에게 받은 것)"); pi.type="password"; pi.hidden=true;   // 코드를 넣고 그 학교가 암호를 쓸 때만 보인다
     var toAdm=el("button","linkbtn","관리자이신가요? 학교를 만들거나 관리하려면 여기를 누르세요"); toAdm.onclick=function(){ codeGate("","admin"); };
-    // 구글로: 이미 이 구글로 가입했으면 바로 들어가고, 처음이면 이 구글 계정으로 로그인된 채 위 칸에 적어 가입 요청
-    var gIn=el("div","step done"), gm=myMail()&&lsGet("jh.role")==="teacher"?myMail():"";
-    gIn.appendChild(el("b",null,gm?"✓ "+gm+" 로 가입합니다":"구글 계정으로 가입·입장 (추천)"));
-    var gb=el("button","btn","구글로 들어가기"); if(!gm) gIn.appendChild(gb);
-    gIn.appendChild(el("span","shint",gm?"위에 학교 코드(또는 초대 링크로 열기)·이름·담당 반을 넣고 가입을 요청하세요. 승인되면 다음부터는 어느 컴퓨터에서든 ‘구글로 들어가기’만 누르면 됩니다.":
-      "이미 구글로 가입했으면 바로 우리 반으로 들어갑니다. 처음이면 구글로 로그인한 뒤 위 칸을 채워 가입하세요. 다음부터 어느 컴퓨터에서든 초대 링크 없이 들어옵니다."));
+    var gm=myMail()&&lsGet("jh.role")==="teacher"?myMail():"";
+    var gb=el("button","btn gbtn","G  구글로 들어가기");
     gb.onclick=function(){
       googleIn().then(function(){ lsSet("jh.role","teacher"); return myLinkedSchool(); }).then(function(x){
+        if(x&&x.err){ say("이 구글 계정의 가입 정보를 읽지 못했습니다("+x.err+"). 관리자가 Firebase 콘솔에 최신 Firestore 규칙(users 칸 포함)을 붙여넣고 게시해야 합니다."); return; }
         if(x){ enterCode(x.code,{remember:true}); return; }
-        codeGate("‘"+myMail()+"’ 계정으로 가입한 학교가 아직 없습니다. 위에 학교 코드·이름·담당 반을 넣고 가입을 요청하세요(이 구글 계정으로 가입됩니다).","teacher",normCode(ci.value).length>=8?ci.value:undefined);
+        codeGate("‘"+myMail()+"’ 계정으로 가입한 학교가 아직 없습니다. ‘처음 가입하기’를 채워 가입을 요청하세요(이 구글 계정으로 가입됩니다).","teacher",normCode(ci.value).length>=8?ci.value:undefined);
       },function(e){ if(e&&e.msg) say(e.msg); });
     };
     var rl=el("label","ckrow"), rc=document.createElement("input"); rc.type="checkbox"; rc.checked=true;
     rl.appendChild(rc); rl.appendChild(document.createTextNode(" 이 컴퓨터에 코드 기억(여럿이 쓰는 컴퓨터면 끄세요)"));
     var go=el("button","btn","가입 요청 · 들어가기");
     go.onclick=function(){
-      if(normCode(ci.value).length<8){ ci.focus(); say("관리자에게 받은 학교 코드를 넣어 주세요."); return; }
+      if(normCode(ci.value).length<8){ ci.hidden=false; ci.focus(); say("관리자에게 받은 학교 코드를 넣어 주세요(초대 링크를 통째로 붙여넣어도 됩니다)."); return; }
       if(!ni.value.trim()){ ni.focus(); say("이름을 적어 주세요. 관리자가 승인할 때 봅니다."); return; }
       if(ks.value===""){ ks.focus(); say("담당 반을 골라 주세요. 그 반 학생만 보입니다."); return; }
       try{ localStorage.setItem("jh.myname",ni.value.trim().slice(0,20)); }catch(e){}
@@ -5043,10 +5052,25 @@ function codeGate(err,mode,preset){
       enterCode(ci.value,{remember:rc.checked, pw:pi.value});
     };
     [ci,ni,pi].forEach(function(x){ x.onkeydown=function(e){ if(e.key==="Enter") go.onclick(); }; });
-    [toAdm,ci,ni,ks,pi,rl,go,gIn,note,back].forEach(function(x){ f.appendChild(x); });
-    showGate(preset?"선생님: 초대 링크로 가입하기":"선생님: 학교 코드로 가입하기",
-      preset?"학교 코드는 이미 들어가 있습니다. 이름·담당 반과 관리자에게 따로 받은 가입 암호를 넣고 가입을 요청하세요. 관리자가 승인하면 화면이 저절로 열리고, 담당 반 학생만 보입니다.":
-      "관리자가 보낸 초대 링크를 누르면 코드를 칠 필요가 없습니다. 코드로 가입하려면 학교 코드·이름·담당 반을 넣고 가입을 요청하세요. 가입 암호가 필요한 학교면 코드를 넣을 때 칸이 나옵니다.",[f]);
+    // 한눈에: 어떻게 들어오나
+    var how=el("div","thow");
+    [["1","처음 한 번만 가입","초대 링크를 누르고(또는 학교 코드) 이름·담당 반을 넣어 가입 요청 → 관리자가 승인"],
+     ["2","구글로 가입해 두면","다음부터 어느 컴퓨터에서든 ‘구글로 들어가기’ 하나로 끝"],
+     ["3","같은 컴퓨터는","다음부터 열기만 하면 바로 우리 반"]].forEach(function(x){
+      var r=el("div","thi"); r.appendChild(el("span","n",x[0])); var t=el("div"); t.appendChild(el("b",null,x[1])); t.appendChild(el("span",null,x[2])); r.appendChild(t); how.appendChild(r); });
+    // 두 칸: 처음 가입하기 / 구글로 바로(화면에서는 구글 칸이 먼저)
+    var grid=el("div","tjoin"), cj=el("div","tcard"), cg=el("div","tcard g");
+    cj.appendChild(el("h3",null,"처음 가입하기"));
+    cj.appendChild(el("p",null,gm?"✓ "+gm+" 계정으로 가입됩니다. 승인되면 다음부터 ‘구글로 들어가기’만 누르세요.":preset?"초대 링크로 열어서 학교 코드는 이미 들어가 있어요. 이름과 담당 반만 넣으세요.":"관리자가 보낸 초대 링크를 누르면 학교 코드는 저절로 들어가요."));
+    [ci,ni,ks,pi,rl,go].forEach(function(x){ cj.appendChild(x); });
+    cg.appendChild(el("h3",null,gm?"✓ 구글 로그인됨":"이미 가입했나요?"));
+    cg.appendChild(el("p",null,gm?gm+" 로 로그인했습니다. 왼쪽 ‘처음 가입하기’를 채워 주세요.":"구글로 가입한 적이 있으면 이 단추 하나로 우리 반이 열립니다. 처음이어도 여기서 구글로 로그인한 뒤 가입하면, 다음부터 어디서나 링크 없이 들어옵니다."));
+    if(!gm) cg.appendChild(gb);
+    if(gm){ var so=el("button","linkbtn","다른 구글 계정으로"); so.onclick=function(){ fb.U.signOut(fb.auth).then(function(){ lsSet("jh.role",null); codeGate("","teacher"); }); }; cg.appendChild(so); }
+    grid.appendChild(cj); grid.appendChild(cg);
+    f.classList.add("wide");
+    [how,grid,note,toAdm,back].forEach(function(x){ f.appendChild(x); });
+    showGate("선생님 들어가기", preset?"초대 링크로 열었습니다. 이름과 담당 반만 넣으면 가입 요청이 됩니다.":"처음이면 한 번만 가입하고, 다음부터는 구글 단추 하나(또는 같은 컴퓨터는 열기만)로 들어옵니다.",[f]);
     // 코드가 다 들어오면 그 학교가 가입 암호를 쓰는지 보고 암호 칸을 보이거나 숨긴다
     var lastChk="", pwCheck=function(code){
       code=normCode(code); if(code.length<8||code===lastChk) return; lastChk=code;
@@ -5253,7 +5277,8 @@ function linkJoin(code,key){
 /* ── 담임 구글 연결 ── */
 function myLinkedSchool(){
   var u=fb.auth.currentUser; if(!u||u.isAnonymous) return Promise.resolve(null);
-  return fb.S.getDoc(fb.S.doc(fb.fs,"users",u.uid)).then(function(d){ return d.exists()&&d.data().code?d.data():null; },function(){ return null; });
+  // 못 읽으면(예전 규칙) 가입이 없는 것과 구별해 {err} 를 돌려준다
+  return fb.S.getDoc(fb.S.doc(fb.fs,"users",u.uid)).then(function(d){ return d.exists()&&d.data().code?d.data():null; },function(e){ return {err:(e&&e.code)||"error"}; });
 }
 function linkGoogle(btn){
   var u=fb.auth.currentUser; if(!u||!school) return;
