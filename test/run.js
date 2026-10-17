@@ -652,6 +652,9 @@ function buildTestPage() {
   const pwHidden = await t6.$eval("#banner input[name=pw]", (e) => e.hidden);
   await t6.fill("#banner input[name=name]", "최담임"); await t6.selectOption("#banner select[name=cls]", "5"); await t6.click("#banner .codeform .btn"); await t6.waitForTimeout(1500);
   check("가입 암호 없이 승인만으로: 초대 링크에 암호 칸이 없고 이름·반만으로 승인 대기", [pwOffSaved, pwHidden, await gateTitle(t6)], [true, true, "관리자 승인을 기다리는 중입니다"]);
+  const t8 = await who({}); await t8.click("#banner .choice >> text=선생님입니다"); await t8.fill("#banner input[name=code]", firstCode.toLowerCase()); await t8.waitForTimeout(1200);
+  check("코드를 쳐도 가입 암호를 끈 학교면 암호 칸이 사라짐", await t8.$eval("#banner input[name=pw]", (e) => e.hidden), true);
+  await t8.context().close();
   await adm.uncheck("#schoolPanel input[name=pwoff]"); await adm.waitForTimeout(600);
   const t7 = await who({ hash: "#join=" + firstCode }); await t7.waitForTimeout(1200);
   await t7.fill("#banner input[name=name]", "한담임"); await t7.selectOption("#banner select[name=cls]", "6"); await t7.click("#banner .codeform .btn"); await t7.waitForTimeout(1500);

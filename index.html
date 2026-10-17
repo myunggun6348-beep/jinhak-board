@@ -5009,12 +5009,21 @@ function codeGate(err,mode,preset){
     [toAdm,ci,ni,ks,pi,rl,go,note,back].forEach(function(x){ f.appendChild(x); });
     showGate(preset?"선생님: 초대 링크로 가입하기":"선생님: 학교 코드로 가입하기",
       preset?"학교 코드는 이미 들어가 있습니다. 이름·담당 반과 관리자에게 따로 받은 가입 암호를 넣고 가입을 요청하세요. 관리자가 승인하면 화면이 저절로 열리고, 담당 반 학생만 보입니다.":
-      "관리자가 보낸 초대 링크를 누르면 코드를 칠 필요가 없습니다. 코드로 가입하려면 학교 코드·이름·담당 반·가입 암호를 넣고 가입을 요청하세요.",[f]);
-    if(preset) (fb.auth.currentUser?Promise.resolve():fb.U.signInAnonymously(fb.auth)).then(function(){ return codeKeys(preset); }).then(function(K){ return fb.S.getDoc(sRef(K.room)); }).then(function(d){
-      if(!d.exists()||!d.data().pwOff) return;
-      pi.hidden=true; pi.value="";
-      var gp=document.querySelector("#banner > p"); if(gp) gp.textContent="학교 코드는 이미 들어가 있습니다. 이름과 담당 반만 넣고 가입을 요청하세요. 관리자가 승인하면 화면이 저절로 열리고, 담당 반 학생만 보입니다.";
-    }).catch(function(){});
+      "관리자가 보낸 초대 링크를 누르면 코드를 칠 필요가 없습니다. 코드로 가입하려면 학교 코드·이름·담당 반을 넣고(가입 암호를 받았으면 함께) 가입을 요청하세요.",[f]);
+    // 코드가 다 들어오면 그 학교가 가입 암호를 쓰는지 보고 암호 칸을 보이거나 숨긴다
+    var lastChk="", pwCheck=function(code){
+      code=normCode(code); if(code.length<8||code===lastChk) return; lastChk=code;
+      (fb.auth.currentUser?Promise.resolve():fb.U.signInAnonymously(fb.auth)).then(function(){ return codeKeys(code); }).then(function(K){ return fb.S.getDoc(sRef(K.room)); }).then(function(d){
+        if(code!==lastChk||!d.exists()) return;
+        var off=!!d.data().pwOff; pi.hidden=off; if(off) pi.value="";
+        pi.placeholder="가입 암호 (관리자에게 받은 것)";
+        var gp=document.querySelector("#banner > p");
+        if(gp) gp.textContent=off?(preset?"학교 코드는 이미 들어가 있습니다. ":"‘"+(d.data().name||"학교")+"’ 학교입니다. ")+"이름과 담당 반만 넣고 가입을 요청하세요. 관리자가 승인하면 화면이 저절로 열리고, 담당 반 학생만 보입니다."
+          :"‘"+(d.data().name||"학교")+"’ 학교입니다. 이름·담당 반과 관리자에게 받은 가입 암호를 넣고 가입을 요청하세요.";
+      }).catch(function(){});
+    };
+    ci.addEventListener("input",function(){ pwCheck(ci.value); });
+    if(preset) pwCheck(preset);
     render(); return;
   }
   // 관리자: ① 구글 로그인 → ② 새 학교 만들기 또는 만든 학교 들어가기
