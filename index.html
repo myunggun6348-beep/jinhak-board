@@ -5377,14 +5377,17 @@ function renderSchoolPanel(){
 function deleteSchool(){
   var sid=school.K.room, name=school.name;
   stopWatch(); setSync("","학교 지우는 중");
-  var del=function(c){ return fb.S.getDocs(fb.S.collection(fb.fs,"schools",sid,c)).then(function(q){ return Promise.all(q.docs.map(function(d){ return fb.S.deleteDoc(sRef(sid,c,d.id)); })); }); };
-  Promise.all(["students","minreq","links","members"].map(del)).then(function(){
+  // 먼저 지울 문서를 모두 읽어 본다(연결 링크 목록은 최신 규칙에서만 읽힌다). 하나라도 막히면 아무것도 지우지 않는다
+  var C=["students","minreq","links","members"];
+  Promise.all(C.map(function(c){ return fb.S.getDocs(fb.S.collection(fb.fs,"schools",sid,c)); })).catch(function(e){ throw {code:"rules-old", raw:e}; }).then(function(Q){
+    return Promise.all(Q.map(function(q,i){ return Promise.all(q.docs.map(function(d){ return fb.S.deleteDoc(sRef(sid,C[i],d.id)); })); }));
+  }).then(function(){
     return Promise.all(["join","code"].map(function(id){ return fb.S.deleteDoc(sRef(sid,"private",id)).catch(function(){}); }));
   }).then(function(){ return fb.S.deleteDoc(sRef(sid)); }).then(function(){
     try{ localStorage.removeItem(CODE_KEY); }catch(e){}
     codeGate("‘"+name+"’ 학교를 지웠습니다.","admin");
   },function(e){
-    alert("학교를 다 지우지 못했습니다("+((e&&e.code)||"")+"). 관리자가 최신 Firestore 규칙을 붙여넣었는지 확인한 뒤 다시 해 주세요.");
+    alert(e&&e.code==="rules-old"?"아직 아무것도 지우지 않았습니다. Firebase 콘솔에 최신 Firestore 규칙을 붙여넣고 게시한 뒤 다시 해 주세요.":"학교를 다 지우지 못했습니다("+((e&&e.code)||"")+"). 최신 Firestore 규칙을 붙여넣었는지 확인한 뒤 다시 해 주세요.");
     location.reload();
   });
 }
