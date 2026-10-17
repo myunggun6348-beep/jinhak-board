@@ -8,7 +8,7 @@
 // 그 주소에 '혼자 쓰기' 자료가 있으면 옮기지 않고 백업해서 옮기라고만 알린다(브라우저 저장은 주소마다 따로라서).
 (function(){
   var h=location.hostname, home="https://jinhak-board.vercel.app";
-  if(!/^jinhak-board-[a-z0-9-]+.vercel.app$/.test(h)) return;
+  if(!/^jinhak-board-[a-z0-9-]+\.vercel\.app$/.test(h)) return;
   var has=false; try{ has=!!localStorage.getItem("jh.local.students"); }catch(e){}
   if(!has){ location.replace(home+location.pathname+location.search+location.hash); return; }
   document.addEventListener("DOMContentLoaded",function(){
