@@ -3,7 +3,7 @@ rules_version = '2';
 // schools/{sid}: 학교 이름·관리자 이메일. sid 는 학교 코드에서 만든 40자라 코드를 모르면 찾을 수 없다.
 // schools/{sid}/private/code: (관리자가 '구글 로그인만으로 열기'를 켰을 때만) 학교 코드. 관리자만 읽고 쓴다.
 // schools/{sid}/private/join: 가입 암호 해시. 관리자만 읽고 쓴다. 가입 요청(members 생성)은 이 해시와 같은 pw 를 가져와야 한다.
-// schools/{sid}/members/{uid}: 선생님 가입(익명 로그인). ok·cls(담당 반)는 관리자만 바꾼다.
+// schools/{sid}/members/{uid}: 선생님 가입(익명 로그인). ok·cls(담당 반)는 관리자만 바꾼다. 학교 문서에 pwOff 면 가입 암호 없이 요청(승인은 그대로).
 // schools/{sid}/links/{해시}: 다른 컴퓨터 연결 링크 {cls, name, exp}. 승인된 담임(자기 반)·관리자가 만들고, 24시간 안에 그 링크로 만든 가입은 바로 승인된다.
 // schools/{sid}/students/{id}: 학교 코드로 암호화된 {v, iv, c, t} + 반 번호 cls. 담임은 자기 반만, 관리자는 전부.
 // schools/{sid}/minreq/{id}: 학교 공용 최저 기준표(암호화). 승인된 선생님 모두.
@@ -17,7 +17,7 @@ service cloud.firestore {
     function memberPath(sid) { return /databases/$(database)/documents/schools/$(sid)/members/$(request.auth.uid); }
     function isMember(sid) { return signedIn() && exists(memberPath(sid)) && get(memberPath(sid)).data.ok == true; }
     function myCls(sid) { return get(memberPath(sid)).data.cls; }
-    function okSchool(d) { return d.keys().hasOnly(['name', 'admins', 'created']) && d.name is string && d.name.size() <= 40
+    function okSchool(d) { return d.keys().hasOnly(['name', 'admins', 'created', 'pwOff']) && (!('pwOff' in d) || d.pwOff is bool) && d.name is string && d.name.size() <= 40
       && d.admins is list && d.admins.size() >= 1 && d.admins.size() <= 10; }
     function okData(d, withCls) {
       return d.keys().hasOnly(withCls ? ['v', 'iv', 'c', 't', 'cls'] : ['v', 'iv', 'c', 't'])
@@ -41,7 +41,8 @@ service cloud.firestore {
         allow create: if signedIn() && request.auth.uid == uid && request.resource.data.ok == false
           && request.resource.data.keys().hasOnly(['name', 'cls', 'at', 'ok', 'pw']) && request.resource.data.name.size() <= 20
           && request.resource.data.cls is int
-          && request.resource.data.pw == get(/databases/$(database)/documents/schools/$(sid)/private/join).data.hash
+          && (get(/databases/$(database)/documents/schools/$(sid)).data.get('pwOff', false) == true
+              || request.resource.data.pw == get(/databases/$(database)/documents/schools/$(sid)/private/join).data.hash)
           || signedIn() && request.auth.uid == uid && request.resource.data.ok == true
           && request.resource.data.keys().hasOnly(['name', 'cls', 'at', 'ok', 'link']) && request.resource.data.cls is int
           && exists(/databases/$(database)/documents/schools/$(sid)/links/$(request.resource.data.link))

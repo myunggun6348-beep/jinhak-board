@@ -4992,7 +4992,7 @@ function codeGate(err,mode,preset){
   if(mode==="teacher"){
     var ci=inp("code","학교 코드 (예: K7QM-3XPA)",preset?fmtCode(preset):""), ni=inp("name","선생님 이름 (예: 김○○)",myName()), ks=clsSelect(getMyCls()||"");
     if(preset) ci.hidden=true;
-    var pi=inp("pw","가입 암호 (관리자가 정해서 알려 준 것)"); pi.type="password";
+    var pi=inp("pw","가입 암호 (관리자에게 받은 것 — 받지 않았으면 비워 두세요)"); pi.type="password";
     var toAdm=el("button","linkbtn","관리자이신가요? 학교를 만들거나 관리하려면 여기를 누르세요"); toAdm.onclick=function(){ codeGate("","admin"); };
     var rl=el("label","ckrow"), rc=document.createElement("input"); rc.type="checkbox"; rc.checked=true;
     rl.appendChild(rc); rl.appendChild(document.createTextNode(" 이 컴퓨터에 코드 기억(여럿이 쓰는 컴퓨터면 끄세요)"));
@@ -5001,7 +5001,6 @@ function codeGate(err,mode,preset){
       if(normCode(ci.value).length<8){ ci.focus(); say("관리자에게 받은 학교 코드를 넣어 주세요."); return; }
       if(!ni.value.trim()){ ni.focus(); say("이름을 적어 주세요. 관리자가 승인할 때 봅니다."); return; }
       if(ks.value===""){ ks.focus(); say("담당 반을 골라 주세요. 그 반 학생만 보입니다."); return; }
-      if(!pi.value.trim()){ pi.focus(); say("가입 암호를 넣어 주세요. 관리자에게 따로 받습니다."); return; }
       try{ localStorage.setItem("jh.myname",ni.value.trim().slice(0,20)); }catch(e){}
       setMyCls(+ks.value); if(+ks.value) setCls(+ks.value);
       enterCode(ci.value,{remember:rc.checked, pw:pi.value});
@@ -5011,6 +5010,11 @@ function codeGate(err,mode,preset){
     showGate(preset?"선생님: 초대 링크로 가입하기":"선생님: 학교 코드로 가입하기",
       preset?"학교 코드는 이미 들어가 있습니다. 이름·담당 반과 관리자에게 따로 받은 가입 암호를 넣고 가입을 요청하세요. 관리자가 승인하면 화면이 저절로 열리고, 담당 반 학생만 보입니다.":
       "관리자가 보낸 초대 링크를 누르면 코드를 칠 필요가 없습니다. 코드로 가입하려면 학교 코드·이름·담당 반·가입 암호를 넣고 가입을 요청하세요.",[f]);
+    if(preset) (fb.auth.currentUser?Promise.resolve():fb.U.signInAnonymously(fb.auth)).then(function(){ return codeKeys(preset); }).then(function(K){ return fb.S.getDoc(sRef(K.room)); }).then(function(d){
+      if(!d.exists()||!d.data().pwOff) return;
+      pi.hidden=true; pi.value="";
+      var gp=document.querySelector("#banner > p"); if(gp) gp.textContent="학교 코드는 이미 들어가 있습니다. 이름과 담당 반만 넣고 가입을 요청하세요. 관리자가 승인하면 화면이 저절로 열리고, 담당 반 학생만 보입니다.";
+    }).catch(function(){});
     render(); return;
   }
   // 관리자: ① 구글 로그인 → ② 새 학교 만들기 또는 만든 학교 들어가기
@@ -5214,10 +5218,11 @@ function enterCode(code,o){
     var mref=sRef(K.room,"members",fb.auth.currentUser.uid);
     return fb.S.getDoc(mref).then(function(m){
       if(m.exists()) return;
+      var base={name:myName()||"선생님",cls:getMyCls()||0,at:new Date().toISOString(),ok:false};
+      if(info.pwOff) return fb.S.setDoc(mref,base);   // 이 학교는 가입 암호 없이 승인만으로
       if(!o.pw) throw {code:"need-pw"};
-      return joinHash(K.room,o.pw).then(function(h){
-        return fb.S.setDoc(mref,{name:myName()||"선생님",cls:getMyCls()||0,at:new Date().toISOString(),ok:false,pw:h});
-      }).catch(function(e){ throw e&&e.code==="permission-denied"?{code:"bad-pw"}:e; });
+      return joinHash(K.room,o.pw).then(function(h){ base.pw=h; return fb.S.setDoc(mref,base); })
+        .catch(function(e){ throw e&&e.code==="permission-denied"?{code:"bad-pw"}:e; });
     }).then(function(){ waitApproval(K,code,info,mref); });
   }).catch(function(e){
     try{ localStorage.removeItem(CODE_KEY); }catch(x){}
@@ -5248,7 +5253,7 @@ function waitApproval(K,code,info,mref){
 }
 function enterSchool(K,code,info,admin,cls){
   setLocalMode(""); setLanding(false);
-  school={K:K, code:normCode(code), name:info.name||"", admins:info.admins||[], admin:admin, cls:cls||0};
+  school={K:K, code:normCode(code), name:info.name||"", admins:info.admins||[], admin:admin, cls:cls||0, pwOff:!!info.pwOff};
   if(!admin&&cls){ setMyCls(cls); setCls(cls); }
   var chip=document.getElementById("whoChip"); chip.hidden=false; chip.innerHTML="";
   chip.appendChild(el("span",null,(school.name||"학교")+" · "+(admin?"관리자":(cls?cls+"반 ":"")+(myName()||"선생님"))));
@@ -5338,9 +5343,19 @@ function renderSchoolPanel(){
   wait.forEach(function(m){ line(w,m,true); });
 
   // 선생님 초대: ① 가입 암호 ② 초대 링크 (③ 학교 코드)
-  var inv=tile("선생님 초대","초대 링크와 가입 암호를 따로 보내세요");
+  var inv=tile("선생님 초대",school.pwOff?"초대 링크만 보내면 됩니다(승인은 관리자가)":"초대 링크와 가입 암호를 따로 보내세요");
   var step=function(n,k){ var r=el("div","astep"); r.appendChild(el("span","n",n)); r.appendChild(el("span","k",k)); inv.appendChild(r); return r; };
   var s1=step("1","가입 암호");
+  var pol=el("label","ckrow"), poc=document.createElement("input"); poc.type="checkbox"; poc.name="pwoff"; poc.checked=!!school.pwOff;
+  pol.appendChild(poc); pol.appendChild(document.createTextNode(" 가입 암호 없이 승인만으로"));
+  poc.onchange=function(){
+    if(poc.checked&&!window.confirm("담임 선생님이 초대 링크에 이름·반만 넣어 가입을 요청합니다(가입 암호 없음).\n관리자 승인은 그대로 필요해서, 승인 전에는 아무것도 보이지 않습니다. 링크가 학교 밖으로 퍼지지 않게만 주의하세요. 켤까요?")){ poc.checked=false; return; }
+    setPwOff(poc.checked);
+  };
+  if(school.pwOff){
+    s1.appendChild(el("span","ok","쓰지 않음")); s1.appendChild(pol);
+    s1.appendChild(el("span","shint","담임은 초대 링크에서 이름·반만 넣고 가입을 요청합니다. 승인 기다리는 선생님의 이름·반을 꼭 확인하고 승인하세요."));
+  } else {
   s1.appendChild(el("span",school.pwSet?"ok":"bad",school.pwSet?"정해짐 ✓":"아직 없음"));
   var pin=document.createElement("input"); pin.type="password"; pin.placeholder=school.pwSet?"새 암호 (4자 이상)":"가입 암호 (4자 이상)";
   var pb2=el("button","btn sec",school.pwSet?"암호 바꾸기":"암호 정하기");
@@ -5350,11 +5365,13 @@ function renderSchoolPanel(){
   };
   s1.appendChild(pin); s1.appendChild(pb2);
   s1.appendChild(el("span","shint","암호는 저장하지 않아 다시 볼 수 없습니다. 잊었으면 새로 정해 알려 주세요. 이미 승인된 선생님은 그대로 씁니다."));
+  s1.appendChild(pol);
+  }
   var s2=step("2","초대 링크");
   var il=el("button","btn sec","초대 링크 복사"); il.onclick=function(){ copyText(inviteLink(school.code),function(){ flashBtn(il,"복사됨 ✓"); }); };
-  il.disabled=!school.pwSet; if(!school.pwSet) il.title="가입 암호를 먼저 정해 주세요";
+  il.disabled=!school.pwSet&&!school.pwOff; if(il.disabled) il.title="가입 암호를 먼저 정해 주세요";
   s2.appendChild(il);
-  s2.appendChild(el("span","shint",school.pwSet?"학교 메신저로 보내세요. 링크를 누르면 학교 코드가 저절로 들어갑니다.":"가입 암호를 먼저 정하면 복사할 수 있습니다."));
+  s2.appendChild(el("span","shint",school.pwSet||school.pwOff?"학교 메신저로 보내세요. 링크를 누르면 학교 코드가 저절로 들어갑니다.":"가입 암호를 먼저 정하면 복사할 수 있습니다."));
   var s3=step("3","학교 코드");
   s3.appendChild(el("b","mono",codeShown?fmtCode(school.code):fmtCode(school.code).replace(/[0-9A-Z]/g,"•")));
   var sh=el("button","ghost",codeShown?"가리기":"보기"); sh.onclick=function(){ codeShown=!codeShown; renderSchoolPanel(); };
@@ -5422,14 +5439,20 @@ function deleteSchool(){
     codeGate("‘"+name+"’ 학교를 지웠습니다.","admin");
   },function(e){ wipeFail(e); location.reload(); });
 }
+// 학교 문서: name·admins·created(+ pwOff). 바꿀 칸만 덮는다
+function schoolDoc(x,patch){ var o={name:x.name,admins:x.admins,created:x.created}; if(x.pwOff) o.pwOff=true; Object.keys(patch).forEach(function(k){ o[k]=patch[k]; }); if(!o.pwOff) delete o.pwOff; return o; }
+function setPwOff(on){
+  fb.S.getDoc(sRef(school.K.room)).then(function(d){ return fb.S.setDoc(sRef(school.K.room),schoolDoc(d.data(),{pwOff:on})); }).then(function(){ school.pwOff=on; renderSchoolPanel(); },
+    function(e){ alert("바꾸지 못했습니다("+((e&&e.code)||"")+"). 최신 Firestore 규칙을 붙여넣었는지 확인해 주세요."); renderSchoolPanel(); });
+}
 function setAdmins(list){
   fb.S.getDoc(sRef(school.K.room)).then(function(d){
-    var x=d.data(); return fb.S.setDoc(sRef(school.K.room),{name:x.name,admins:list,created:x.created}).then(function(){ school.admins=list; renderSchoolPanel(); });
+    var x=d.data(); return fb.S.setDoc(sRef(school.K.room),schoolDoc(x,{admins:list})).then(function(){ school.admins=list; renderSchoolPanel(); });
   }).catch(function(e){ alert("관리자를 바꾸지 못했습니다. ("+((e&&e.code)||"")+")"); });
 }
 function renameSchool(name){
   fb.S.getDoc(sRef(school.K.room)).then(function(d){
-    var x=d.data(); return fb.S.setDoc(sRef(school.K.room),{name:name.slice(0,40),admins:x.admins,created:x.created}).then(function(){
+    var x=d.data(); return fb.S.setDoc(sRef(school.K.room),schoolDoc(x,{name:name.slice(0,40)})).then(function(){
       school.name=name.slice(0,40); var c=document.querySelector("#whoChip span"); if(c) c.textContent=school.name+" · 관리자"; renderSchoolPanel(); });
   }).catch(function(e){ alert("이름을 바꾸지 못했습니다. ("+((e&&e.code)||"")+")"); });
 }

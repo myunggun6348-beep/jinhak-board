@@ -24,7 +24,7 @@ window.__fbMock = (function () {
       return Promise.resolve(false);
     }
     var lp = p[2] === "members" && data && data.ok === true && data.link ? get("schools/" + sid + "/links/" + data.link) : null;
-    return Promise.all([isAdmin(sid), member(sid), p[3] ? get(path) : null, get("schools/" + sid + "/private/join"), lp]).then(function (r) {
+    return Promise.all([isAdmin(sid), member(sid), p[3] ? get(path) : null, get("schools/" + sid + "/private/join"), lp, get("schools/" + sid)]).then(function (r) {
       var adm = r[0], m = r[1] && r[1].ok ? r[1] : null, old = r[2], own = p[3] === u.uid, join = r[3];
       if (p[2] === "private") return adm;
       if (p[2] === "links") {
@@ -38,7 +38,8 @@ window.__fbMock = (function () {
         if (op === "get" || op === "delete") return own || adm;
         var lk = r[4];
         if (own && !old && data.ok === true && lk) return lk.cls === data.cls && lk.exp > Date.now();
-        return adm || (own && !old && data.ok === false && typeof data.cls === "number" && !!join && data.pw === join.hash);
+        var sd = r[5] || {};
+        return adm || (own && !old && data.ok === false && typeof data.cls === "number" && (sd.pwOff === true || (!!join && data.pw === join.hash)));
       }
       if (p[2] === "minreq") return adm || !!m;
       if (p[2] === "students") {
