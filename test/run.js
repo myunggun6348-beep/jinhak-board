@@ -585,6 +585,8 @@ function buildTestPage() {
   const t4 = await who({ hash: "#link=" + lastCode + ".AAAAAAAAAAAAAAAA" }); await t4.waitForTimeout(1500);
   check("틀린 링크는 못 씀", /쓸 수 없는 링크/.test(await t4.innerText("#banner")), true);
   await t3.context().close(); await t4.context().close();
+  await t2.reload(); await t2.waitForTimeout(2000);
+  check("담임: 한 번 가입하면 다음부터는 코드 없이 바로 들어감", [await gateTitle(t2), (await rowNames(t2)).includes("김예시")], ["", true]);
   await t2.click("#tabAll"); await t2.waitForTimeout(500);
   check("담임은 다른 반(5반) 학생이 안 보임", /박예시/.test(await t2.innerText("#viewAll")), false);
   await adm.click("#tabAll"); await adm.waitForTimeout(500);

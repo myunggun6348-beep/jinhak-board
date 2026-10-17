@@ -5006,6 +5006,7 @@ function codeGate(err,mode,preset){
   var help=el("button","linkbtn","사용 설명서"); help.onclick=openHelp;
   if(!mode){ landingPage(err); render(); return; }
   if(mode==="teacher"){
+    if(!preset){ try{ preset=localStorage.getItem(CODE_KEY)||""; }catch(e){} }
     var ci=inp("code","학교 코드 (예: K7QM-3XPA)",preset?fmtCode(preset):""), ni=inp("name","선생님 이름 (예: 김○○)",myName()), ks=clsSelect(getMyCls()||"");
     if(preset) ci.hidden=true;
     var pi=inp("pw","가입 암호 (관리자에게 받은 것)"); pi.type="password"; pi.hidden=true;   // 코드를 넣고 그 학교가 암호를 쓸 때만 보인다
@@ -5251,12 +5252,12 @@ function enterCode(code,o){
         .catch(function(e){ throw e&&e.code==="permission-denied"?{code:"bad-pw"}:e; });
     }).then(function(){ waitApproval(K,code,info,mref); });
   }).catch(function(e){
-    try{ localStorage.removeItem(CODE_KEY); }catch(x){}
+    if(e&&e.code==="no-school"){ try{ localStorage.removeItem(CODE_KEY); }catch(x){} }
     var mode=myMail()?"admin":"teacher";
     if(e&&e.code==="no-school") codeGate("이 코드의 학교가 없습니다. 받은 코드를 다시 확인해 주세요.",mode);
     else if(e&&e.code==="need-pw") codeGate("가입 암호를 넣어 주세요.","teacher",code);
     else if(e&&e.code==="bad-pw") codeGate("가입 암호가 맞지 않습니다(또는 관리자가 아직 암호를 정하지 않았습니다). 관리자에게 확인해 주세요.","teacher",code);
-    else codeGate("들어가지 못했습니다"+(e&&e.code?" ("+e.code+")":"")+". 인터넷 연결과 코드를 확인해 주세요.",mode);
+    else codeGate("들어가지 못했습니다"+(e&&e.code?" ("+e.code+")":"")+". 인터넷 연결을 확인하고 다시 눌러 주세요(코드는 기억하고 있습니다).",mode,mode==="teacher"?code:undefined);
   });
 }
 // 승인을 기다리고, 승인되면 바로 들어간다. 들어간 뒤 빠지거나 반이 바뀌면 다시 맞춘다.
