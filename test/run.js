@@ -638,6 +638,13 @@ function buildTestPage() {
   const swOpts = await multi.evaluate(() => { const s = document.querySelector("#whoChip select.schoolsw"); return s ? [...s.options].map((o) => o.textContent) : null; });
   if (swOpts) { await multi.selectOption("#whoChip select.schoolsw", { label: "가고" }); await multi.waitForTimeout(1500); }
   check("관리자 학교 바꾸기: 빠른 열기 학교끼리 위쪽에서 바로 옮김", [swOpts, await multi.evaluate(() => { const s = document.querySelector("#whoChip select.schoolsw"); return s && s.options[0].textContent; })], [["나고 · 관리자", "가고", "다른 학교 코드로…"], "가고 · 관리자"]);
+  await multi.click("#whoChip button >> text=나가기"); await multi.waitForTimeout(1500);
+  await multi.click("#banner .choice >> text=관리자입니다"); await multi.click("#banner .btn >> text=구글로 로그인"); await multi.waitForTimeout(900);
+  const before = await multi.$$eval("#banner .myschool .msn", (e) => e.map((x) => x.textContent));
+  const gaSid = Object.keys(KV).find((k) => /^schools\/[0-9a-f]{40}$/.test(k) && KV[k].name === "가고").split("/")[1];
+  await multi.click("#banner .myschool:has-text('가고') .msdel"); await multi.waitForTimeout(2500);
+  const after = await multi.$$eval("#banner .myschool .msn", (e) => e.map((x) => x.textContent));
+  check("내 학교: 첫 화면에서 학교마다 지우기(확인 한 번), 그 학교 문서가 모두 사라짐", [before, after, Object.keys(KV).filter((k) => k.includes(gaSid)).length], [["가고", "나고"], ["나고"], 0]);
   await multi.context().close();
   const wrong = await who({});
   await join(wrong, "AAAA-BBBB-CCCC-DDDD", "누구", 1);

@@ -80,6 +80,12 @@ button{cursor:pointer}
 .dzone .dzt{flex-basis:100%; font-size:12.5px; color:var(--bad); font-weight:700; line-height:1.6}
 .btn.del{background:var(--bad); border-color:var(--bad); color:#fff}
 .btn.del:disabled{opacity:.45}
+.myschool{display:flex; align-items:center; gap:8px; width:100%; padding:6px 0; border-top:1px solid var(--line)}
+.myschool:first-of-type{border-top:0}
+.myschool .msn{font-weight:700; font-size:14px; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.myschool .msh{font-size:12px; color:var(--ink-3)}
+.myschool .btn{font-size:13px; padding:6px 12px}
+.myschool .msdel{font-size:12px; color:var(--bad); border-color:var(--bad-soft)}
 .tbadge{display:inline-block; min-width:18px; margin-left:5px; padding:0 5px; border-radius:9px; background:var(--bad); color:#fff; font-size:11px; font-weight:700; line-height:18px; text-align:center}
 .adminpage .ahead{display:flex; align-items:baseline; flex-wrap:wrap; gap:4px 10px; margin-bottom:12px}
 .adminpage .ahead h2{font-size:18px; margin:0}
@@ -5020,10 +5026,16 @@ function codeGate(err,mode,preset){
   }
   // 내 학교: 구글 로그인만으로 열기를 켠 학교는 바로 [열기]
   var s0=el("div","step done"); s0.hidden=true;
-  if(mail) myQuickSchools().then(function(L){
+  if(mail) mySchools().then(function(L){
     if(!L.length) return;
-    s0.hidden=false; s0.innerHTML=""; s0.appendChild(el("b",null,"내 학교 — 구글 로그인만으로 열기"));
-    L.forEach(function(x){ var b=el("button","btn",(x.name||"학교")+" 열기 →"); b.onclick=function(){ enterCode(x.code,{remember:true}); }; s0.appendChild(b); });
+    s0.hidden=false; s0.innerHTML=""; s0.appendChild(el("b",null,"내 학교 ("+L.length+")"));
+    L.forEach(function(x){
+      var r=el("div","myschool"); r.appendChild(el("span","msn",x.name));
+      if(x.code){ var b=el("button","btn","열기 →"); b.onclick=function(){ enterCode(x.code,{remember:true}); }; r.appendChild(b); }
+      else r.appendChild(el("span","msh","코드로 열기(빠른 열기 꺼짐)"));
+      var d=el("button","ghost msdel","지우기"); d.title="이 학교와 학생 자료를 모두 지웁니다"; d.onclick=function(){ quickWipe(x,d); }; r.appendChild(d);
+      s0.appendChild(r);
+    });
   });
   // 칸마다 왜 필요한지 바로 밑에 적는다(처음 쓰는 분이 '정확히 써야 하나?' 망설이지 않게)
   var s2=el("div","step"+(mail?"":" off")); s2.appendChild(el("b",null,"② 새 학교 만들기 (처음 한 번만)"));
@@ -5054,13 +5066,41 @@ function codeGate(err,mode,preset){
 // 관리자가 새 학교를 만든다: 학교 이름 → 새 코드(화면에 보여 줌)
 // 가입 암호는 원문 대신 학교마다 다른 해시만 둔다(관리자만 읽는 private/join). 규칙이 가입 요청의 해시와 맞춰 본다.
 // 내가 관리자인 학교 중 '구글 로그인만으로 열기'를 켠 곳: [{name, code}]
-function myQuickSchools(){
+// 내가 관리자인 학교 모두: [{sid, name, code(빠른 열기를 켰을 때만)}]
+function mySchools(){
   var m=myMail(); if(!m||!fb.S.getDocs) return Promise.resolve([]);
   return fb.S.getDocs(fb.S.query(fb.S.collection(fb.fs,"schools"),fb.S.where("admins","array-contains",m))).then(function(q){
     return Promise.all(q.docs.map(function(d){
-      return fb.S.getDoc(sRef(d.id,"private","code")).then(function(c){ return c.exists()&&c.data().code?{name:d.data().name,code:c.data().code}:null; },function(){ return null; });
+      var x={sid:d.id, name:d.data().name||"학교", code:""};
+      return fb.S.getDoc(sRef(d.id,"private","code")).then(function(c){ if(c.exists()&&c.data().code) x.code=c.data().code; return x; },function(){ return x; });
     }));
-  }).then(function(L){ return L.filter(Boolean); },function(){ return []; });
+  }).then(function(L){ return L.sort(function(a,b){ return a.name.localeCompare(b.name,"ko"); }); },function(){ return []; });
+}
+function myQuickSchools(){ return mySchools().then(function(L){ return L.filter(function(x){ return x.code; }); }); }
+// 학교 통째로 지우기(sid 만 있으면 된다. 학생 문서는 암호문이라 열지 않고 지운다)
+// 먼저 지울 문서를 모두 읽어 본다(연결 링크 목록은 최신 규칙에서만 읽힌다). 하나라도 막히면 아무것도 지우지 않는다
+function wipeSchool(sid){
+  var C=["students","minreq","links","members"];
+  return Promise.all(C.map(function(c){ return fb.S.getDocs(fb.S.collection(fb.fs,"schools",sid,c)); })).catch(function(e){ throw {code:"rules-old", raw:e}; }).then(function(Q){
+    return Promise.all(Q.map(function(q,i){ return Promise.all(q.docs.map(function(d){ return fb.S.deleteDoc(sRef(sid,C[i],d.id)); })); }));
+  }).then(function(){
+    return Promise.all(["join","code"].map(function(id){ return fb.S.deleteDoc(sRef(sid,"private",id)).catch(function(){}); }));
+  }).then(function(){ return fb.S.deleteDoc(sRef(sid)); });
+}
+function wipeFail(e){
+  alert(e&&e.code==="rules-old"?"아직 아무것도 지우지 않았습니다. Firebase 콘솔에 최신 Firestore 규칙을 붙여넣고 게시한 뒤 다시 해 주세요(한 번만 하면 됩니다).":"학교를 다 지우지 못했습니다("+((e&&e.code)||"")+"). 최신 Firestore 규칙을 붙여넣었는지 확인한 뒤 다시 해 주세요.");
+}
+// 첫 화면 '내 학교'에서 바로 지우기: 학생 수를 보여 주고 확인 한 번
+function quickWipe(x,btn){
+  btn.disabled=true; btn.textContent="확인 중…";
+  fb.S.getDocs(fb.S.collection(fb.fs,"schools",x.sid,"students")).then(function(q){ return q.docs.length; },function(){ return -1; }).then(function(n){
+    if(!window.confirm("‘"+x.name+"’ 학교를 지울까요?\n"+(n>0?"학생 "+n+"명 자료와 담임 가입이 모두 지워지고 되돌릴 수 없습니다.":n===0?"학생 자료는 없습니다.":"학생 자료가 있으면 함께 지워지고 되돌릴 수 없습니다."))){ btn.disabled=false; btn.textContent="지우기"; return; }
+    btn.textContent="지우는 중…";
+    return wipeSchool(x.sid).then(function(){
+      try{ if(x.code&&normCode(localStorage.getItem(CODE_KEY)||"")===normCode(x.code)) localStorage.removeItem(CODE_KEY); }catch(e){}
+      codeGate("‘"+x.name+"’ 학교를 지웠습니다.","admin");
+    },function(e){ wipeFail(e); btn.disabled=false; btn.textContent="지우기"; });
+  });
 }
 function setQuick(on){
   var r=sRef(school.K.room,"private","code");
@@ -5377,19 +5417,10 @@ function renderSchoolPanel(){
 function deleteSchool(){
   var sid=school.K.room, name=school.name;
   stopWatch(); setSync("","학교 지우는 중");
-  // 먼저 지울 문서를 모두 읽어 본다(연결 링크 목록은 최신 규칙에서만 읽힌다). 하나라도 막히면 아무것도 지우지 않는다
-  var C=["students","minreq","links","members"];
-  Promise.all(C.map(function(c){ return fb.S.getDocs(fb.S.collection(fb.fs,"schools",sid,c)); })).catch(function(e){ throw {code:"rules-old", raw:e}; }).then(function(Q){
-    return Promise.all(Q.map(function(q,i){ return Promise.all(q.docs.map(function(d){ return fb.S.deleteDoc(sRef(sid,C[i],d.id)); })); }));
-  }).then(function(){
-    return Promise.all(["join","code"].map(function(id){ return fb.S.deleteDoc(sRef(sid,"private",id)).catch(function(){}); }));
-  }).then(function(){ return fb.S.deleteDoc(sRef(sid)); }).then(function(){
+  wipeSchool(sid).then(function(){
     try{ localStorage.removeItem(CODE_KEY); }catch(e){}
     codeGate("‘"+name+"’ 학교를 지웠습니다.","admin");
-  },function(e){
-    alert(e&&e.code==="rules-old"?"아직 아무것도 지우지 않았습니다. Firebase 콘솔에 최신 Firestore 규칙을 붙여넣고 게시한 뒤 다시 해 주세요.":"학교를 다 지우지 못했습니다("+((e&&e.code)||"")+"). 최신 Firestore 규칙을 붙여넣었는지 확인한 뒤 다시 해 주세요.");
-    location.reload();
-  });
+  },function(e){ wipeFail(e); location.reload(); });
 }
 function setAdmins(list){
   fb.S.getDoc(sRef(school.K.room)).then(function(d){
