@@ -537,6 +537,27 @@ function buildTestPage() {
     await c.close();
   }
 
+  {
+    const c = await browser.newContext({ viewport: { width: 1200, height: 900 } }); const x = await c.newPage(); x.on("pageerror", (e) => errors.push(String(e)));
+    const A = (id, u, itv, extra) => Object.assign({ id, kind: "수시", univ: u, major: "경영학과", jh: "학생부종합(일반)", type: "학종", status: "지원완료", c6: true, itv }, extra || {});
+    await x.addInitScript((s) => { if (sessionStorage.getItem("seeded")) return; sessionStorage.setItem("seeded", "1"); localStorage.setItem("jh.local.students", JSON.stringify(s)); localStorage.setItem("jh.cls", "2"); localStorage.setItem("jh.mode", "local"); localStorage.setItem("jh.alltab", "exam"); },
+      [{ id: "s1", cls: 2, no: "30201", name: "가나", apps: [A("a1", "경북대학교", "2026-12-05")] }, { id: "s2", cls: 3, no: "30301", name: "다라", apps: [A("a2", "경북대학교", "2026-12-05")] },
+       { id: "s3", cls: 4, no: "30401", name: "마바", apps: [A("a3", "경북대학교", "2026-12-05", { itvTime: "14:00", itvSrc: "학생" })] },
+       { id: "s4", cls: 4, no: "30402", name: "사아", apps: [A("a4", "동아대학교", "2026-12-06")] }]);
+    await x.goto("file://" + page404); await x.waitForTimeout(500);
+    await x.click("#tabAll"); await x.waitForTimeout(300);
+    const rows0 = await x.$$eval("#examTable tbody tr", (r) => r.map((e) => e.innerText.replace(/\s+/g, " ")));
+    await x.click("#examTable tbody tr >> nth=0 >> button >> text=넣기"); await x.waitForTimeout(150);
+    await x.fill("#examTable input[name=time]", "10:30"); await x.fill("#examTable input[name=place]", "글로벌플라자 301호");
+    await x.click("#examTable button >> text=저장"); await x.waitForTimeout(300);
+    const got = await x.evaluate(() => JSON.parse(localStorage.getItem("jh.local.students")).map((s) => [s.name, s.apps[0].itvTime || "", s.apps[0].itvPlace || "", s.apps[0].itvSrc || ""]));
+    const row1 = await x.$eval("#examTable tbody tr", (e) => e.innerText.replace(/\s+/g, " "));
+    check("고사 시간표: 대학·전형·날짜로 묶고, 한 번 넣으면 같은 지원 학생 모두에게(학생에게 받은 시각은 그대로)",
+      [rows0.length, /가나 외 2명/.test(rows0[0]), /시각 없음/.test(rows0[0]), got, /10:30 · 글로벌플라자 301호/.test(row1), /학생별 시각 다른 학생 1명/.test(row1), await x.textContent("#examCnt")],
+      [2, true, true, [["가나", "10:30", "글로벌플라자 301호", "공지"], ["다라", "10:30", "글로벌플라자 301호", "공지"], ["마바", "14:00", "", "학생"], ["사아", "", "", ""]], true, true, "앞으로 2건 · 시각 확인 1건 · 아직 1건"]);
+    await c.close();
+  }
+
   /* ── 자료 지키기(백업 알림) ── */
   const bb = () => p.evaluate(() => { const b = document.getElementById("backupBar"); return [!b.hidden, b.classList.contains("due"), b.textContent]; });
   let B1 = await bb();
@@ -596,7 +617,7 @@ function buildTestPage() {
     await x.fill("#banner input[name=code]", code); await x.fill("#banner input[name=name]", name); await x.selectOption("#banner select[name=cls]", String(cls)); await x.fill("#banner input[name=pw]", pw || "1234");
     await x.click("#banner .codeform .btn"); await x.waitForTimeout(1500);
   };
-  const stu = (id, cls, name) => ({ id, cls, no: id, name, updatedAt: "2026-10-01T00:00:00Z", apps: [{ id: "a" + id, kind: "수시", univ: "부산대학교", major: "국어국문학과", type: "학종", status: "지원완료", c6: true }] });
+  const stu = (id, cls, name) => ({ id, cls, no: id, name, updatedAt: "2026-10-01T00:00:00Z", apps: [{ id: "a" + id, kind: "수시", univ: "부산대학교", major: "국어국문학과", type: "학종", status: "지원완료", c6: true, itv: "2026-11-21" }] });
   const adm = await who({ email: "admin@x.com", local: [stu("30201", 2, "김예시"), stu("30501", 5, "박예시")] });
   check("처음: 선생님/관리자 고르기", await gateTitle(adm), "진학 현황판");
   const vis = (x) => x.evaluate(() => getComputedStyle(document.getElementById("viewClass")).display !== "none");
@@ -677,6 +698,13 @@ function buildTestPage() {
   check("담임은 다른 반(5반) 학생이 안 보임", /박예시/.test(await t2.innerText("#viewAll")), false);
   await adm.click("#tabAll"); await adm.waitForTimeout(500);
   check("관리자는 모든 반", /2반[\s\S]*5반/.test(await adm.innerText("#classTable")), true);
+  await t2.click("#allTabs button >> text=고사 시간표"); await t2.waitForTimeout(200);
+  await t2.click("#examTable button >> text=넣기"); await t2.fill("#examTable input[name=time]", "09:30"); await t2.fill("#examTable input[name=place]", "인문관");
+  await t2.click("#examTable button >> text=저장"); await adm.waitForTimeout(2500);
+  await adm.click("#allTabs button >> text=고사 시간표"); await adm.waitForTimeout(300);
+  const ex = await adm.$eval("#examTable tbody", (e) => e.innerText.replace(/\s+/g, " "));
+  check("학교 장부: 2반 담임이 넣은 고사 시각이 5반 학생에게도(관리자 화면)", [/09:30 · 인문관/.test(ex), /외 1명/.test(ex), /박담임 입력/.test(ex), /김예시|30201|인문관/.test(JSON.stringify(KV))], [true, true, true, false]);
+  await adm.click("#allTabs button >> text=한눈에"); await t2.click("#allTabs button >> text=한눈에");
   await t2.click("#tabClass"); await t2.click(".row >> nth=0 >> .rowhead"); await t2.waitForTimeout(200);
   const ti = await t2.evaluate(() => [...document.querySelectorAll(".detail select")].findIndex((x) => [...x.options].some((o) => o.value === "최초합")));
   await (await t2.$$(".detail select"))[ti].selectOption("최초합"); await adm.waitForTimeout(2500);
