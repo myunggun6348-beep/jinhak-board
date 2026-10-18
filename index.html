@@ -767,7 +767,7 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
     <li><b>관리자입니다</b> → 구글로 로그인 → 학교 이름·가입 암호 → <b>학교 만들기</b>.</li>
     <li><b>학교 관리</b> 탭 → <b>초대 링크 복사</b>(암호가 번거로우면 ‘가입 암호 없이 승인만으로’).</li>
     <li>빨간 숫자가 뜨면 이름·반 확인 후 <b>승인</b>. <b>반별 진행 현황</b>에서 챙길 반 확인.</li>
-    <li>7일마다 <b>전체 백업 받기</b>. 안 쓰는 학교는 첫 화면 <b>내 학교 → 지우기</b>.</li>
+    <li><b>학교 관리 → 자료 백업</b>에서 가끔 전체 백업(7일 지나면 위에 알림). 안 쓰는 학교는 첫 화면 <b>내 학교 → 지우기</b>.</li>
   </ol>
   <h3>알아 둘 것</h3>
   <ul>
@@ -1991,8 +1991,9 @@ function addApp(st,kind,jc){
 
 /* ── render: overview ──────────────────────── */
 function renderAll(){
-  document.getElementById("btnRestore").hidden=canWrite===false||(demo&&!practice);
-  document.getElementById("btnMerge").hidden=canWrite===false;
+  document.getElementById("btnRestore").hidden=canWrite===false||(demo&&!practice)||!!school;
+  document.getElementById("btnMerge").hidden=canWrite===false||!!school;
+  if(school) document.getElementById("btnBackup").hidden=true;   // 학교 장부: 백업은 학교 관리 탭에서만
   var all=sorted(list());
   renderToday(document.getElementById("allToday"), all, true);
   renderAlerts(document.getElementById("allAlerts"), all, true);
@@ -3297,7 +3298,7 @@ function doBackup(){
   markBackup();
 }
 function markBackup(){
-  if(school&&school.admin){ lsSet("jh.lastBackup."+school.K.room,new Date().toISOString()); renderBackupBar(); return; }
+  if(school&&school.admin){ lsSet("jh.lastBackup."+school.K.room,new Date().toISOString()); renderBackupBar(); renderSchoolPanel(); return; }
   lsSet("jh.lastBackup",new Date().toISOString()); lsSet("jh.chg",null); lsSet("jh.chgRes",null); renderBackupBar();
 }
 function noteChange(lines){
@@ -3323,6 +3324,7 @@ function renderBackupBar(){
     var sk="jh.lastBackup."+school.K.room, sl=lsGet(sk), sd=sl?Math.floor((Date.now()-Date.parse(sl))/86400000):null;
     var sdue=!sl?"아직 이 컴퓨터에서 전체 백업을 받은 적이 없습니다":sd>=7?"마지막 전체 백업 뒤 "+sd+"일이 지났습니다":"";
     var sw=sdue&&lsGet("jh.snooze.school")!==new Date().toDateString();
+    if(!sw){ bar.hidden=true; return; }
     bar.hidden=false; bar.innerHTML=""; bar.className="backupbar"+(sw?" due":"");
     bar.appendChild(el("span",null,sw?"학교 장부 전체 백업을 받아 두세요. "+sdue+". 학교 코드를 잃거나 실수로 지우면 되살릴 수 없습니다.":"학교 장부 · 마지막 전체 백업 "+fmtWhen(sl)));
     var ssp=el("span","sp"), sb=el("button",sw?"btn":"ghost","전체 백업 받기"); sb.onclick=doBackup; ssp.appendChild(sb);
@@ -5777,6 +5779,14 @@ function renderSchoolPanel(){
     if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(m)){ alert("이메일을 확인해 주세요."); return; }
     if(school.admins.indexOf(m)<0) setAdmins(school.admins.concat([m])); };
   ar.appendChild(ai); ar.appendChild(ab); at.appendChild(ar);
+
+  // 자료 백업: 학교 코드를 잃거나 학교를 지우면 되살릴 수 없으니 관리자가 가끔 파일로
+  var bl=lsGet("jh.lastBackup."+school.K.room), bt=tile("자료 백업","마지막 전체 백업(이 컴퓨터): "+(bl?fmtWhen(bl):"없음"));
+  var br=el("div","astep"), bb=el("button","btn sec","전체 백업 받기"); bb.onclick=doBackup; br.appendChild(bb);
+  var rb=el("button","ghost","백업 되살리기"); rb.onclick=function(){ document.getElementById("restoreFile").click(); }; br.appendChild(rb);
+  var mb=el("button","ghost","반 파일 합치기"); mb.title="혼자 쓰기로 받은 반 파일을 학교 장부에 합칩니다"; mb.onclick=function(){ document.getElementById("mergeFile").click(); }; br.appendChild(mb);
+  bt.appendChild(br);
+  bt.appendChild(el("span","shint","원서 접수 뒤·발표 많은 주·학년 말에 한 번씩 받아 두세요. 학교 코드를 잃거나 학교를 지워도 이 파일로 되살릴 수 있습니다. 파일에는 학생 정보가 들어 있으니 학교 컴퓨터·USB에만 보관하세요."));
 
   // 학교 정보
   var it=tile("학교 정보","화면 위에 보이는 이름표");

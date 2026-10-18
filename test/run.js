@@ -688,8 +688,9 @@ function buildTestPage() {
   await adm.click(".row >> nth=0 >> .rowhead"); await adm.waitForTimeout(100);
   const bb1 = await adm.$eval("#backupBar", (b) => [!b.hidden, b.classList.contains("due"), /학교 장부 전체 백업/.test(b.textContent)]);
   await adm.click("#backupBar button >> text=전체 백업 받기"); await adm.waitForTimeout(300);
-  check("관리자 백업 알림: 처음엔 주황 경고, 받으면 마지막 백업 날짜", [bb1, await adm.$eval("#backupBar", (b) => [b.classList.contains("due"), /마지막 전체 백업/.test(b.textContent)])], [[true, true, true], [false, true]]);
+  check("관리자 백업 알림: 처음엔 주황 경고, 받으면 알림 줄은 사라지고 학교 관리 탭에 날짜", [bb1, await adm.$eval("#backupBar", (b) => b.hidden), await adm.$eval("#schoolPanel", (e) => /마지막 전체 백업\(이 컴퓨터\): (?!없음)/.test(e.textContent))], [[true, true, true], true, true]);
   check("담임에게는 백업 알림 없음(자료는 학교 장부에)", await t2.$eval("#backupBar", (b) => b.hidden), true);
+  check("학교 장부: 반별 현황에서 백업·되살리기·합치기 단추 감춤(학교 관리 탭으로)", await t2.evaluate(() => ["btnBackup", "btnRestore", "btnMerge"].map((i) => document.getElementById(i).hidden)), [true, true, true]);
   const other = await who({ email: "other@x.com", school: "다른고" });
   await other.makeSchool(); await other.waitForTimeout(500);
   check("다른 학교는 서로 안 보임", [Object.keys(KV).filter((k) => /^schools\/[0-9a-f]{40}$/.test(k)).length, (await rowNames(other)).includes("김예시")], [2, false]);
