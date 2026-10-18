@@ -149,6 +149,17 @@ button{cursor:pointer}
 .dtabs{display:flex; gap:3px; background:var(--surface-2); padding:3px; border-radius:9px; margin-bottom:12px; width:fit-content; max-width:100%; flex-wrap:wrap}
 .dtab{border:0; background:transparent; color:var(--ink-2); padding:7px 14px; border-radius:7px; font:inherit; font-size:13px; font-weight:600; cursor:pointer}
 .dtab[aria-selected="true"]{background:var(--surface); color:var(--ink); box-shadow:var(--shadow); font-weight:800}
+#viewAll .otab{display:none}
+#viewAll[data-tab="sum"] .otab[data-t="sum"],#viewAll[data-tab="cls"] .otab[data-t="cls"],#viewAll[data-tab="uni"] .otab[data-t="uni"],#viewAll[data-tab="jun"] .otab[data-t="jun"],#viewAll[data-tab="min"] .otab[data-t="min"],#viewAll[data-tab="res"] .otab[data-t="res"]{display:block}
+.otabs{display:flex; gap:3px; background:var(--surface-2); padding:3px; border-radius:10px; margin:0 0 16px; width:fit-content; max-width:100%; flex-wrap:wrap}
+.otabs button{border:0; background:transparent; color:var(--ink-2); padding:8px 15px; border-radius:8px; font:inherit; font-size:13.5px; font-weight:600; cursor:pointer}
+.otabs button[aria-selected="true"]{background:var(--surface); color:var(--ink); box-shadow:var(--shadow); font-weight:800}
+.rfilter{display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:0 0 10px}
+.rfilter input{flex:0 1 220px; min-width:140px; border:1px solid var(--line-2); background:var(--surface); color:var(--ink); border-radius:999px; padding:6px 13px; font:inherit; font-size:13px}
+.rfilter .rf{border:1px solid var(--line-2); background:var(--surface); color:var(--ink-2); border-radius:999px; padding:4px 11px; font:inherit; font-size:12.5px; cursor:pointer}
+.rfilter .rf b{margin-left:4px; font-weight:800}
+.rfilter .rf[aria-pressed="true"]{background:var(--accent); border-color:var(--accent); color:var(--on-accent,#fff)}
+.rfilter .rf.zero{opacity:.45}
 .tbadge{display:inline-block; min-width:18px; margin-left:5px; padding:0 5px; border-radius:9px; background:var(--bad); color:#fff; font-size:11px; font-weight:700; line-height:18px; text-align:center}
 .adminpage .ahead{display:flex; align-items:baseline; flex-wrap:wrap; gap:4px 10px; margin-bottom:12px}
 .adminpage .ahead h2{font-size:18px; margin:0}
@@ -809,6 +820,7 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
     <div class="sched" id="bulkPanel" hidden></div>
     <div class="sched" id="csatPanel" hidden></div>
     <div class="sched" id="noticePanel" hidden></div>
+    <div class="rfilter" id="rfilter" hidden></div>
     <div class="rows" id="rows"></div>
 
     <div class="panel" id="addPanel">
@@ -861,7 +873,11 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
 
   <div id="viewAdmin" hidden><div id="schoolPanel" class="adminpage" hidden></div></div>
 
-  <div id="viewAll" hidden>
+  <div id="viewAll" hidden data-tab="sum">
+    <div class="otabs" role="tablist" id="allTabs">
+      <button role="tab" data-t="sum">한눈에</button><button role="tab" data-t="cls">반별 현황</button><button role="tab" data-t="uni">대학별 지원</button><button role="tab" data-t="jun">정시</button><button role="tab" data-t="min">수능최저</button><button role="tab" data-t="res">진학 실적</button>
+    </div>
+    <div class="otab" data-t="sum">
     <div class="today" id="allToday" hidden></div>
     <div class="alerts" id="allAlerts"></div>
     <div class="stats" id="allStats"></div>
@@ -872,24 +888,35 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
     <div class="sched" id="allAfterCsat" hidden></div>
     <div class="sched" id="allReg" hidden></div>
     <div class="sched" id="allLog"></div>
+    </div>
+    <div class="otab" data-t="cls">
     <div class="listhead"><h2>반별 현황</h2><span class="sp"><button class="ghost" id="btnBulkAll" title="대학이나 발표일을 고르면 모든 반의 그 지원 결과를 한 화면에서 넣습니다">결과 한꺼번에</button><button class="ghost" id="btnBackup" title="모든 반 학생·지원 자료를 파일 하나로 받습니다">전체 백업 받기</button><button class="ghost" id="btnMerge" title="여러 선생님이 받은 반 파일을 한꺼번에 골라 합칩니다">반 파일 합치기</button><input type="file" id="mergeFile" accept=".json,application/json" multiple hidden><button class="ghost" id="btnRestore" title="백업 파일의 학생 자료로 되돌립니다">백업 되살리기</button><input type="file" id="restoreFile" accept=".json,application/json" hidden><button class="ghost" id="btnCsvAll">전체 CSV 내려받기</button></span></div>
     <div class="sched" id="allBulk" hidden></div>
     <div class="tablewrap"><table id="classTable"></table></div>
-    <div class="listhead" style="margin-top:22px"><h2>정시 현황</h2><span class="cnt">수시 합격자는 정시 지원 불가</span></div>
-    <div class="tablewrap"><table id="jungsiTable"></table></div>
-    <div id="recWrap" hidden><div class="listhead" style="margin-top:22px"><h2>학교장추천 현황</h2><span class="cnt" id="recCnt"></span><span class="cnt">대학별 추천 인원 한도와 맞춰 보세요</span></div>
-    <div class="sched" id="recBox"></div></div>
-    <div class="listhead" style="margin-top:22px"><h2>수능최저 기준 점검</h2><span class="cnt" id="minCheckCnt"></span>
-      <span class="sp"><button class="ghost" id="btnMinCopy">목록 복사</button><button class="ghost" id="btnMinCsv">목록 CSV 받기</button></span></div>
-    <div class="sched" id="minCheck"></div>
-    <div class="listhead" style="margin-top:22px"><h2>진학 실적</h2><span class="cnt">학년 말 보고용</span><span class="sp"><button class="ghost" id="btnResults">실적 엑셀(CSV) 받기</button></span></div>
-    <div class="sched" id="resultsBox"></div>
-    <div class="listhead" style="margin-top:22px"><h2>지원 현황</h2>
+    </div>
+    <div class="otab" data-t="uni">
+    <div class="listhead"><h2>지원 현황</h2>
       <span class="seg" role="group" aria-label="보기"><button id="byUniv" aria-pressed="true">대학별</button><button id="byMajor" aria-pressed="false">학과별</button></span>
       <span class="cnt" id="univCount"></span>
       <span class="sp"><input id="univQ" class="usearch" type="search" placeholder="대학·학과·학생 찾기"></span></div>
     <p class="uhint" id="univHint"></p>
     <div class="tablewrap"><table id="univTable"></table></div>
+    <div id="recWrap" hidden><div class="listhead" style="margin-top:22px"><h2>학교장추천 현황</h2><span class="cnt" id="recCnt"></span><span class="cnt">대학별 추천 인원 한도와 맞춰 보세요</span></div>
+    <div class="sched" id="recBox"></div></div>
+    </div>
+    <div class="otab" data-t="jun">
+    <div class="listhead"><h2>정시 현황</h2><span class="cnt">수시 합격자는 정시 지원 불가</span></div>
+    <div class="tablewrap"><table id="jungsiTable"></table></div>
+    </div>
+    <div class="otab" data-t="min">
+    <div class="listhead"><h2>수능최저 기준 점검</h2><span class="cnt" id="minCheckCnt"></span>
+      <span class="sp"><button class="ghost" id="btnMinCopy">목록 복사</button><button class="ghost" id="btnMinCsv">목록 CSV 받기</button></span></div>
+    <div class="sched" id="minCheck"></div>
+    </div>
+    <div class="otab" data-t="res">
+    <div class="listhead"><h2>진학 실적</h2><span class="cnt">학년 말 보고용</span><span class="sp"><button class="ghost" id="btnResults">실적 엑셀(CSV) 받기</button></span></div>
+    <div class="sched" id="resultsBox"></div>
+    </div>
   </div>
 </div>
 
@@ -1470,7 +1497,8 @@ function render(){
   renderTodo(document.getElementById("todo"), cls?mine:[], false);
   renderAfterCsat(document.getElementById("afterCsat"), cls?mine:[], false);
   renderReg(document.getElementById("reg"), cls?mine:[], false);
-  renderRows(mine, cls);
+  var shown=rowFilter(mine); renderRows(shown, cls, mine.length);
+  if(cls&&shown.length!==mine.length) document.getElementById("listCount").textContent=shown.length+" / "+mine.length+"명";
   document.getElementById("btnNotesCsv").hidden=!mine.some(function(x){ return (x.notes||[]).length; });
   renderCsat(cls?mine:[]);
   renderJungsi(cls?mine:[]);
@@ -1589,10 +1617,46 @@ function minShort(raw){
 function annCell(a){ return [a.ann1?"1단계 "+mmdd(a.ann1):"", mmdd(a.ann)].filter(Boolean).join(" / "); }
 function mmdd(s){ var m=String(s||"").match(/^\d{4}-(\d{2})-(\d{2})/); return m?(+m[1])+"/"+(+m[2]):""; }
 
-function renderRows(arr, cls){
+/* 우리 반 찾기·거르기: 이름·학번·대학 찾기 + 전체/경고/결과 기다림/합격/정시 준비 */
+var rowsQ="", rowsF="all";
+var RF=[["all","전체"],["warn","경고"],["wait","결과 기다림"],["pass","합격"],["jun","정시 준비"]];
+function rfTest(k,st){
+  var apps=st.apps||[];
+  if(k==="warn") return checkStudent(st).length>0;
+  if(k==="wait") return apps.some(function(a){ return LIVE[a.status||"지원완료"]; });
+  if(k==="pass") return apps.some(function(a){ return PASS[a.status]&&a.status!=="등록포기"; });
+  if(k==="jun"){ var o=jungsiOf(st); return !o.pass.length&&(o.any||GUN.some(function(g){ return jcandOf(st,g).length; })); }
+  return true;
+}
+function rowFilter(mine){
+  var bar=document.getElementById("rfilter");
+  bar.hidden=!mine.length;
+  if(!mine.length) return mine;
+  var qi=bar.querySelector("input");
+  if(!qi){
+    qi=document.createElement("input"); qi.type="search"; qi.placeholder="이름·학번·대학 찾기"; qi.setAttribute("aria-label","학생 찾기");
+    qi.oninput=function(){ rowsQ=qi.value.trim(); render(); };
+    bar.appendChild(qi);
+  }
+  [].slice.call(bar.querySelectorAll(".rf")).forEach(function(b){ b.remove(); });
+  RF.forEach(function(x){
+    var n=mine.filter(function(st){ return rfTest(x[0],st); }).length;
+    var b=el("button","rf"+(n||x[0]==="all"?"":" zero")); b.type="button"; b.appendChild(document.createTextNode(x[1])); b.appendChild(el("b",null,String(n)));
+    b.setAttribute("aria-pressed",String(rowsF===x[0])); b.onclick=function(){ rowsF=rowsF===x[0]?"all":x[0]; render(); };
+    bar.appendChild(b);
+  });
+  var q=sameKey(rowsQ).toLowerCase();
+  return mine.filter(function(st){
+    if(!rfTest(rowsF,st)) return false;
+    if(!q) return true;
+    return [st.name,st.no].concat((st.apps||[]).map(function(a){ return a.univ+" "+a.major; })).some(function(v){ return sameKey(v).toLowerCase().indexOf(q)>=0; });
+  });
+}
+function renderRows(arr, cls, total){
   var host=document.getElementById("rows");
   host.innerHTML="";
   if(!cls){ host.appendChild(el("div","empty-state","위에서 담당하시는 반을 먼저 선택해 주세요.")); return; }
+  if(!arr.length&&total){ var es=el("div","empty-state","조건에 맞는 학생이 없습니다. "); var rb=el("button","linkbtn","모두 보기"); rb.onclick=function(){ rowsQ=""; rowsF="all"; var qi=document.querySelector("#rfilter input"); if(qi) qi.value=""; render(); }; es.appendChild(rb); host.appendChild(es); return; }
   if(!arr.length){ host.appendChild(el("div","empty-state","아직 등록된 학생이 없습니다. 아래에서 명단을 넣어 주세요.")); return; }
   arr.forEach(function(st){
     var warns=checkStudent(st);
@@ -4076,6 +4140,10 @@ function bindStatic(){
   document.querySelectorAll(".tmenu").forEach(function(m){ m.addEventListener("click",function(e){ if(e.target.closest(".tmenu-list button")) m.open=false; }); });
   document.addEventListener("click",function(e){ document.querySelectorAll(".tmenu[open]").forEach(function(m){ if(!m.contains(e.target)) m.open=false; }); });
   document.getElementById("btnBulkRes").onclick=function(){ bulkC.open=!bulkC.open; render(); if(bulkC.open) document.getElementById("bulkPanel").scrollIntoView({block:"start"}); };
+  var allTab=lsGet("jh.alltab")||"sum", va=document.getElementById("viewAll");
+  var setAllTab=function(t){ allTab=t; va.dataset.tab=t; lsSet("jh.alltab",t); [].forEach.call(document.querySelectorAll("#allTabs button"),function(b){ b.setAttribute("aria-selected",String(b.dataset.t===t)); }); };
+  [].forEach.call(document.querySelectorAll("#allTabs button"),function(b){ b.onclick=function(){ setAllTab(b.dataset.t); }; });
+  setAllTab(allTab);
   document.getElementById("btnBulkAll").onclick=function(){ bulkA.open=!bulkA.open; renderAll(); };
   document.getElementById("btnNotesCsv").onclick=function(){ var c=getCls(); notesCsv(c?byClass(c):[], YEAR+"_상담기록_"+c+"반.csv"); };
   document.getElementById("btnHelp").onclick=openHelp;

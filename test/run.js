@@ -513,6 +513,30 @@ function buildTestPage() {
   await p.click(".detail .dtab >> text=지원 대학"); await p.click(".row >> nth=0 >> .rowhead"); await p.waitForTimeout(100);
   check("학생 화면: 요약 줄과 탭(지원 대학이 먼저, 수능은 탭으로)", [dv, dv2], [[true, ["지원 대학", "수능 성적", "상담 기록", "기타"], true, false], [true, false]]);
 
+  {
+    const c = await browser.newContext({ viewport: { width: 1200, height: 900 } }); const x = await c.newPage(); x.on("pageerror", (e) => errors.push(String(e)));
+    const A = (u, st) => ({ id: u + st, kind: "수시", univ: u, major: "경영학과", type: "학종", status: st, c6: true });
+    await x.addInitScript((s) => { if (sessionStorage.getItem("seeded")) return; sessionStorage.setItem("seeded", "1"); localStorage.setItem("jh.local.students", JSON.stringify(s)); localStorage.setItem("jh.cls", "2"); localStorage.setItem("jh.mode", "local"); },
+      [{ id: "s1", cls: 2, no: "30201", name: "가나", apps: [A("부산대학교", "최초합")] }, { id: "s2", cls: 2, no: "30202", name: "다라", apps: [A("경북대학교", "지원완료")] },
+       { id: "s3", cls: 2, no: "30203", name: "마바", apps: [A("동아대학교", "등록완료"), A("부경대학교", "등록완료")] }]);
+    await x.goto("file://" + page404); await x.waitForTimeout(500);
+    const names = () => x.$$eval("#rows .row .nm", (e) => e.map((n) => n.textContent));
+    const all = await names();
+    await x.click("#rfilter .rf >> text=경고"); await x.waitForTimeout(100); const warn = await names();
+    await x.click("#rfilter .rf >> text=경고"); await x.click("#rfilter .rf >> text=결과 기다림"); await x.waitForTimeout(100); const wait = await names();
+    await x.click("#rfilter .rf >> text=결과 기다림"); await x.fill("#rfilter input", "경북"); await x.waitForTimeout(150); const q = await names();
+    const cnt = await x.textContent("#listCount");
+    check("우리 반 찾기·거르기: 경고·결과 기다림·대학 이름으로", [all.length, warn, wait, q, cnt], [3, ["마바"], ["다라"], ["다라"], "1 / 3명"]);
+    await x.click("#tabAll"); await x.waitForTimeout(200);
+    const vis = (id) => x.$eval(id, (e) => getComputedStyle(e.closest(".otab")).display !== "none");
+    const t0 = [await vis("#allAlerts"), await vis("#classTable")];
+    await x.click("#allTabs button >> text=반별 현황"); await x.waitForTimeout(150);
+    const t1 = [await vis("#allAlerts"), await vis("#classTable")];
+    await x.reload(); await x.waitForTimeout(500); await x.click("#tabAll"); await x.waitForTimeout(200);
+    check("전체 현황 탭: 한눈에 → 반별 현황, 다시 열어도 기억", [t0, t1, await vis("#classTable")], [[true, false], [false, true], true]);
+    await c.close();
+  }
+
   /* ── 자료 지키기(백업 알림) ── */
   const bb = () => p.evaluate(() => { const b = document.getElementById("backupBar"); return [!b.hidden, b.classList.contains("due"), b.textContent]; });
   let B1 = await bb();
