@@ -493,7 +493,16 @@ function buildTestPage() {
     await x.goto("file://" + page404); await x.waitForTimeout(500);
     await x.click(".row >> nth=0 >> .rowhead"); await x.waitForTimeout(200);
     const ws = await x.$$eval(".apptable tbody tr.arow", (rs) => rs.map((r) => (r.querySelector(".w") || {}).textContent || ""));
-    check("면접 겹침: 같은 날끼리 번호와 상대 대학", ws, ["② 경북대와 같은 날", "① 숭실대와 같은 날", "① 건국대와 같은 날", "② 부산대와 같은 날", ""]);
+    const itvT = await p.evaluate(() => { const d = window.__dev, c = d.checkStudent;
+    const mk = (t1, t2) => ({ id: "t", cls: 2, name: "가", apps: [{ kind: "수시", univ: "부산대학교(부산)", itv: "2026-11-28", itvTime: t1, status: "지원완료" }, { kind: "수시", univ: "경북대학교(대구)", itv: "2026-11-28", itvTime: t2, status: "지원완료" }] });
+    const w = (st) => c(st).filter((x) => x.code === "면접중복").map((x) => x.lv + ":" + (/겹칩니다/.test(x.msg) ? "over" : /시간은 다릅니다/.test(x.msg) ? "far" : "unknown"));
+    const r = d.readApps([["이름", "대학", "면접일", "면접시각", "고사장"], ["가나", "부산대학교", "2026-11-28", "10시 30분", "인문관 301"], ["다라", "경북대학교", "2026-11-28 14:00", "", ""]]).apps.map((x) => [x.app.itvTime || "", x.app.itvPlace || ""]);
+    const nt = d.noticeText({ name: "가", apps: [{ kind: "수시", univ: "부산대학교", major: "경영학과", type: "논술", itv: "2026-11-28", itvTime: "10:00", itvPlace: "인문관", status: "지원완료" }] }, 400, 2);
+    return { over: w(mk("10:00", "11:30")), far: w(mk("09:00", "15:00")), unk: w(mk("10:00", undefined)), read: r, notice: /논술 10:00 — 부산대 경영학과 \(논술\) \[인문관\]/.test(nt) }; });
+  check("면접 시각: 3시간 안이면 겹침(빨강), 떨어지면 이동 확인(주황), 모르면 확인 요청", [itvT.over, itvT.far, itvT.unk], [["crit:over"], ["warn:far"], ["warn:unknown"]]);
+  check("면접 시각: 파일의 면접시각·고사장(또는 면접일 안의 시각)을 읽음", itvT.read, [["10:30", "인문관 301"], ["14:00", ""]]);
+  check("면접 시각: 안내 문자에 시각·고사장", itvT.notice, true);
+  check("면접 겹침: 같은 날끼리 번호와 상대 대학", ws, ["② 경북대와 같은 날", "① 숭실대와 같은 날", "① 건국대와 같은 날", "② 부산대와 같은 날", ""]);
     await c.close();
   }
 
