@@ -139,6 +139,16 @@ button{cursor:pointer}
 .pvb{display:flex; gap:8px; margin-top:10px} .pvb .doimport{font-size:14px; padding:9px 16px}
 .progt{font-size:12.5px} .progt th,.progt td{padding:6px 10px; white-space:nowrap} .progt td.num{text-align:right; font-variant-numeric:tabular-nums}
 .progt tr.need td:first-child{font-weight:800; color:var(--warn)}
+.dsum{display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:2px 0 10px}
+.dchip{font-size:12.5px; padding:3px 11px; border-radius:999px; background:var(--surface); border:1px solid var(--line); color:var(--ink-2); font-family:inherit}
+.dchip.ok{color:var(--ok); background:var(--ok-soft); border-color:transparent; font-weight:700}
+.dchip.wait{color:var(--warn); background:var(--warn-soft); border-color:transparent; font-weight:700}
+.dchip.bad{color:var(--bad); background:var(--bad-soft); border-color:transparent; font-weight:700}
+.dchip.link{cursor:pointer} .dchip.link:hover{border-color:var(--accent-2); color:var(--accent)}
+.dsum .dlast{margin-left:auto; font-size:11.5px; color:var(--ink-3)}
+.dtabs{display:flex; gap:3px; background:var(--surface-2); padding:3px; border-radius:9px; margin-bottom:12px; width:fit-content; max-width:100%; flex-wrap:wrap}
+.dtab{border:0; background:transparent; color:var(--ink-2); padding:7px 14px; border-radius:7px; font:inherit; font-size:13px; font-weight:600; cursor:pointer}
+.dtab[aria-selected="true"]{background:var(--surface); color:var(--ink); box-shadow:var(--shadow); font-weight:800}
 .tbadge{display:inline-block; min-width:18px; margin-left:5px; padding:0 5px; border-radius:9px; background:var(--bad); color:#fff; font-size:11px; font-weight:700; line-height:18px; text-align:center}
 .adminpage .ahead{display:flex; align-items:baseline; flex-wrap:wrap; gap:4px 10px; margin-bottom:12px}
 .adminpage .ahead h2{font-size:18px; margin:0}
@@ -1653,27 +1663,39 @@ function dateInput(type,value,onchange){
   i.disabled=ro();
   return i;
 }
+var detailTab={};   // 학생마다 고른 탭(처음엔 지원 대학)
+// 맨 위 한 줄 요약: 지원 장수·결과·수능·경고·진로
+function stuSummary(st){
+  var apps=st.apps||[], su=apps.filter(function(a){ return a.kind==="수시"; }).length, js=apps.filter(function(a){ return a.kind==="정시"; }).length;
+  var cnt=function(f){ return apps.filter(f).length; };
+  var box=el("div","dsum");
+  box.appendChild(el("span","dchip",apps.length?"수시 "+su+"장"+(js?" · 정시 "+js+"곳":""):"지원 없음"));
+  var pass=cnt(function(a){ return PASS[a.status]&&a.status!=="등록포기"; }), wait=cnt(function(a){ return a.status==="충원대기"; }), fail=cnt(function(a){ return /불/.test(a.status||""); });
+  var res=[pass?"합격 "+pass:"", wait?"충원대기 "+wait:"", fail?"불합격 "+fail:""].filter(Boolean);
+  if(apps.length) box.appendChild(el("span","dchip"+(pass?" ok":wait?" wait":""),res.length?res.join(" · "):"결과 기다리는 중"));
+  var g=st.csat||{}, ct;
+  if(hasCsat(st)){
+    ct="수능 "+[["kor","국"],["math","수"],["eng","영"]].filter(function(k){ return g[k[0]]; }).map(function(k){ return k[1]+g[k[0]]; }).join(" ");
+    if(g.inq1||g.inq2) ct+=" 탐"+[g.inq1,g.inq2].filter(Boolean).join("·");
+    if(g.his) ct+=" 한"+g.his;
+    if(g.src==="가채점") ct+=" (가채점)";
+  } else ct="수능 성적 없음";
+  var cc=el("button","dchip link",ct); cc.title="수능 성적 탭 열기"; cc.onclick=function(e){ e.stopPropagation(); detailTab[st.id]="csat"; render(); }; box.appendChild(cc);
+  var wn=checkStudent(st).length; if(wn) box.appendChild(el("span","dchip bad","경고 "+wn));
+  if(st.fate) box.appendChild(el("span","dchip","진로: "+st.fate));
+  if(st.updatedAt) box.appendChild(el("span","dlast","마지막 수정 "+fmtWhen(st.updatedAt)+(st.updatedName&&!st.updatedBy?" · "+st.updatedName:"")));
+  return box;
+}
 function detail(st){
-  var d=el("div","detail");
-  if(st.updatedAt){
-    var lb=el("div","lastby");
-    if(st.fate) lb.appendChild(document.createTextNode("최종 진로: "+st.fate+" · "));
-    lb.appendChild(document.createTextNode("마지막 수정 "+fmtWhen(st.updatedAt)));
-    if(st.updatedBy){ lb.appendChild(document.createTextNode(" · ")); var who=el("span","uname"); who.dataset.uid=st.updatedBy; lb.appendChild(who); }
-    else if(st.updatedName) lb.appendChild(document.createTextNode(" · "+st.updatedName));
-    d.appendChild(lb);
-  }
-  if(st.log&&st.log.length){
-    var lbox=d.querySelector(".lastby"); if(!lbox){ lbox=el("div","lastby"); d.appendChild(lbox); }
-    var open=logOpenId===st.id, lbtn=el("button","ghost logbtn",(open?"변경 기록 접기":"변경 기록 "+st.log.length+"건"));
-    lbtn.onclick=function(){ logOpenId=open?null:st.id; render(); };
-    lbox.appendChild(lbtn);
-    if(open){
-      var ll=el("div","loglist");
-      st.log.slice().reverse().forEach(function(e){ ll.appendChild(logRow(e)); });
-      d.appendChild(ll);
-    }
-  }
+  var d=el("div","detail"), tab=detailTab[st.id]||"apps", nn=(st.notes||[]).length;
+  d.appendChild(stuSummary(st));
+  var tbar=el("div","dtabs"); tbar.setAttribute("role","tablist");
+  [["apps","지원 대학 ("+(st.apps||[]).length+")"],["csat","수능 성적"],["notes","상담 기록"+(nn?" ("+nn+")":"")],["etc","기타"]].forEach(function(x){
+    var b=el("button","dtab",x[1]); b.setAttribute("role","tab"); b.setAttribute("aria-selected",String(tab===x[0]));
+    b.onclick=function(e){ e.stopPropagation(); detailTab[st.id]=x[0]; render(); }; tbar.appendChild(b);
+  });
+  d.appendChild(tbar);
+  if(tab==="csat"){
   var cs=el("div","app");
   cs.appendChild(el("div","apphead")).appendChild(el("span","kind","수능 성적"));
   var cg=el("div","grid csat");
@@ -1698,10 +1720,35 @@ function detail(st){
   });
   cs.appendChild(sg);
   d.appendChild(cs);
+    return d;
+  }
+  if(tab==="notes"){ d.appendChild(noteCard(st)); return d; }
+  if(tab==="etc"){
   var fc=el("div","app"), fg=el("div","grid");
   fc.appendChild(el("div","apphead")).appendChild(el("span","kind","최종 진로"));
   fg.appendChild(field("진학하지 않을 때(재수·취업 등)", sel(FATES,st.fate||"",function(v){ st.fate=v; save(st); render(); })));
   fc.appendChild(fg); d.appendChild(fc);
+  if(st.updatedAt){
+    var lb=el("div","lastby");
+    if(st.fate) lb.appendChild(document.createTextNode("최종 진로: "+st.fate+" · "));
+    lb.appendChild(document.createTextNode("마지막 수정 "+fmtWhen(st.updatedAt)));
+    if(st.updatedBy){ lb.appendChild(document.createTextNode(" · ")); var who=el("span","uname"); who.dataset.uid=st.updatedBy; lb.appendChild(who); }
+    else if(st.updatedName) lb.appendChild(document.createTextNode(" · "+st.updatedName));
+    d.appendChild(lb);
+  }
+  if(st.log&&st.log.length){
+    var lbox=d.querySelector(".lastby"); if(!lbox){ lbox=el("div","lastby"); d.appendChild(lbox); }
+    var open=logOpenId===st.id, lbtn=el("button","ghost logbtn",(open?"변경 기록 접기":"변경 기록 "+st.log.length+"건"));
+    lbtn.onclick=function(){ logOpenId=open?null:st.id; render(); };
+    lbox.appendChild(lbtn);
+    if(open){
+      var ll=el("div","loglist");
+      st.log.slice().reverse().forEach(function(e){ ll.appendChild(logRow(e)); });
+      d.appendChild(ll);
+    }
+  }
+    return d;
+  }
   /* 지원 한 건을 한 줄로. 줄을 누르면 그 아래에 고치는 칸이 열린다. 상태는 줄에서 바로 바꾼다. */
   var apps=st.apps||[];
   if(apps.length){
@@ -1867,7 +1914,6 @@ function addRow(d,st){
   b6.onclick=function(){ var t=noticeText(st, 400, st.cls); if(!t){ alert("남은 일정이 없습니다."); return; } copyText(t, function(){ flashBtn(b6,"복사됨 ✓"); }); };
   add.appendChild(b1); add.appendChild(b2); add.appendChild(b4); add.appendChild(b5); add.appendChild(b6); add.appendChild(b3);
   d.appendChild(add);
-  d.appendChild(noteCard(st));
 }
 function addApp(st,kind,jc){
   remember(jc?"전문대 지원 추가":"지원 추가");
@@ -3768,7 +3814,7 @@ function jungsiOf(st){
   o.any=GUN.some(function(g){ return o.gun[g].length; })||o.jc.length||o.none.length;
   return o;
 }
-function openApp(st,a){ openId=st.id; editAppId=a?a.id:null; render();
+function openApp(st,a){ openId=st.id; editAppId=a?a.id:null; if(a) detailTab[st.id]="apps"; render();
   setTimeout(function(){ var h=document.querySelector("#rows [aria-expanded=true]"); if(h) h.scrollIntoView({block:"start"}); },0); }
 /* 정시 후보: 군마다 '대학 학과' 몇 개. 확정하면 실제 정시 지원(지원완료)이 되고 후보에서 빠진다 */
 function jcandOf(st,g){ return (st.jcand&&st.jcand[g])||[]; }

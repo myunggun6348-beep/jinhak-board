@@ -463,7 +463,7 @@ function buildTestPage() {
   check("경고는 학생마다 한 칸(이름·경고 수)", await p.evaluate(() => { const g = [...document.querySelectorAll("#alerts .alert.grp")]; return g.length > 0 && g.every((x) => x.querySelector(".stu b") && x.querySelectorAll("li").length >= 1); }), true);
 
   await p.click(".row >> nth=0 >> .rowhead"); await p.waitForTimeout(200);
-  await p.fill(".detail textarea[name=note]", "학부모 상담 — 정시 가능성 설명"); await p.click(".detail .btn >> text=기록 추가"); await p.waitForTimeout(300);
+  await p.click(".detail .dtab >> text=상담 기록"); await p.waitForTimeout(150); await p.fill(".detail textarea[name=note]", "학부모 상담 — 정시 가능성 설명"); await p.click(".detail .btn >> text=기록 추가"); await p.waitForTimeout(300);
   const nts = await p.evaluate(() => { const S = window.__dev.students(); const s = S.find((x) => (x.notes || []).length); return s ? [s.notes.length, s.notes[0].t, s.notes[0].k, window.__dev.logs().some((e) => e.w.some((w) => /상담 기록 추가/.test(w)))] : null; });
   check("상담 기록: 학생 화면에서 추가, 변경 기록에 남음", nts, [1, "학부모 상담 — 정시 가능성 설명", "학생", true]);
   check("상담 기록: 줄 머리에 상담 수, 반 CSV 단추", await p.evaluate(() => [document.querySelector(".row .cnote") && document.querySelector(".row .cnote").textContent, !document.getElementById("btnNotesCsv").hidden]), ["상담 1", true]);
@@ -505,6 +505,13 @@ function buildTestPage() {
   check("면접 겹침: 같은 날끼리 번호와 상대 대학", ws, ["② 경북대와 같은 날", "① 숭실대와 같은 날", "① 건국대와 같은 날", "② 부산대와 같은 날", ""]);
     await c.close();
   }
+
+  await p.click(".row >> nth=0 >> .rowhead"); await p.waitForTimeout(200); await p.click(".detail .dtab >> nth=0"); await p.waitForTimeout(150);
+  const dv = await p.evaluate(() => { const d = document.querySelector(".detail"); return [!!d.querySelector(".dsum"), [...d.querySelectorAll(".dtab")].map((b) => b.textContent.replace(/\s*\(\d+\)/, "")), !!d.querySelector(".apptable"), !!d.querySelector(".grid.csat")]; });
+  await p.click(".detail .dtab >> text=수능 성적"); await p.waitForTimeout(150);
+  const dv2 = await p.evaluate(() => { const d = document.querySelector(".detail"); return [!!d.querySelector(".grid.csat"), !!d.querySelector(".apptable")]; });
+  await p.click(".detail .dtab >> text=지원 대학"); await p.click(".row >> nth=0 >> .rowhead"); await p.waitForTimeout(100);
+  check("학생 화면: 요약 줄과 탭(지원 대학이 먼저, 수능은 탭으로)", [dv, dv2], [[true, ["지원 대학", "수능 성적", "상담 기록", "기타"], true, false], [true, false]]);
 
   /* ── 자료 지키기(백업 알림) ── */
   const bb = () => p.evaluate(() => { const b = document.getElementById("backupBar"); return [!b.hidden, b.classList.contains("due"), b.textContent]; });
@@ -652,7 +659,7 @@ function buildTestPage() {
   await adm.click("#tabClass"); await adm.waitForTimeout(300);
   check("담임이 고친 결과가 관리자 화면에 실시간", await adm.evaluate(() => document.querySelector(".row .pills").textContent.includes("최초합")), true);
   await adm.click(".row >> nth=0 >> .rowhead"); await adm.waitForTimeout(200);
-  await adm.fill(".detail textarea[name=note]", "학교 장부 상담"); await adm.click(".detail .btn >> text=기록 추가"); await t2.waitForTimeout(2500);
+  await adm.click(".detail .dtab >> text=상담 기록"); await adm.waitForTimeout(150); await adm.fill(".detail textarea[name=note]", "학교 장부 상담"); await adm.click(".detail .btn >> text=기록 추가"); await t2.waitForTimeout(2500);
   check("학교 장부: 상담 기록도 저장되어 담임 화면에 보임", await t2.evaluate(() => { const c = document.querySelector(".row .cnote"); return c && c.textContent; }), "상담 1");
   await adm.click(".row >> nth=0 >> .rowhead"); await adm.waitForTimeout(100);
   const bb1 = await adm.$eval("#backupBar", (b) => [!b.hidden, b.classList.contains("due"), /학교 장부 전체 백업/.test(b.textContent)]);
