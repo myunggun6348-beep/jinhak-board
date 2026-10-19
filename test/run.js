@@ -558,6 +558,27 @@ function buildTestPage() {
     await c.close();
   }
 
+  {
+    const c = await browser.newContext({ viewport: { width: 1200, height: 900 } }); const x = await c.newPage(); x.on("pageerror", (e) => errors.push(String(e)));
+    await x.clock.install({ time: new Date("2026-11-24T08:30:00+09:00") });
+    const A = (id, u, st, ann) => ({ id, kind: "수시", univ: u, major: "경영학과", type: "학종", status: st, ann, c6: true });
+    await x.addInitScript((s) => { if (sessionStorage.getItem("seeded")) return; sessionStorage.setItem("seeded", "1"); localStorage.setItem("jh.local.students", JSON.stringify(s)); localStorage.setItem("jh.cls", "2"); localStorage.setItem("jh.mode", "local"); },
+      [{ id: "s1", cls: 2, no: "30201", name: "가나", apps: [A("a1", "부산대학교", "지원완료", "2026-11-20")] }, { id: "s2", cls: 2, no: "30202", name: "다라", apps: [A("a2", "경북대학교", "지원완료", "2026-12-12")] }]);
+    await x.goto("file://" + page404); await x.waitForTimeout(500);
+    const shown = (sel) => x.$eval(sel, (e) => !!e.offsetParent);
+    const tabs = await x.$$eval("#clsTabs button", (b) => b.map((e) => e.textContent + (e.classList.contains("zero") ? "-" : "")));
+    const s0 = [await shown("#rows"), await shown("#stats")];
+    await x.click("#today .tmore button >> text=결과 넣을 것"); await x.waitForTimeout(200);
+    const s1 = [await shown("#todo"), await shown("#rows"), await x.$eval("#clsTabs button[aria-selected=true]", (b) => b.dataset.t)];
+    await x.click("#clsTabs button >> text=면접 준비"); await x.waitForTimeout(100);
+    const empty = await x.$eval("#viewClass .ctab[data-t=prp] .ctabempty", (e) => !e.hidden && e.textContent);
+    await x.click("#clsTabs button >> text=결과·등록"); await x.click("#todo .who >> text=가나"); await x.waitForTimeout(200);
+    const s2 = [await shown("#rows"), await x.$eval("#clsTabs button[aria-selected=true]", (b) => b.dataset.t)];
+    check("우리 반 탭: 학생 목록이 먼저, '결과 넣을 것 →'은 결과 탭, 빈 탭은 흐리게·안내, 학생 이름 누르면 학생 탭",
+      [tabs, s0, s1, empty, s2], [["학생2", "일정", "면접 준비-", "결과·등록1", "숫자·그래프"], [true, false], [true, false, "res"], "2주 안에 준비할 면접·고사가 없습니다.", [true, "stu"]]);
+    await c.close();
+  }
+
   /* ── 자료 지키기(백업 알림) ── */
   const bb = () => p.evaluate(() => { const b = document.getElementById("backupBar"); return [!b.hidden, b.classList.contains("due"), b.textContent]; });
   let B1 = await bb();
@@ -897,7 +918,7 @@ function buildTestPage() {
     t = await at("2026-12-19T09:00:00+09:00");
     check("12/19: 수시 발표 마감이 지났는데 발표일 없이 지원완료면 결과 입력할 것", [t.r.codes[0].includes("결과 미입력"), t.r.pend], [true, ["30201:annx"]]);
     check("등록했는데 충원 합격: 옮길지 정하기 + 경고", [t.r.reg[1], t.r.codes[1]], ["move", ["충원 합격"]]);
-    await t.x.click("#reg button:has-text('여기로 옮기기')"); await t.x.waitForTimeout(300);
+    await t.x.click("#clsTabs button[data-t=res]"); await t.x.click("#reg button:has-text('여기로 옮기기')"); await t.x.waitForTimeout(300);
     const moved = await t.x.evaluate(() => window.__dev.students().find((s) => s.no === "30202").apps.map((a) => a.univ + ":" + a.status));
     check("여기로 옮기기: 새 곳 등록완료, 원래 곳 등록포기(이중등록 없음)", moved, ["부산대학교:등록완료", "동아대학교:등록포기"]);
     await t.c.close();

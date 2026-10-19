@@ -149,6 +149,11 @@ button{cursor:pointer}
 .dtabs{display:flex; gap:3px; background:var(--surface-2); padding:3px; border-radius:9px; margin-bottom:12px; width:fit-content; max-width:100%; flex-wrap:wrap}
 .dtab{border:0; background:transparent; color:var(--ink-2); padding:7px 14px; border-radius:7px; font:inherit; font-size:13px; font-weight:600; cursor:pointer}
 .dtab[aria-selected="true"]{background:var(--surface); color:var(--ink); box-shadow:var(--shadow); font-weight:800}
+#viewClass .ctab{display:none}
+#viewClass[data-tab="stu"] .ctab[data-t="stu"],#viewClass[data-tab="sch"] .ctab[data-t="sch"],#viewClass[data-tab="prp"] .ctab[data-t="prp"],#viewClass[data-tab="res"] .ctab[data-t="res"],#viewClass[data-tab="num"] .ctab[data-t="num"]{display:block}
+.otabs button.zero{opacity:.5}
+.otabs button .tn{margin-left:5px; font-size:11.5px; font-weight:800; color:var(--accent)}
+.ctabempty{padding:28px 12px; text-align:center; color:var(--ink-3); font-size:13px; background:var(--surface); border:1px dashed var(--line-2); border-radius:var(--radius)}
 #viewAll .otab{display:none}
 #viewAll[data-tab="sum"] .otab[data-t="sum"],#viewAll[data-tab="cls"] .otab[data-t="cls"],#viewAll[data-tab="uni"] .otab[data-t="uni"],#viewAll[data-tab="exam"] .otab[data-t="exam"],#viewAll[data-tab="jun"] .otab[data-t="jun"],#viewAll[data-tab="min"] .otab[data-t="min"],#viewAll[data-tab="res"] .otab[data-t="res"]{display:block}
 .otabs{display:flex; gap:3px; background:var(--surface-2); padding:3px; border-radius:10px; margin:0 0 16px; width:fit-content; max-width:100%; flex-wrap:wrap}
@@ -797,20 +802,20 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
   <div id="backupBar" class="backupbar" hidden></div>
 
   <div class="keydates" id="keydates"></div>
-  <div id="viewClass">
+  <div id="viewClass" data-tab="stu">
     <div class="classbar" id="classbar"></div>
     <div class="lockbar" id="lockbar" hidden></div>
     <div class="backupbar due" id="csatNudge" hidden></div>
     <div class="today" id="today" hidden></div>
     <div class="alerts" id="alerts"></div>
-    <div class="stats" id="stats"></div>
-    <div class="glance" id="glance"></div>
-    <div class="sched" id="sched"></div>
-    <div class="sched" id="prep" hidden></div>
-    <div class="sched" id="todo" hidden></div>
-    <div class="sched" id="afterCsat" hidden></div>
-    <div class="sched" id="reg" hidden></div>
-
+    <div class="otabs" role="tablist" id="clsTabs">
+      <button role="tab" data-t="stu">학생</button><button role="tab" data-t="sch">일정</button><button role="tab" data-t="prp">면접 준비</button><button role="tab" data-t="res">결과·등록</button><button role="tab" data-t="num">숫자·그래프</button>
+    </div>
+    <div class="ctab" data-t="sch"><div class="sched" id="sched"></div></div>
+    <div class="ctab" data-t="prp"><div class="sched" id="prep" hidden></div><div class="sched" id="afterCsat" hidden></div></div>
+    <div class="ctab" data-t="res"><div class="sched" id="todo" hidden></div><div class="sched" id="reg" hidden></div></div>
+    <div class="ctab" data-t="num"><div class="stats" id="stats"></div><div class="glance" id="glance"></div></div>
+    <div class="ctab" data-t="stu">
     <div class="listhead">
       <h2 id="listTitle">학생</h2>
       <span class="cnt" id="listCount"></span>
@@ -884,6 +889,7 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
       </div>
       <div id="importMsg"></div>
     </div>
+  </div>
   </div>
 
   <div id="viewAdmin" hidden><div id="schoolPanel" class="adminpage" hidden></div></div>
@@ -1518,7 +1524,7 @@ function render(){
   renderTodo(document.getElementById("todo"), cls?mine:[], false);
   renderAfterCsat(document.getElementById("afterCsat"), cls?mine:[], false);
   renderReg(document.getElementById("reg"), cls?mine:[], false);
-  var shown=rowFilter(mine); renderRows(shown, cls, mine.length);
+  var shown=rowFilter(mine); renderRows(shown, cls, mine.length); markClsTabs(cls?mine.length:0);
   if(cls&&shown.length!==mine.length) document.getElementById("listCount").textContent=shown.length+" / "+mine.length+"명";
   document.getElementById("btnNotesCsv").hidden=!mine.some(function(x){ return (x.notes||[]).length; });
   renderCsat(cls?mine:[]);
@@ -1638,6 +1644,26 @@ function minShort(raw){
 function annCell(a){ return [a.ann1?"1단계 "+mmdd(a.ann1):"", mmdd(a.ann)].filter(Boolean).join(" / "); }
 function mmdd(s){ var m=String(s||"").match(/^\d{4}-(\d{2})-(\d{2})/); return m?(+m[1])+"/"+(+m[2]):""; }
 
+/* 우리 반 탭: 학생 목록이 먼저. 일정·면접 준비·결과·숫자는 탭으로 */
+function setClsTab(t){
+  document.getElementById("viewClass").dataset.tab=t; lsSet("jh.clstab",t==="stu"?null:t);
+  [].forEach.call(document.querySelectorAll("#clsTabs button"),function(b){ b.setAttribute("aria-selected",String(b.dataset.t===t)); });
+}
+// 탭마다 지금 보일 칸이 있는지: 없으면 흐리게, 열면 '볼 내용 없음'. 학생 탭은 인원, 면접 준비·결과·등록은 건수
+function markClsTabs(n){
+  [].forEach.call(document.querySelectorAll("#viewClass .ctab"),function(c){
+    var t=c.dataset.t, b=document.querySelector("#clsTabs button[data-t="+t+"]");
+    if(t==="stu"){ b.innerHTML=""; b.appendChild(document.createTextNode("학생")); if(n) b.appendChild(el("span","tn",String(n))); return; }
+    var on=[].filter.call(c.children,function(x){ return !x.hidden&&!x.classList.contains("ctabempty")&&!document.body.classList.contains("hide-"+x.id); });
+    var cnt=on.map(function(x){ var k=x.querySelector(".schedhead .cnt"); var m=k&&k.textContent.match(/^(\d+)/); return m?+m[1]:0; }).reduce(function(p,q){ return p+q; },0);
+    b.classList.toggle("zero",!on.length);
+    var label={sch:"일정",prp:"면접 준비",res:"결과·등록",num:"숫자·그래프"}[t];
+    b.innerHTML=""; b.appendChild(document.createTextNode(label)); if(cnt&&(t==="prp"||t==="res")) b.appendChild(el("span","tn",String(cnt)));
+    var em=c.querySelector(".ctabempty");
+    if(!on.length&&!em){ em=el("div","ctabempty"); c.appendChild(em); }
+    if(em){ em.hidden=!!on.length; em.textContent=t==="prp"?"2주 안에 준비할 면접·고사가 없습니다.":t==="res"?"지금 넣을 결과나 등록할 것이 없습니다.":t==="sch"?"다가오는 일정이 없습니다.":"학생을 넣으면 숫자와 그래프가 나옵니다."; }
+  });
+}
 /* 우리 반 찾기·거르기: 이름·학번·대학 찾기 + 전체/경고/결과 기다림/합격/정시 준비 */
 var rowsQ="", rowsF="all";
 var RF=[["all","전체"],["warn","경고"],["wait","결과 기다림"],["pass","합격"],["jun","정시 준비"]];
@@ -2721,8 +2747,8 @@ function renderToday(host, arr, showClass){
   });
   host.appendChild(cols);
   var more=el("div","tmore");
-  if(pend){ var pb=el("button","ghost","결과 넣을 것 "+pend+"건 →"); pb.onclick=function(){ var t=document.getElementById(showClass?"allTodo":"todo"); if(t) t.scrollIntoView({block:"start"}); }; more.appendChild(pb); }
-  if(prep.length){ var rb=el("button","ghost","2~3일 안 면접 준비 덜 됨 "+prep.length+"건 →"); rb.onclick=function(){ var t=document.getElementById(showClass?"allPrep":"prep"); if(t) t.scrollIntoView({block:"start"}); }; more.appendChild(rb); }
+  if(pend){ var pb=el("button","ghost","결과 넣을 것 "+pend+"건 →"); pb.onclick=function(){ if(!showClass) setClsTab("res"); var t=document.getElementById(showClass?"allTodo":"todo"); if(t) t.scrollIntoView({block:"start"}); }; more.appendChild(pb); }
+  if(prep.length){ var rb=el("button","ghost","2~3일 안 면접 준비 덜 됨 "+prep.length+"건 →"); rb.onclick=function(){ if(!showClass) setClsTab("prp"); var t=document.getElementById(showClass?"allPrep":"prep"); if(t) t.scrollIntoView({block:"start"}); }; more.appendChild(rb); }
   if(more.childNodes.length) host.appendChild(more);
 }
 /* ── 수시 합격·등록 ── 합격(최초합·충원합)한 학생은 한 곳만 등록한다. 마감: 최초합은 수시 등록, 충원합은 충원 등록 */
@@ -3931,7 +3957,7 @@ function jungsiOf(st){
   o.any=GUN.some(function(g){ return o.gun[g].length; })||o.jc.length||o.none.length;
   return o;
 }
-function openApp(st,a){ openId=st.id; editAppId=a?a.id:null; if(a) detailTab[st.id]="apps"; render();
+function openApp(st,a){ setClsTab("stu"); openId=st.id; editAppId=a?a.id:null; if(a) detailTab[st.id]="apps"; render();
   setTimeout(function(){ var h=document.querySelector("#rows [aria-expanded=true]"); if(h) h.scrollIntoView({block:"start"}); },0); }
 /* 정시 후보: 군마다 '대학 학과' 몇 개. 확정하면 실제 정시 지원(지원완료)이 되고 후보에서 빠진다 */
 function jcandOf(st,g){ return (st.jcand&&st.jcand[g])||[]; }
@@ -4052,6 +4078,7 @@ function renderJungsi(mine){
 }
 function goStudent(s){
   if(s.cls) setCls(s.cls);
+  setClsTab("stu");
   openId=s.id; editAppId=null;
   switchTab(true); render();
   setTimeout(function(){
@@ -4193,6 +4220,8 @@ function bindStatic(){
   document.querySelectorAll(".tmenu").forEach(function(m){ m.addEventListener("click",function(e){ if(e.target.closest(".tmenu-list button")) m.open=false; }); });
   document.addEventListener("click",function(e){ document.querySelectorAll(".tmenu[open]").forEach(function(m){ if(!m.contains(e.target)) m.open=false; }); });
   document.getElementById("btnBulkRes").onclick=function(){ bulkC.open=!bulkC.open; render(); if(bulkC.open) document.getElementById("bulkPanel").scrollIntoView({block:"start"}); };
+  [].forEach.call(document.querySelectorAll("#clsTabs button"),function(b){ b.onclick=function(){ setClsTab(b.dataset.t); }; });
+  setClsTab(lsGet("jh.clstab")||"stu");
   var allTab=lsGet("jh.alltab")||"sum", va=document.getElementById("viewAll");
   var setAllTab=function(t){ allTab=t; va.dataset.tab=t; lsSet("jh.alltab",t); [].forEach.call(document.querySelectorAll("#allTabs button"),function(b){ b.setAttribute("aria-selected",String(b.dataset.t===t)); }); };
   [].forEach.call(document.querySelectorAll("#allTabs button"),function(b){ b.onclick=function(){ setAllTab(b.dataset.t); }; });
