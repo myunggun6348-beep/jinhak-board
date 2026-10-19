@@ -943,6 +943,17 @@ function buildTestPage() {
     await x.goto("file://" + page404); await x.waitForTimeout(600);
     const td = await x.evaluate(() => { const h = document.getElementById("today"); const cols = [...h.querySelectorAll(".tcol")].map((c) => c.innerText); return [!h.hidden, cols[0], cols[1]]; });
     check("오늘 할 일: 오늘 발표 2건, 내일 면접", [td[0], /발표[\s\S]*가나[\s\S]*발표[\s\S]*다라/.test(td[1]), /면접·고사[\s\S]*가나[\s\S]*경북대/.test(td[2])], [true, true, true]);
+    const btns = await x.$$eval("#today .tcol:first-child .qres", (q) => q.map((e) => e.innerText.replace(/\s+/g, " ")));
+    await x.click("#today .tcol:first-child .sitem:has-text('다라') .qb >> text=충원"); await x.waitForTimeout(200);
+    await x.fill("#today .tcol:first-child .sitem:has-text('다라') .qres input", "12"); await x.press("#today .tcol:first-child .sitem:has-text('다라') .qres input", "Tab"); await x.waitForTimeout(150);
+    await x.click("#today .tcol:first-child .sitem:has-text('가나') .qb >> text=합격"); await x.waitForTimeout(200);
+    const after = await x.evaluate(() => [window.__dev.students().map((s) => s.apps[0].status + (s.apps[0].rank ? ":" + s.apps[0].rank : "")), document.querySelector("#today .tcol").innerText.replace(/\s+/g, " ")]);
+    await x.click("#today .tcol:first-child .sitem:has-text('가나') .linkbtn >> text=되돌리기"); await x.waitForTimeout(200);
+    await x.click("#today .tcol:first-child .sitem:has-text('다라') .linkbtn >> text=되돌리기"); await x.waitForTimeout(200);
+    const undone = await x.evaluate(() => [window.__dev.students().map((s) => s.apps[0].status).join(), document.querySelectorAll("#today .tcol:first-child .qb").length]);
+    check("오늘 발표: 줄마다 합격·충원·불합격 단추, 누르면 저장되고 줄은 남아 예비 번호·되돌리기",
+      [btns, after[0], /✓ 최초합[\s\S]*✓ 충원대기/.test(after[1]), undone],
+      [["합격 충원 불합격", "합격 충원 불합격"], ["최초합", "충원대기:12", "지원완료"], true, ["면접완료,지원완료,지원완료", 6]]);
     await x.click("#btnBulkRes"); await x.waitForTimeout(200);
     const pick = await x.$eval("#bulkPanel select.bulkpick", (s) => [s.value, s.options[s.selectedIndex].textContent]);
     const names = await x.$$eval("#bulkPanel .bulkrow .who", (b) => b.map((e) => e.textContent));

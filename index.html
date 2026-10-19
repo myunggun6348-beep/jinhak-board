@@ -391,6 +391,11 @@ body.landing .gate{margin-top:10px}
 .today .tcol h3{font-size:12px; color:var(--ink-3); margin:0 0 2px; font-weight:700}
 .today .tcol .sitem:first-of-type{border-top:0}
 .today .tmore{display:flex; flex-wrap:wrap; gap:6px; margin-top:8px}
+.qres{margin-left:auto; display:inline-flex; flex-wrap:wrap; gap:4px; align-items:center}
+.qres .qb{border:1px solid var(--line-2); background:var(--surface); border-radius:6px; padding:3px 10px; font:inherit; font-size:12px; font-weight:700; cursor:pointer}
+.qres .qb.ok{color:var(--ok)} .qres .qb.wait{color:var(--warn)} .qres .qb.bad{color:var(--bad)}
+.qres .qb:hover{background:var(--surface-2)} .qres .qb:disabled{opacity:.5; cursor:default}
+.qres input{width:76px; border:1px solid var(--line-2); background:var(--surface); color:var(--ink); border-radius:6px; padding:3px 7px; font:inherit; font-size:12px}
 .today .tnone{font-size:12.5px; color:var(--ink-3); padding:4px 0}
 @media (max-width:760px){ .today .tcols{grid-template-columns:1fr} }
 .bulkrow select,.bulkrow input{border:1px solid var(--line-2); background:var(--surface); color:var(--ink); border-radius:6px; padding:3px 6px; font-size:12.5px; font-family:inherit}
@@ -2658,11 +2663,39 @@ function renderBulk(host, arr, showClass, S, btnId){
     row.appendChild(sp); host.appendChild(row);
   });
 }
+/* ── 오늘 발표 결과 바로 넣기 ── 한 번 누르면 저장. 넣은 줄은 오늘 할 일에 남겨 예비 번호·되돌리기 */
+var todayDone={};   // 지원 id -> {kind, prev}
+var QUICK={ann:[["최초합","합격","ok"],["충원대기","충원","wait"],["불합격","불합격","bad"]], ann1:[["1단계합","1단계 합","ok"],["1단계불","불합격","bad"]]};
+function quickRes(s,a,kind,showClass){
+  var box=el("span","qres"), off=canWrite===false||(demo&&!practice), d=todayDone[a.id];
+  var redraw=function(){ showClass?renderAll():render(); };
+  var find=function(){ var t=st0(s); return {t:t, a:(t.apps||[]).filter(function(y){ return y.id===a.id; })[0]}; };
+  if(d){
+    var st=a.status||"지원완료";
+    box.appendChild(el("span","pill "+(PASS[st]||st==="1단계합"?"s-ok":st==="충원대기"?"s-wait":"s-bad"),"✓ "+st));
+    if(st==="충원대기"){ var rk=document.createElement("input"); rk.placeholder="예비 번호"; rk.value=a.rank||""; rk.disabled=off; rk.setAttribute("aria-label","예비 번호");
+      rk.onchange=function(){ var f=find(); if(!f.a) return; f.a.rank=rk.value.trim(); save(f.t); }; box.appendChild(rk); }
+    var u=el("button","linkbtn","되돌리기"); u.disabled=off;
+    u.onclick=function(){ var f=find(); if(!f.a) return; f.a.status=d.prev; delete todayDone[a.id]; save(f.t); redraw(); };
+    box.appendChild(u); return box;
+  }
+  QUICK[kind].forEach(function(q){
+    var b=el("button","qb "+q[2],q[1]); b.disabled=off; b.title=(s.name||"")+" "+shortUniv(a.univ)+" → "+q[0];
+    b.onclick=function(){ var f=find(); if(!f.a) return; remember("결과 입력"); todayDone[a.id]={kind:kind, prev:f.a.status||"지원완료"}; f.a.status=q[0]; save(f.t); redraw(); };
+    box.appendChild(b);
+  });
+  return box;
+}
 /* ── 오늘 할 일 ── 오늘·내일 일정, 진행 중인 공통 일정, 결과 넣을 것, 준비 덜 된 면접만 맨 위에 */
 function renderToday(host, arr, showClass){
   host.innerHTML="";
   var ev=upcoming(arr,1).filter(function(e){ if(e.kind!=="itv"||!afterCsatApp(e.a)) return true; var v=examVerdict(e.s,e.a); return !(v&&v.v==="skip"); });
   var col={0:[],1:[]}; ev.forEach(function(e){ col[e.d].push(e); });
+  // 방금 결과를 넣은 오늘 발표도 그 자리에 남긴다
+  arr.forEach(function(st){ (st.apps||[]).forEach(function(a){ var d=todayDone[a.id];
+    if(d&&daysTo(d.kind==="ann"?a.ann:a.ann1)===0&&!ev.some(function(e){ return e.a===a; })) col[0].push({s:st,a:a,kind:d.kind,when:d.kind==="ann"?a.ann:a.ann1,d:0}); }); });
+  var KO={itv:0,ann1:1,ann:2,due:3};
+  col[0].sort(function(p,q){ return ((KO[p.kind]||0)-(KO[q.kind]||0))||((p.s.cls||0)-(q.s.cls||0))||String(p.s.no||"").localeCompare(String(q.s.no||""))||String(p.a.univ).localeCompare(String(q.a.univ)); });
   var kd={0:[],1:[]};
   KEYDATES.forEach(function(k){ var d=kdDays(k); if(d.a<=0&&d.b>=0) kd[0].push(k.t+(k.e&&d.b>0?" ("+mdw(k.e)+"까지)":d.b===0&&k.e?" — 마지막 날":"")); else if(d.a===1) kd[1].push(k.t+" 시작"); });
   var pend=arr.length?pending(arr).length:0;
@@ -2680,6 +2713,7 @@ function renderToday(host, arr, showClass){
       var who=el("button","who",(showClass&&s.cls?s.cls+"반 ":"")+(s.name||"")); who.onclick=function(){ goStudent(s); }; r.appendChild(who);
       r.appendChild(el("span","sub",[(a.jc?"전문대 ":"")+shortUniv(a.univ), shortMajor(a.major)].filter(Boolean).join(" ")));
       if(e.kind==="itv"&&prepNeeds(a)&&prepLeft(a).length) r.appendChild(el("span","pill s-bad","준비 "+prepDone(a)+"/"+prepList(a).length));
+      if(p[0]===0&&QUICK[e.kind]) r.appendChild(quickRes(s,a,e.kind,showClass));
       c.appendChild(r);
     });
     if(!kd[p[0]].length&&!col[p[0]].length) c.appendChild(el("div","tnone","일정 없음"));
