@@ -850,7 +850,15 @@ function buildTestPage() {
     const gOf = (no) => (r.g.find((y) => y[0] === no) || [])[1] || {};
     check("붙여넣기: 머리줄 건너뛰고 학번으로 맞춤(순서 섞여도), 빈칸은 자리 지킴", [gOf("30201").kor, gOf("30201").inq1, gOf("30201").inq2, gOf("30201").his, gOf("30202").kor, gOf("30203").kor, gOf("30201").src], ["2", undefined, "4", undefined, "5", undefined, "가채점"]);
     check("붙여넣기 안내: 넣은 학생·못 찾은 줄·잘못된 칸", /학생 2명.*학번·이름으로 맞춤.*못 찾은 줄 1개: 30299 없는학생.*(1~9가 아닌|알아보지 못한) 칸 1개/.test(r.msg), true);
-    check("등급을 다 넣으면 맨 위 알림이 사라짐", r.nudge, false);
+    const sum = await x.$eval("#csatNudge", (e) => !e.hidden && e.classList.contains("csum") && e.innerText.replace(/\s+/g, " "));
+    check("등급을 다 넣으면 맨 위 알림이 가채점 판정 요약으로", /가채점 판정 · 수능 뒤 고사 2건.*안 가도 됨 1.*응시 1/.test(sum || ""), true);
+    await x.click("#csatNudge button >> text=응시 판단 보기"); await x.waitForTimeout(200);
+    check("'응시 판단 보기'는 면접 준비 탭의 응시 판단(맨 위)으로", await x.evaluate(() => [document.querySelector("#clsTabs button[aria-selected=true]").dataset.t, !!document.getElementById("afterCsat").offsetParent, document.querySelector(".ctab[data-t=prp]").firstElementChild.id]), ["prp", true, "afterCsat"]);
+    await x.click("#clsTabs button[data-t=stu]");
+    const gi = await x.$$("#csatPanel input.g");
+    await gi[6].fill("1"); await gi[7].fill("1"); await x.waitForTimeout(500);
+    const sum2 = await x.$eval("#csatNudge", (e) => e.innerText.replace(/\s+/g, " "));
+    check("등급을 고치면 표 밖을 누르지 않아도 판정 요약이 바로 바뀜", [/안 가도 됨/.test(sum2), /응시 2/.test(sum2)], [false, true]);
     await c.close();
   }
   /* 성적 통지 날(12/11): 가채점 학생 알림 → 학교 성적 엑셀(두 줄 머리, 과목마다 선택·표점·백분위·등급) 통째로 붙여넣기 */

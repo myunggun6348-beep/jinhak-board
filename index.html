@@ -410,6 +410,8 @@ body.landing .gate{margin-top:10px}
 .qres .qb.ok{color:var(--ok)} .qres .qb.wait{color:var(--warn)} .qres .qb.bad{color:var(--bad)}
 .qres .qb:hover{background:var(--surface-2)} .qres .qb:disabled{opacity:.5; cursor:default}
 .qres input{width:76px; border:1px solid var(--line-2); background:var(--surface); color:var(--ink); border-radius:6px; padding:3px 7px; font:inherit; font-size:12px}
+.backupbar.csum > span:first-child{display:flex; flex-wrap:wrap; gap:6px; align-items:center}
+.backupbar.csum b{margin-right:4px}
 .today .tnone{font-size:12.5px; color:var(--ink-3); padding:4px 0}
 @media (max-width:760px){ .today .tcols{grid-template-columns:1fr} }
 .bulkrow select,.bulkrow input{border:1px solid var(--line-2); background:var(--surface); color:var(--ink); border-radius:6px; padding:3px 6px; font-size:12.5px; font-family:inherit}
@@ -821,7 +823,7 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
       <button role="tab" data-t="stu">학생</button><button role="tab" data-t="sch">일정</button><button role="tab" data-t="prp">면접 준비</button><button role="tab" data-t="res">결과·등록</button><button role="tab" data-t="num">숫자·그래프</button>
     </div>
     <div class="ctab" data-t="sch"><div class="sched" id="sched"></div></div>
-    <div class="ctab" data-t="prp"><div class="sched" id="prep" hidden></div><div class="sched" id="afterCsat" hidden></div></div>
+    <div class="ctab" data-t="prp"><div class="sched" id="afterCsat" hidden></div><div class="sched" id="prep" hidden></div></div>
     <div class="ctab" data-t="res"><div class="sched" id="todo" hidden></div><div class="sched" id="reg" hidden></div></div>
     <div class="ctab" data-t="num"><div class="stats" id="stats"></div><div class="glance" id="glance"></div></div>
     <div class="ctab" data-t="stu">
@@ -3025,6 +3027,21 @@ function renderCsatNudge(host, mine){
     if(k){ need.push(st); n+=k; }
   });
   if(!after&&need.length) msg="수능이 끝났습니다. 가채점 등급을 넣으면 최저가 있는 수능 뒤 면접·논술·실기 "+n+"건을 갈지 말지 바로 판단합니다. 등급이 없는 학생 "+need.length+"명: "+need.slice(0,5).map(function(st){ return st.name; }).join(", ")+(need.length>5?" 외":"");
+  if(!after&&!need.length&&daysTo(csatDay())<=0){
+    var cnt={}, n2=0;
+    mine.forEach(function(st){ if(!hasCsat(st)) return; (st.apps||[]).forEach(function(a){
+      if(!afterCsatApp(a)||daysTo(a.itv)<0) return; var r=examVerdict(st,a); if(!r) return; cnt[r.v]=(cnt[r.v]||0)+1; n2++; }); });
+    if(n2){
+      host.hidden=false; host.innerHTML=""; host.className="backupbar csum";
+      var t=el("span",null); t.appendChild(el("b",null,(mine.some(function(st){ return st.csat&&st.csat.src==="가채점"; })?"가채점":"수능")+" 판정 · 수능 뒤 고사 "+n2+"건"));
+      VORDER.forEach(function(v){ if(cnt[v]) t.appendChild(el("span","pill "+VERD[v][1],VERD[v][0]+" "+cnt[v])); });
+      host.appendChild(t);
+      var sp2=el("span","sp"), gb=el("button","ghost","응시 판단 보기 →");
+      gb.onclick=function(){ setClsTab("prp"); var p=document.getElementById("afterCsat"); if(p) p.scrollIntoView({block:"start"}); };
+      sp2.appendChild(gb); host.appendChild(sp2); return;
+    }
+  }
+  host.className="backupbar due";
   host.hidden=!msg;
   if(host.hidden) return;
   host.innerHTML="";
@@ -3304,9 +3321,23 @@ function scoreCsv(arr){
       r.ns?r.s:"",r.np?r.p:""].map(function(v){ return v==null?"":v; })); });
   saveCsv(rows, YEAR+"_수능성적_"+(arr[0]&&arr[0].cls?arr[0].cls+"반":"")+".csv");
 }
+var sideTimer=null;
+function refreshSide(){
+  clearTimeout(sideTimer);
+  sideTimer=setTimeout(function(){
+    var cls=getCls(), mine=cls?byClass(cls):[];
+    renderCsatNudge(document.getElementById("csatNudge"), mine);
+    renderAlerts(document.getElementById("alerts"), mine, false);
+    renderToday(document.getElementById("today"), mine, false);
+    renderAfterCsat(document.getElementById("afterCsat"), mine, false);
+    renderPrep(document.getElementById("prep"), mine, false);
+    markClsTabs(mine.length);
+  },250);
+}
 function setGrade(st,k,v,quiet){
   if(!quiet) remember("수능 등급");
   st.csat=st.csat||{}; st.csat[k]=v; if(v&&GK.indexOf(k)>=0) st.csat.src=csatSrcNow(); applyMin(st); save(st);
+  refreshSide();
 }
 function renderLockBar(cls){
   var bar=document.getElementById("lockbar"), m=getMyCls();
