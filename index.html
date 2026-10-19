@@ -839,16 +839,16 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
         <button class="ghost" id="btnUndo" hidden disabled>↶ 되돌리기</button>
         <button class="ghost" id="btnJungsi" title="학생마다 수시 결과와 정시 가·나·다군 지원을 한눈에 봅니다">정시 현황</button>
         <button class="ghost" id="btnBulkRes" title="대학이나 발표일을 고르면 그 지원 학생들의 결과를 한 화면에서 넣습니다">결과 한꺼번에</button>
-        <button class="ghost" id="btnNotice" title="학생마다 남은 면접·발표·충원 마감 일정을 문자로 보내기 좋은 글로 만들어 복사합니다">일정 안내 문자</button>
         <button class="ghost" id="btnCsat" title="반 학생 전체의 수능(가채점) 등급을 표 한 장에 넣고 최저 충족을 바로 봅니다">수능 성적 넣기</button>
-        <details class="tmenu"><summary class="ghost">받기·인쇄 ▾</summary><div class="tmenu-list">
+        <details class="tmenu"><summary class="ghost">더보기 ▾</summary><div class="tmenu-list">
+        <button class="ghost" id="btnNotice" title="학생마다 남은 면접·발표·충원 마감 일정을 문자로 보내기 좋은 글로 만들어 복사합니다">일정 안내 문자</button>
         <button class="ghost" id="btnClassFile" title="이 반 학생·지원 자료를 파일 하나로 받습니다. 학교 메신저·공유 폴더로 다른 선생님과 주고받으세요">우리 반 파일 받기</button>
         <button class="ghost" id="btnCsv">CSV 내려받기</button>
         <button class="ghost" id="btnNotesCsv" hidden title="이 반 학생들의 상담 기록을 엑셀(CSV)로 받습니다">상담 기록 받기</button>
         <button class="ghost" id="btnPrint" title="이 반의 지원·결과를 A4 로 인쇄합니다">인쇄</button>
-        </div></details>
         <button class="ghost" id="btnView" title="반 화면에 보일 칸을 고릅니다">보기 설정</button>
         <button class="ghost" id="btnClearLocal" hidden title="이 브라우저에 저장된 자료만 지웁니다">이 브라우저 자료 지우기</button>
+        </div></details>
       </span>
     </div>
     <div class="sched" id="viewPanel" hidden></div>
@@ -3047,6 +3047,7 @@ function renderCsatNudge(host, mine){
   var after=sc&&daysTo(sc.s)<=0&&!(ja&&daysTo(ja.e)<0), need=[], n=0, msg="";
   if(after){
     mine.forEach(function(st){
+      if(jungsiOf(st).pass.length) return;   // 수시 합격자는 정시 지원 불가
       var live=(st.apps||[]).some(function(a){ return a.kind==="정시"||a.kind==="수시"&&a.mreq&&!parseMin(a.mreq).none&&LIVE[a.status]; })||GUN.some(function(g){ return jcandOf(st,g).length; });
       if(hasCsat(st)?st.csat.src==="가채점"||!hasScore(st)&&live:live) need.push(st);
     });
@@ -4080,7 +4081,7 @@ function renderJungsi(mine){
   var fa=0, fd=0; rows.forEach(function(o){ if(o.pass.length) return; (o.st.apps||[]).forEach(function(a){ if(a.kind==="정시"&&!/불|포기/.test(a.status||"")){ fa++; if(a.filed) fd++; } }); });
   if(fa) sum.appendChild(el("span","pill "+(fd===fa?"s-ok":"s-wait"),"원서 접수 "+fd+"/"+fa+"건"));
   host.appendChild(sum);
-  host.appendChild(el("div","shint","수시에 합격한 학생은(등록을 포기해도) 정시에 지원할 수 없습니다. 4년제 정시는 가·나·다군마다 한 곳, 전문대 정시는 군 제한이 없습니다. 군마다 ‘+ 후보’로 고민 중인 대학을 적어 두고, 정하면 ‘확정’. 원서를 내면 ‘접수 전’을 눌러 ‘접수 ✓’로 바꾸세요."));
+  host.appendChild(el("div","shint","수시에 합격한 학생은(등록을 포기해도) 정시에 지원할 수 없습니다. 4년제 정시는 가·나·다군마다 한 곳, 전문대 정시는 군 제한이 없습니다. 군마다 ‘+ 후보’로 고민 중인 대학을 적어 두고, 정하면 ‘확정’(그 군 지원이 됩니다). 원서를 내면 ‘접수 전’을 눌러 ‘접수 ✓’로 바꾸세요."));
   var tw=el("div","tablewrap"); tw.style.marginTop="8px";
   var t=document.createElement("table"), hr=t.createTHead().insertRow();
   ["학번","이름","수능 (국·수·탐2 합)","수시","가군","나군","다군","전문대","확인할 것"].forEach(function(h){ hr.appendChild(el("th",null,h)); });
@@ -4132,11 +4133,11 @@ function renderJungsi(mine){
           c.appendChild(cb);
         }
       }
-      if((!list.length||jc)&&!lock){
+      if(jc&&!lock){
         var ad=el("button","ghost jadd",list.length?"+ 더":"+ 추가");
         ad.onclick=function(){ addJungsi(st,g,jc); };
         c.appendChild(ad);
-      } else if(!list.length) c.appendChild(el("span","jno","—"));
+      } else if(!list.length&&(lock||!g)) c.appendChild(el("span","jno","—"));
     };
     GUN.forEach(function(g){ cell(o.gun[g],g,false); });
     cell(o.jc,"",true);
@@ -4288,7 +4289,7 @@ function bindStatic(){
   document.getElementById("mergeFile").onchange=function(){ var fl=[].slice.call(this.files||[]); this.value=""; if(fl.length) mergeFiles(fl); };
   document.getElementById("btnClassFile").onclick=classFile;
   document.getElementById("btnView").onclick=function(){ viewOpen=!viewOpen; render(); if(viewOpen) document.getElementById("viewPanel").scrollIntoView({block:"nearest"}); };
-  // 받기·인쇄 메뉴: 고르면 닫고, 바깥을 누르면 닫는다
+  // 더보기 메뉴: 고르면 닫고, 바깥을 누르면 닫는다
   document.querySelectorAll(".tmenu").forEach(function(m){ m.addEventListener("click",function(e){ if(e.target.closest(".tmenu-list button")) m.open=false; }); });
   document.addEventListener("click",function(e){ document.querySelectorAll(".tmenu[open]").forEach(function(m){ if(!m.contains(e.target)) m.open=false; }); });
   document.getElementById("btnBulkRes").onclick=function(){ bulkC.open=!bulkC.open; render(); if(bulkC.open) document.getElementById("bulkPanel").scrollIntoView({block:"start"}); };

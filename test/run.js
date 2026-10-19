@@ -579,6 +579,24 @@ function buildTestPage() {
     await c.close();
   }
 
+  {
+    const c = await browser.newContext({ viewport: { width: 1200, height: 900 } }); const x = await c.newPage(); x.on("pageerror", (e) => errors.push(String(e)));
+    await x.clock.install({ time: new Date("2026-12-11T10:00:00+09:00") });
+    const A = (id, st) => ({ id, kind: "수시", univ: "부산대학교", major: "경영학과", type: "학종", status: st, c6: true });
+    const G = { kor: "3", math: "3", eng: "3", inq1: "3", inq2: "3", his: "3", src: "가채점" };
+    await x.addInitScript((s) => { if (sessionStorage.getItem("seeded")) return; sessionStorage.setItem("seeded", "1"); localStorage.setItem("jh.local.students", JSON.stringify(s)); localStorage.setItem("jh.cls", "2"); localStorage.setItem("jh.mode", "local"); },
+      [{ id: "s1", cls: 2, no: "30201", name: "가나", csat: G, apps: [A("a1", "최초합")] }, { id: "s2", cls: 2, no: "30202", name: "다라", csat: G, apps: [A("a2", "불합격")] }]);
+    await x.goto("file://" + page404); await x.waitForTimeout(500);
+    const nudge = await x.$eval("#csatNudge", (e) => !e.hidden && e.innerText);
+    await x.click("#btnJungsi"); await x.waitForTimeout(200);
+    const cells = await x.$$eval("#jungsiPanel tbody tr", (r) => r.map((tr) => [...tr.querySelectorAll("td.gun")].map((td) => td.innerText.replace(/\s+/g, " ").trim())));
+    const bar = await x.evaluate(() => [...document.querySelectorAll("#viewClass .listhead .sp > button:not([hidden])")].map((b) => b.textContent));
+    check("정시: 성적표 알림에서 수시 합격자는 빼고, 4년제 군 칸은 '+ 후보' 하나, 단추 줄은 4개 + 더보기",
+      [/학생 1명: 다라\./.test(nudge || ""), cells, bar.length <= 4, await x.textContent(".listhead .tmenu > summary")],
+      [true, [["—", "—", "—", "—"], ["+ 후보", "+ 후보", "+ 후보", "+ 추가"]], true, "더보기 ▾"]);
+    await c.close();
+  }
+
   /* ── 자료 지키기(백업 알림) ── */
   const bb = () => p.evaluate(() => { const b = document.getElementById("backupBar"); return [!b.hidden, b.classList.contains("due"), b.textContent]; });
   let B1 = await bb();
@@ -951,7 +969,7 @@ function buildTestPage() {
     await x.goto("file://" + page404); await x.waitForTimeout(500);
     const shown = (id) => x.$eval("#" + id, (e) => getComputedStyle(e).display !== "none");
     const g0 = await shown("glance");
-    await x.click("#btnView"); await x.uncheck("#viewPanel input[name=view-glance]"); await x.waitForTimeout(100);
+    await x.click(".tmenu > summary"); await x.click("#btnView"); await x.uncheck("#viewPanel input[name=view-glance]"); await x.waitForTimeout(100);
     const g1 = await shown("glance");
     await x.reload(); await x.waitForTimeout(500);
     check("보기 설정: 칸 숨기기, 다시 열어도 기억", [g0, g1, await shown("glance")], [true, false, false]);
