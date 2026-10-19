@@ -921,8 +921,17 @@ function buildTestPage() {
       return { c, x, r };
     };
     let t = await at("2026-12-14T09:00:00+09:00");
-    check("12/14: 발표일 없는 지원은 아직 안 잡음, 충원 마감 없는 충원 대기는 알림", [t.r.codes[0], t.r.pend], [["충원 마감 미입력"], []]);
+    check("12/14: 발표일 없는 지원은 아직 안 잡음, 충원 마감 없는 충원 대기도 아직 경고 아님", [t.r.codes[0], t.r.pend], [[], []]);
     await t.c.close();
+    await t.c.close();
+    t = await at("2026-12-27T09:00:00+09:00");
+    const addRow = await t.x.$$eval("#today .tadd .sitem", (r) => r.map((e) => e.innerText.replace(/\s+/g, " ")));
+    check("충원 기간(12/27): 오늘 할 일에 충원 대기(예비 번호)와 [충원 합격][불합격], 공통 마감 2일 전부터 경고", [addRow.length, /예비 12 가나 부산대 경영학 충원 합격 불합격/.test(addRow[0] || ""), t.r.codes[0].includes("충원마감")], [1, true, true]);
+    await t.x.click("#today .tadd .qb >> text=충원 합격"); await t.x.waitForTimeout(250);
+    const after = await t.x.evaluate(() => [window.__dev.students()[0].apps[1].status, document.querySelector("#today .tadd").innerText.replace(/\s+/g, " ")]);
+    check("충원 합격을 누르면 저장되고 줄은 남아 '등록 정하기 →'", [after[0], /✓ 충원합.*등록 정하기/.test(after[1])], ["충원합", true]);
+    await t.x.click("#today .tadd .linkbtn >> text=등록 정하기"); await t.x.waitForTimeout(200);
+    check("'등록 정하기 →'는 결과·등록 탭의 합격·등록으로", await t.x.evaluate(() => [document.querySelector("#clsTabs button[aria-selected=true]").dataset.t, /가나/.test(document.getElementById("reg").innerText)]), ["res", true]);
     t = await at("2026-12-19T09:00:00+09:00");
     check("12/19: 수시 발표 마감이 지났는데 발표일 없이 지원완료면 결과 입력할 것", [t.r.codes[0].includes("결과 미입력"), t.r.pend], [true, ["30201:annx"]]);
     check("등록했는데 충원 합격: 옮길지 정하기 + 경고", [t.r.reg[1], t.r.codes[1]], ["move", ["충원 합격"]]);

@@ -412,6 +412,11 @@ body.landing .gate{margin-top:10px}
 .qres input{width:76px; border:1px solid var(--line-2); background:var(--surface); color:var(--ink); border-radius:6px; padding:3px 7px; font:inherit; font-size:12px}
 .backupbar.csum > span:first-child{display:flex; flex-wrap:wrap; gap:6px; align-items:center}
 .backupbar.csum b{margin-right:4px}
+.today .tadd{grid-column:1/-1; display:flex; flex-direction:column; margin-top:10px; border-top:1px solid var(--line); padding-top:8px}
+.today .taddh{margin-bottom:2px}
+.today .tadd h3{display:inline; font-size:12px; color:var(--ink-3); margin:0 8px 0 0; font-weight:700}
+.today .tadd .tsub{font-size:12px; color:var(--ink-3)}
+.today .taddh + .sitem{border-top:0}
 .today .tnone{font-size:12.5px; color:var(--ink-3); padding:4px 0}
 @media (max-width:760px){ .today .tcols{grid-template-columns:1fr} }
 .bulkrow select,.bulkrow input{border:1px solid var(--line-2); background:var(--surface); color:var(--ink); border-radius:6px; padding:3px 6px; font-size:12.5px; font-family:inherit}
@@ -1079,8 +1084,10 @@ function checkStudent(st){
       var ae=a.due||addEnd(a);
       if(ae&&new Date(ae.replace(" ","T")).getTime()<Date.now())
         out.push({lv:"warn",code:"결과 미입력",msg:(a.univ||"한 곳")+" "+(a.due?"충원 마감("+fmtDue(a.due)+")":(a.kind==="정시"?"정시":"수시")+" 충원 합격 통보 마감("+fmtDue(ae)+")")+"이 지났는데 아직 충원 대기입니다. 충원 합격 연락이 없었으면 불합격으로 바꿔 주세요."});
-      else if(!a.due&&ae)
-        out.push({lv:"warn",code:"충원 마감 미입력",msg:(a.univ||"한 곳")+" 충원 대기인데 충원 마감 일시가 없습니다. 대학 공지의 충원 일정(전화·문자 통보 마감)을 넣으면 마감 임박을 알려 드립니다. "+(a.kind==="정시"?"정시":"수시")+" 충원 통보는 늦어도 "+fmtDue(ae)+"에 끝납니다."});
+      else if(!a.due&&ae){
+        var de=daysTo(ae);   // 대학별 마감을 안 넣었으면 공통 통보 마감이 가까울 때만 알린다(평소엔 경고로 세지 않음)
+        if(de!==null&&de>=0&&de<=2) out.push({lv:"warn",code:"충원마감",msg:(a.univ||"한 곳")+" 충원 대기입니다. "+(a.kind==="정시"?"정시":"수시")+" 충원 합격 통보가 "+fmtDue(ae)+"에 끝납니다("+(de===0?"오늘":de+"일 뒤")+"). 대학별 마감이 더 이르면 지원 고치기에서 충원 마감을 넣으세요."});
+      }
     }
   });
   var kja=kdOf("j-app");
@@ -2703,7 +2710,7 @@ function renderBulk(host, arr, showClass, S, btnId){
 }
 /* ── 오늘 발표 결과 바로 넣기 ── 한 번 누르면 저장. 넣은 줄은 오늘 할 일에 남겨 예비 번호·되돌리기 */
 var todayDone={};   // 지원 id -> {kind, prev}
-var QUICK={ann:[["최초합","합격","ok"],["충원대기","충원","wait"],["불합격","불합격","bad"]], ann1:[["1단계합","1단계 합","ok"],["1단계불","불합격","bad"]]};
+var QUICK={due:[["충원합","충원 합격","ok"],["불합격","불합격","bad"]], ann:[["최초합","합격","ok"],["충원대기","충원","wait"],["불합격","불합격","bad"]], ann1:[["1단계합","1단계 합","ok"],["1단계불","불합격","bad"]]};
 function quickRes(s,a,kind,showClass){
   var box=el("span","qres"), off=canWrite===false||(demo&&!practice), d=todayDone[a.id];
   var redraw=function(){ showClass?renderAll():render(); };
@@ -2713,6 +2720,7 @@ function quickRes(s,a,kind,showClass){
     box.appendChild(el("span","pill "+(PASS[st]||st==="1단계합"?"s-ok":st==="충원대기"?"s-wait":"s-bad"),"✓ "+st));
     if(st==="충원대기"){ var rk=document.createElement("input"); rk.placeholder="예비 번호"; rk.value=a.rank||""; rk.disabled=off; rk.setAttribute("aria-label","예비 번호");
       rk.onchange=function(){ var f=find(); if(!f.a) return; f.a.rank=rk.value.trim(); save(f.t); }; box.appendChild(rk); }
+    if(st==="충원합"&&!showClass){ var rg=el("button","linkbtn","등록 정하기 →"); rg.onclick=function(){ setClsTab("res"); var p=document.getElementById("reg"); if(p) p.scrollIntoView({block:"start"}); }; box.appendChild(rg); }
     var u=el("button","linkbtn","되돌리기"); u.disabled=off;
     u.onclick=function(){ var f=find(); if(!f.a) return; f.a.status=d.prev; delete todayDone[a.id]; save(f.t); redraw(); };
     box.appendChild(u); return box;
@@ -2723,6 +2731,13 @@ function quickRes(s,a,kind,showClass){
     box.appendChild(b);
   });
   return box;
+}
+// 충원 기간(합격자 등록 시작 ~ 충원 통보 마감)인 충원 대기 지원. 방금 넣은 것도 그 자리에 남긴다
+function addWindow(a){ var k=a.kind==="정시"?["j-reg","j-add"]:["s-reg","s-add"], b=kdOf(k[0]), e=kdOf(k[1]); return !!(b&&e&&daysTo(b.s)<=0&&daysTo(e.s)>=0); }
+function addWaiting(arr){
+  var out=[]; arr.forEach(function(st){ (st.apps||[]).forEach(function(a){
+    var d=todayDone[a.id]; if((a.status==="충원대기"||d&&d.kind==="due")&&addWindow(a)) out.push({s:st,a:a}); }); });
+  return out.sort(function(p,q){ return ((p.s.cls||0)-(q.s.cls||0))||String(p.s.no||"").localeCompare(String(q.s.no||"")); });
 }
 /* ── 오늘 할 일 ── 오늘·내일 일정, 진행 중인 공통 일정, 결과 넣을 것, 준비 덜 된 면접만 맨 위에 */
 function renderToday(host, arr, showClass){
@@ -2738,7 +2753,8 @@ function renderToday(host, arr, showClass){
   KEYDATES.forEach(function(k){ var d=kdDays(k); if(d.a<=0&&d.b>=0) kd[0].push(k.t+(k.e&&d.b>0?" ("+mdw(k.e)+"까지)":d.b===0&&k.e?" — 마지막 날":"")); else if(d.a===1) kd[1].push(k.t+" 시작"); });
   var pend=arr.length?pending(arr).length:0;
   var prep=[]; arr.forEach(function(st){ (st.apps||[]).forEach(function(a){ var d=daysTo(a.itv); if(prepNeeds(a)&&d!==null&&d>=2&&d<=3&&prepLeft(a).length) prep.push(a); }); });
-  var any=col[0].length||col[1].length||kd[0].length||kd[1].length||pend||prep.length;
+  var adds=addWaiting(arr);
+  var any=col[0].length||col[1].length||kd[0].length||kd[1].length||pend||prep.length||adds.length;
   host.hidden=!any; if(!any) return;
   var now=new Date(), hd=el("div","th"); hd.appendChild(el("h2",null,"오늘 할 일")); hd.appendChild(el("span",null,mdw(ymdNow()))); host.appendChild(hd);
   var cols=el("div","tcols");
@@ -2758,6 +2774,21 @@ function renderToday(host, arr, showClass){
     cols.appendChild(c);
   });
   host.appendChild(cols);
+  if(adds.length){
+    var ab=el("div","tadd"), ae=kdOf(adds[0].a.kind==="정시"?"j-add":"s-add");
+    var ahd=el("div","taddh"); ab.appendChild(ahd);
+    ahd.appendChild(el("h3",null,"충원 대기 "+adds.filter(function(x){ return x.a.status==="충원대기"; }).length+"명"));
+    ahd.appendChild(el("span","tsub","전화·문자로 충원 합격 연락이 오면 바로 누르세요"+(ae?" · 통보 마감 "+mdw(ae.s)+(ae.time?" "+ae.time:""):"")));
+    adds.forEach(function(x){
+      var s=x.s, a=x.a, r=el("div","sitem");
+      r.appendChild(el("span","sk due",a.rank?"예비 "+a.rank:"충원 대기"));
+      var who=el("button","who",(showClass&&s.cls?s.cls+"반 ":"")+(s.name||"")); who.onclick=function(){ goStudent(s); }; r.appendChild(who);
+      r.appendChild(el("span","sub",[(a.jc?"전문대 ":"")+shortUniv(a.univ), shortMajor(a.major)].filter(Boolean).join(" ")+(a.due?" · 마감 "+fmtDue(a.due):"")));
+      r.appendChild(quickRes(s,a,"due",showClass));
+      ab.appendChild(r);
+    });
+    host.appendChild(ab);
+  }
   var more=el("div","tmore");
   if(pend){ var pb=el("button","ghost","결과 넣을 것 "+pend+"건 →"); pb.onclick=function(){ if(!showClass) setClsTab("res"); var t=document.getElementById(showClass?"allTodo":"todo"); if(t) t.scrollIntoView({block:"start"}); }; more.appendChild(pb); }
   if(prep.length){ var rb=el("button","ghost","2~3일 안 면접 준비 덜 됨 "+prep.length+"건 →"); rb.onclick=function(){ if(!showClass) setClsTab("prp"); var t=document.getElementById(showClass?"allPrep":"prep"); if(t) t.scrollIntoView({block:"start"}); }; more.appendChild(rb); }
