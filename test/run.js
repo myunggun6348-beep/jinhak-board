@@ -460,7 +460,7 @@ function buildTestPage() {
   await p.click("#brandHome"); await p.waitForTimeout(200);
   check("제목 누르면 홈(우리 반 맨 위, 펼친 학생 닫힘)", await p.evaluate(() => [!document.getElementById("viewClass").hidden, document.querySelectorAll(".detail").length]), [true, 0]);
 
-  check("경고는 학생마다 한 칸(이름·경고 수)", await p.evaluate(() => { const g = [...document.querySelectorAll("#alerts .alert.grp")]; return g.length > 0 && g.every((x) => x.querySelector(".stu b") && x.querySelectorAll("li").length >= 1); }), true);
+  check("경고는 종류마다 한 칸(종류·인원, 줄마다 학생 이름)", await p.evaluate(() => { const g = [...document.querySelectorAll("#alerts .alert.kgrp")]; const codes = g.map((x) => x.querySelector(".wc").textContent); return g.length > 0 && new Set(codes).size === codes.length && g.every((x) => /^\d+명$/.test(x.querySelector(".kn").textContent) && x.querySelectorAll("li .who").length >= 1); }), true);
 
   await p.click(".row >> nth=0 >> .rowhead"); await p.waitForTimeout(200);
   await p.click(".detail .dtab >> text=상담 기록"); await p.waitForTimeout(150); await p.fill(".detail textarea[name=note]", "학부모 상담 — 정시 가능성 설명"); await p.click(".detail .btn >> text=기록 추가"); await p.waitForTimeout(300);

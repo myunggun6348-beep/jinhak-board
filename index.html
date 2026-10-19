@@ -328,6 +328,15 @@ body.landing .gate{margin-top:10px}
 .alert .wc{flex:none; font-size:11.5px; font-weight:700; padding:1px 7px; border-radius:5px; background:var(--surface); color:var(--warn); border:1px solid currentColor}
 .alert .wc.crit{color:var(--bad)}
 .alerts .amore{align-self:flex-start}
+.alert.kgrp{display:grid; grid-template-columns:150px minmax(0,1fr); gap:4px 14px; padding:10px 14px; align-items:start}
+.alert.kgrp .khead{display:flex; flex-direction:column; align-items:flex-start; gap:4px}
+.alert.kgrp .kn{font-size:12px; color:var(--ink-3)}
+.alert.kgrp ul{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:4px}
+.alert.kgrp li{display:flex; gap:10px; align-items:baseline; color:var(--ink-2); line-height:1.5}
+.alert.kgrp .who{flex:none; border:0; background:none; padding:0; font:inherit; font-weight:700; color:var(--ink); cursor:pointer}
+.alert.kgrp .who:hover{text-decoration:underline}
+.alert.kgrp .khint{grid-column:2; font-size:12px; color:var(--ink-3); line-height:1.5}
+@media (max-width:640px){ .alert.kgrp{grid-template-columns:1fr} .alert.kgrp .khead{flex-direction:row; align-items:center} .alert.kgrp .khint{grid-column:1} .alert.kgrp li{flex-wrap:wrap; gap:2px 8px} }
 @media (max-width:560px){ .alert.grp{grid-template-columns:1fr} .alert.grp .stu{flex-direction:row; align-items:baseline; gap:8px} }
 .alert .msg{color:var(--ink-2)}
 .alert .msg strong{color:var(--ink); font-weight:700}
@@ -1578,36 +1587,37 @@ function renderStats(host, arr){
     d.appendChild(n1); d.appendChild(k); host.appendChild(d);
   });
 }
-var alertsAll=false;
+
+// 경고는 종류마다 한 칸. 학생마다 첫 문장만 한 줄로, 뒤에 붙는 같은 설명은 칸 아래에 한 번만
+var alertsOpen={};
 function renderAlerts(host, arr, showClass){
   host.innerHTML="";
-  var groups=[];
-  arr.forEach(function(st){
-    var w=checkStudent(st); if(!w.length) return;
-    w.sort(function(x,y){ return (x.lv==="crit"?0:1)-(y.lv==="crit"?0:1); });
-    groups.push({s:st, w:w, crit:w.some(function(x){ return x.lv==="crit"; })});
-  });
-  groups.sort(function(x,y){ return (y.crit-x.crit)||(y.w.length-x.w.length)||((x.s.cls||0)-(y.s.cls||0))||String(x.s.no||"").localeCompare(String(y.s.no||"")); });
-  var LIMIT=8;
-  groups.slice(0,alertsAll?groups.length:LIMIT).forEach(function(g){
-    var box=el("div","alert grp"+(g.crit?" crit":""));
-    var who=el("button","stu"); who.type="button"; who.title="이 학생 보기";
-    who.appendChild(el("b",null,(showClass&&g.s.cls?g.s.cls+"반 ":"")+(g.s.name||"")));
-    who.appendChild(el("span",null,[g.s.no||"","경고 "+g.w.length].filter(Boolean).join(" · ")));
-    who.onclick=function(){ goStudent(g.s); };
-    var ul=document.createElement("ul");
-    g.w.forEach(function(w){
-      var li=document.createElement("li");
-      li.appendChild(el("span","wc"+(w.lv==="crit"?" crit":""),w.code));
-      li.appendChild(el("span",null,w.msg)); ul.appendChild(li);
+  var kinds={}, order=[];
+  arr.forEach(function(st){ checkStudent(st).forEach(function(w){
+    var k=kinds[w.code]; if(!k){ k=kinds[w.code]={code:w.code, crit:false, rows:[]}; order.push(k); }
+    if(w.lv==="crit") k.crit=true;
+    var i=w.msg.indexOf(". ");
+    k.rows.push({s:st, w:w, head:i>0?w.msg.slice(0,i+1):w.msg, rest:i>0?w.msg.slice(i+2):""});
+  }); });
+  order.sort(function(x,y){ return (y.crit-x.crit)||(y.rows.length-x.rows.length); });
+  var LIMIT=5;
+  order.forEach(function(k){
+    k.rows.sort(function(x,y){ return ((x.w.lv==="crit"?0:1)-(y.w.lv==="crit"?0:1))||((x.s.cls||0)-(y.s.cls||0))||String(x.s.no||"").localeCompare(String(y.s.no||"")); });
+    var same=k.rows.length>1&&k.rows[0].rest&&k.rows.every(function(r){ return r.rest===k.rows[0].rest; });
+    var box=el("div","alert kgrp"+(k.crit?" crit":""));
+    var hd=el("div","khead"); hd.appendChild(el("span","wc"+(k.crit?" crit":""),k.code)); hd.appendChild(el("span","kn",k.rows.length+"명"));
+    box.appendChild(hd);
+    var ul=document.createElement("ul"), open=alertsOpen[k.code];
+    k.rows.slice(0,open?k.rows.length:LIMIT).forEach(function(r){
+      var li=document.createElement("li"), who=el("button","who",(showClass&&r.s.cls?r.s.cls+"반 ":"")+(r.s.name||""));
+      who.type="button"; who.title="이 학생 보기"; who.onclick=function(){ goStudent(r.s); };
+      li.appendChild(who); li.appendChild(el("span",null,same?r.head:r.w.msg)); ul.appendChild(li);
     });
-    box.appendChild(who); box.appendChild(ul); host.appendChild(box);
+    if(k.rows.length>LIMIT){ var m=el("button","linkbtn",open?"접기":(k.rows.length-LIMIT)+"명 더 보기"); m.onclick=function(){ alertsOpen[k.code]=!open; render(); }; var lm=document.createElement("li"); lm.appendChild(m); ul.appendChild(lm); }
+    box.appendChild(ul);
+    if(same) box.appendChild(el("div","khint",k.rows[0].rest));
+    host.appendChild(box);
   });
-  if(groups.length>LIMIT){
-    var m=el("button","ghost amore",alertsAll?"접기":"경고가 있는 학생 "+(groups.length-LIMIT)+"명 더 보기");
-    m.onclick=function(){ alertsAll=!alertsAll; render(); };
-    host.appendChild(m);
-  }
 }
 /* ── 짧게 보여주기 ─────────────────────────────
    목록과 표에서만 쓴다. 저장된 값은 그대로다. */
