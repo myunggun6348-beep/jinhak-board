@@ -597,6 +597,21 @@ function buildTestPage() {
     await c.close();
   }
 
+  {
+    const c = await browser.newContext({ viewport: { width: 1200, height: 900 } }); const x = await c.newPage(); x.on("pageerror", (e) => errors.push(String(e))); x.on("dialog", (d) => d.accept());
+    await x.addInitScript((s) => { if (sessionStorage.getItem("seeded")) return; sessionStorage.setItem("seeded", "1"); localStorage.setItem("jh.local.students", JSON.stringify(s)); localStorage.setItem("jh.cls", "2"); localStorage.setItem("jh.mode", "local"); },
+      [{ id: "s1", cls: 2, no: "30201", name: "가나", apps: [{ id: "a1", kind: "수시", univ: "부산대학교", major: "경영학과", type: "학종", status: "등록완료", c6: true }] }]);
+    await x.goto("file://" + page404); await x.waitForTimeout(500);
+    await x.click(".tmenu > summary"); await x.click("#btnRollover"); await x.waitForTimeout(200);
+    const dl = []; x.on("download", (d) => dl.push(d.suggestedFilename()));
+    await x.click("#rolloverPanel button >> text=백업 받기"); await x.click("#rolloverPanel button >> text=실적 받기"); await x.waitForTimeout(400);
+    await x.fill("#rolloverPanel input[name=rollword]", "2027학년도"); const off = await x.$eval("#rolloverPanel .btn.del", (b) => b.disabled);
+    await x.fill("#rolloverPanel input[name=rollword]", "2027학년도 마감"); await x.click("#rolloverPanel .btn.del"); await x.waitForTimeout(500);
+    const left = await x.evaluate(() => [window.__dev.students().length, localStorage.getItem("jh.local.students")]);
+    check("새 학년도로 넘기기(혼자 쓰기): 백업·실적 파일을 받고, 문구를 그대로 쳐야 비워짐", [dl.length, off, left[0], left[1] === null || left[1] === "[]"], [2, true, 0, true]);
+    await c.close();
+  }
+
   /* ── 자료 지키기(백업 알림) ── */
   const bb = () => p.evaluate(() => { const b = document.getElementById("backupBar"); return [!b.hidden, b.classList.contains("due"), b.textContent]; });
   let B1 = await bb();
@@ -758,6 +773,19 @@ function buildTestPage() {
   check("관리자 백업 알림: 처음엔 주황 경고, 받으면 알림 줄은 사라지고 학교 관리 탭에 날짜", [bb1, await adm.$eval("#backupBar", (b) => b.hidden), await adm.$eval("#schoolPanel", (e) => /마지막 전체 백업\(이 컴퓨터\): (?!없음)/.test(e.textContent))], [[true, true, true], true, true]);
   check("담임에게는 백업 알림 없음(자료는 학교 장부에)", await t2.$eval("#backupBar", (b) => b.hidden), true);
   check("학교 장부: 반별 현황에서 백업·되살리기·합치기 단추 감춤(학교 관리 탭으로)", await t2.evaluate(() => ["btnBackup", "btnRestore", "btnMerge"].map((i) => document.getElementById(i).hidden)), [true, true, true]);
+  await adm.click("#tabAdmin"); await adm.waitForTimeout(300);
+  await adm.click("#schoolPanel button >> text=넘기기 시작"); await adm.waitForTimeout(200);
+  const lockedBefore = await adm.$eval("#schoolPanel input[name=rollword]", (e) => e.disabled);
+  await adm.click("#schoolPanel .rstep button >> text=백업 받기"); await adm.click("#schoolPanel .rstep button >> text=실적 받기"); await adm.waitForTimeout(300);
+  await adm.fill("#schoolPanel input[name=rollword]", "2027학년도 마감"); await adm.click("#schoolPanel .btn.del >> text=넘기기"); await t2.waitForTimeout(3000);
+  const stuLeft = Object.keys(KV).filter((k) => /\/students\//.test(k)).length;
+  const t2gate = await gateTitle(t2), pillNew = /새 반 정하기/.test(await adm.innerText("#schoolPanel"));
+  const ti2 = await adm.evaluate(() => { const s = [...document.querySelectorAll("#schoolPanel select[name=cls]")]; const i = s.findIndex((x) => x.closest(".uitem") && /박담임/.test(x.closest(".uitem").textContent)); return i; });
+  await (await adm.$$("#schoolPanel select[name=cls]"))[ti2].selectOption("2"); await t2.waitForTimeout(2500);
+  check("새 학년도로 넘기기(학교 장부): 백업·실적 받기 전엔 잠김, 넘기면 학생 문서 0, 담임은 '새 반 기다리는 중', 새 반을 정하면 빈 반으로 들어감",
+    [lockedBefore, stuLeft, t2gate, pillNew, await gateTitle(t2), /2반/.test(await t2.innerText("#whoChip")), (await rowNames(t2)).includes("김예시")],
+    [true, 0, "새 학년도 담당 반을 기다리는 중입니다", true, "", true, false]);
+  await adm.click("#tabClass");
   const other = await who({ email: "other@x.com", school: "다른고" });
   await other.makeSchool(); await other.waitForTimeout(500);
   check("다른 학교는 서로 안 보임", [Object.keys(KV).filter((k) => /^schools\/[0-9a-f]{40}$/.test(k)).length, (await rowNames(other)).includes("김예시")], [2, false]);
@@ -827,7 +855,7 @@ function buildTestPage() {
   check("위쪽에 누가 로그인했는지(역할·이름·학교)", [await adm.$eval("#whoChip .wrole", (e) => e.textContent), await t2.$eval("#whoChip .wrole", (e) => e.textContent), /박담임/.test(await t2.$eval("#whoChip .wname", (e) => e.textContent))], ["관리자", "2반 담임", true]);
   check("담임에게는 학교 관리 탭이 없음", await t2.$eval("#tabAdmin", (e) => e.hidden), true);
   await adm.click("#tabAdmin"); await adm.waitForTimeout(500);
-  await adm.click("#schoolPanel button >> text=빼기"); await t2.waitForTimeout(2500);
+  await adm.evaluate(() => { const u = [...document.querySelectorAll("#schoolPanel .uitem")].find((x) => /박담임/.test(x.textContent) && x.querySelector("select[name=cls]") && x.querySelector("select[name=cls]").value === "2" && /빼기/.test(x.textContent)); [...u.querySelectorAll("button")].find((b) => b.textContent === "빼기").click(); }); await t2.waitForTimeout(2500);
   check("관리자가 빼면 담임 화면이 막힘", [await gateTitle(t2), (await rowNames(t2)).includes("김예시")], ["진학 현황판", false]);
   await adm.click("#whoChip button >> text=나가기"); await adm.waitForTimeout(1500);
   check("나가기: 관리자도 코드 잊고 로그아웃해 시작 화면으로", [await gateTitle(adm), await adm.evaluate(() => localStorage.getItem("jh.code"))], ["진학 현황판", null]);

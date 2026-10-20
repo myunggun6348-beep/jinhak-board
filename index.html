@@ -417,6 +417,12 @@ body.landing .gate{margin-top:10px}
 .today .tadd h3{display:inline; font-size:12px; color:var(--ink-3); margin:0 8px 0 0; font-weight:700}
 .today .tadd .tsub{font-size:12px; color:var(--ink-3)}
 .today .taddh + .sitem{border-top:0}
+.rstep{display:grid; grid-template-columns:26px minmax(0,1fr) auto; gap:4px 12px; align-items:start; padding:10px 0; border-top:1px solid var(--line)}
+.rstep .n{width:24px; height:24px; border-radius:50%; background:var(--accent); color:var(--on-accent,#fff); display:grid; place-items:center; font-weight:800; font-size:12px}
+.rstep.done .n{background:var(--ok)} .rstep.wait{opacity:.6}
+.rstep .rt{display:flex; flex-direction:column; gap:3px; font-size:13px} .rstep .rt span{font-size:12px; color:var(--ink-3)}
+.rstep .rgo{display:flex; gap:6px; flex-wrap:wrap; margin-top:4px}
+.rstep .rgo input{border:1px solid var(--line-2); background:var(--surface); color:var(--ink); border-radius:7px; padding:6px 9px; font:inherit; font-size:13px; min-width:200px}
 .today .tnone{font-size:12.5px; color:var(--ink-3); padding:4px 0}
 @media (max-width:760px){ .today .tcols{grid-template-columns:1fr} }
 .bulkrow select,.bulkrow input{border:1px solid var(--line-2); background:var(--surface); color:var(--ink); border-radius:6px; padding:3px 6px; font-size:12.5px; font-family:inherit}
@@ -847,6 +853,7 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
         <button class="ghost" id="btnNotesCsv" hidden title="이 반 학생들의 상담 기록을 엑셀(CSV)로 받습니다">상담 기록 받기</button>
         <button class="ghost" id="btnPrint" title="이 반의 지원·결과를 A4 로 인쇄합니다">인쇄</button>
         <button class="ghost" id="btnView" title="반 화면에 보일 칸을 고릅니다">보기 설정</button>
+        <button class="ghost" id="btnRollover" hidden title="올해 자료를 파일로 받아 두고 학생 자료를 비워 새 고3을 맞을 준비를 합니다">새 학년도로 넘기기</button>
         <button class="ghost" id="btnClearLocal" hidden title="이 브라우저에 저장된 자료만 지웁니다">이 브라우저 자료 지우기</button>
         </div></details>
       </span>
@@ -856,6 +863,7 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
     <div class="sched" id="bulkPanel" hidden></div>
     <div class="sched" id="csatPanel" hidden></div>
     <div class="sched" id="noticePanel" hidden></div>
+    <div class="sched" id="rolloverPanel" hidden></div>
     <div class="rfilter" id="rfilter" hidden></div>
     <div class="rows" id="rows"></div>
 
@@ -1550,6 +1558,10 @@ function render(){
   renderBulk(document.getElementById("bulkPanel"), cls?mine:[], false, bulkC, "btnBulkRes");
   renderView();
   renderNotice(cls?mine:[], cls);
+  var rb=document.getElementById("btnRollover"), rp=document.getElementById("rolloverPanel");
+  rb.hidden=!!school||canWrite===false||demo||!list().length;
+  rp.hidden=rb.hidden||!roll.open;
+  if(!rp.hidden){ rp.innerHTML=""; var rh=el("div","schedhead"); rh.appendChild(el("h2",null,"새 학년도로 넘기기")); var rx=el("button","ghost","닫기"); rx.style.marginLeft="auto"; rx.onclick=function(){ roll.open=false; render(); }; rh.appendChild(rx); rp.appendChild(rh); var rbox=el("div"); renderRollover(rbox); rp.appendChild(rbox); }
   renderUndo();
   document.getElementById("btnClearLocal").hidden=!(practice&&!demo);
   curCls=null;
@@ -1663,6 +1675,56 @@ function minShort(raw){
 function annCell(a){ return [a.ann1?"1단계 "+mmdd(a.ann1):"", mmdd(a.ann)].filter(Boolean).join(" / "); }
 function mmdd(s){ var m=String(s||"").match(/^\d{4}-(\d{2})-(\d{2})/); return m?(+m[1])+"/"+(+m[2]):""; }
 
+/* ── 새 학년도로 넘기기 ──
+   입시가 다 끝난 뒤(2월 말) 한 번. 올해 자료를 파일로 받아 둔 다음에만 지운다.
+   지우는 것: 학생(지원·상담·성적), 담임이 넣은 올해 최저 기준표·고사 시간표. 학교·관리자·선생님 가입은 남긴다.
+   학교 장부에서는 선생님 반을 -1(새 반 미정)로 돌려, 관리자가 새 담당 반을 정할 때까지 학생 자료를 받지 않게 한다. */
+var roll={open:false, bk:false, res:false};
+function rollWord(){ return YEAR+"학년도 마감"; }
+function renderRollover(host){
+  host.innerHTML="";
+  var n=demo&&!practice?0:list().length, mins=sharedMins().length, ex=examTable.size, tm=school&&school.admin?((school.members||[]).filter(function(m){ return m.ok&&+m.cls>0; }).length):0;
+  host.appendChild(el("div","shint","정시 추가모집까지 끝난 뒤(2월 말) 한 번 합니다. 학교·관리자·선생님 가입은 그대로 두고, 올해 학생 자료만 파일로 받아 둔 뒤 비웁니다. 지운 뒤에는 받아 둔 백업 파일의 ‘백업 되살리기’로만 되돌릴 수 있습니다."));
+  var step=function(no,title,done,btnText,fn,sub){
+    var r=el("div","rstep"+(done?" done":"")); r.appendChild(el("span","n",done?"✓":String(no)));
+    var t=el("div","rt"); t.appendChild(el("b",null,title)); if(sub) t.appendChild(el("span",null,sub)); r.appendChild(t);
+    if(btnText){ var b=el("button",done?"ghost":"btn sec",done?"다시 받기":btnText); b.onclick=fn; r.appendChild(b); }
+    host.appendChild(r);
+  };
+  step(1,"전체 백업 받기",roll.bk,"백업 받기",function(){ doBackup(); roll.bk=true; rollRedraw(); },"학생·지원·상담·수능 성적 전부. 학교 컴퓨터·USB에 보관하세요(개인정보).");
+  step(2,"진학 실적 받기",roll.res,"실적 받기",function(){ resultsCsv(); roll.res=true; rollRedraw(); },"대학별 합격·등록 인원과 학생별 최종 결과(엑셀). 학년 말 보고용.");
+  var what=["학생 "+n+"명"].concat(mins?["담임이 넣은 최저 기준 "+mins+"건"]:[],ex?["고사 시간표 "+ex+"건"]:[]).join(", ");
+  var r3=el("div","rstep"+(roll.bk&&roll.res?"":" wait")); r3.appendChild(el("span","n","3"));
+  var t3=el("div","rt"); t3.appendChild(el("b",null,"올해 자료 비우기"));
+  t3.appendChild(el("span",null,"지울 것: "+what+"."+(tm?" 선생님 "+tm+"명의 담당 반은 ‘새 반 미정’이 되어, 새 반을 정해 줄 때까지 학생 자료를 볼 수 없습니다.":"")));
+  var row=el("div","rgo"), inp=document.createElement("input"); inp.name="rollword"; inp.placeholder="‘"+rollWord()+"’ 입력"; inp.disabled=!(roll.bk&&roll.res);
+  var go=el("button","btn del","넘기기"); go.disabled=true;
+  inp.oninput=function(){ go.disabled=inp.value.trim()!==rollWord(); };
+  go.onclick=function(){ go.disabled=true; go.textContent="넘기는 중…"; doRollover(); };
+  row.appendChild(inp); row.appendChild(go); t3.appendChild(row);
+  if(!(roll.bk&&roll.res)) t3.appendChild(el("span","rhint","1·2를 받아야 입력할 수 있습니다."));
+  r3.appendChild(t3); host.appendChild(r3);
+}
+function rollRedraw(){ if(school&&school.admin) renderSchoolPanel(); else render(); }
+function doRollover(){
+  var ids=[]; students.forEach(function(v,id){ ids.push(id); });
+  var bt=builtinMin(), jobs=[];
+  if(db&&canWrite!==false&&!demo){
+    ids.forEach(function(id){ jobs.push(db.doc("students/"+id).delete()); });
+    minTable.forEach(function(e,k){ var b=bt.get(k); if(e&&e.text&&(!b||b.text!==e.text)) jobs.push(db.doc("minreq/"+minId(k)).delete()); });
+    examTable.forEach(function(e,k){ jobs.push(db.doc("minreq/"+minId("x|"+k)).delete()); });
+  }
+  if(school&&school.admin) (school.members||[]).forEach(function(m){
+    if(m.ok&&+m.cls>0) jobs.push(fb.S.setDoc(sRef(school.K.room,"members",m.uid),{name:m.name||"",cls:-1,at:m.at||"",ok:true}));
+  });
+  Promise.all(jobs).then(function(){
+    students.clear(); minTable=builtinMin(); examTable=new Map(); todayDone={}; undoStack=[];
+    try{ localStorage.removeItem(LOCAL_KEY); }catch(e){}
+    roll={open:false, bk:false, res:false};
+    render(); rollRedraw();
+    alert("새 학년도로 넘겼습니다.\n\n"+(school&&school.admin?"‘함께 쓰는 선생님’에서 새 담당 반을 정해 주세요. 그 전까지 선생님들은 ‘새 담당 반을 기다리는 중’ 화면을 봅니다.\n":"")+"새 학년도 입시 일정·수능최저 기준은 대학 요강이 나오면 앱 업데이트로 바뀝니다.");
+  },function(e){ alert("다 지우지 못했습니다("+((e&&e.code)||"")+"). 인터넷 연결을 확인하고 다시 눌러 주세요. 받아 둔 백업은 그대로입니다."); rollRedraw(); });
+}
 /* 우리 반 탭: 학생 목록이 먼저. 일정·면접 준비·결과·숫자는 탭으로 */
 function setClsTab(t){
   document.getElementById("viewClass").dataset.tab=t; lsSet("jh.clstab",t==="stu"?null:t);
@@ -4254,6 +4316,7 @@ function bindStatic(){
     csv(byClass(c), "진학현황_"+YEAR+"_"+c+"반.csv");
   };
   document.getElementById("btnClearLocal").onclick=clearLocal;
+  document.getElementById("btnRollover").onclick=function(){ roll.open=true; render(); document.getElementById("rolloverPanel").scrollIntoView({block:"start"}); };
   document.getElementById("univQ").oninput=function(){ openUniv=null; renderUniv(sorted(list())); };
   [["byUniv","univ"],["byMajor","major"]].forEach(function(p){
     document.getElementById(p[0]).onclick=function(){
@@ -5841,6 +5904,12 @@ function waitApproval(K,code,info,mref){
   memberWatch=fb.S.onSnapshot(mref,function(m){
     if(!m.exists()){ try{ localStorage.removeItem(CODE_KEY); }catch(e){} codeGate("관리자가 이 컴퓨터의 가입을 지웠습니다. 필요하면 다시 요청해 주세요."); return; }
     var x=m.data(), c=+x.cls||0;
+    if(x.ok&&c<0){
+      if(school){ var w0=memberWatch; memberWatch=null; leaveSchool(); memberWatch=w0; }   // 이 감시는 남겨 새 반이 정해지면 바로 들어간다
+      var oth=el("button","ghost","다른 코드 넣기"); oth.onclick=function(){ try{ localStorage.removeItem(CODE_KEY); }catch(e){} codeGate("","teacher"); };
+      showGate("새 학년도 담당 반을 기다리는 중입니다", "‘"+(info.name||"학교")+"’ 장부가 새 학년도로 넘어갔습니다. 관리자가 '"+(x.name||"")+"' 선생님의 새 담당 반을 정하면 이 화면이 저절로 바뀝니다.",[oth]);
+      setSync("","새 반 기다리는 중"); render(); return;
+    }
     if(x.ok){
       if(school&&school.cls===c) return;
       if(school){ var w=memberWatch; memberWatch=null; stopWatch(); memberWatch=w; }   // 반이 바뀌었으면 자료를 다시 받는다
@@ -5931,6 +6000,7 @@ function renderSchoolPanel(){
     var r=el("div","uitem"); r.appendChild(el("b",null,m.name||"이름 없음"));
     if(isWait){ r.appendChild(el("span","sub",fmtWhen(m.at)+" 요청"));
       if(ms.some(function(o){ return o.ok&&o.name===m.name&&(+o.cls)===(+m.cls); })) r.appendChild(el("span","pill s-go","이미 승인된 같은 이름·반 — 새 컴퓨터일 수 있음")); }
+    if(!isWait&&+m.cls<0) r.appendChild(el("span","pill s-wait","새 반 정하기"));
     var sp=el("span","sp"), cs=clsSelect(m.cls||0); cs.title="담당 반";
     if(!isWait) cs.onchange=function(){ if(cs.value!=="") put(m,cs.value,true); };
     sp.appendChild(cs);
@@ -6037,6 +6107,11 @@ function renderSchoolPanel(){
   var mb=el("button","ghost","반 파일 합치기"); mb.title="혼자 쓰기로 받은 반 파일을 학교 장부에 합칩니다"; mb.onclick=function(){ document.getElementById("mergeFile").click(); }; br.appendChild(mb);
   bt.appendChild(br);
   bt.appendChild(el("span","shint","원서 접수 뒤·발표 많은 주·학년 말에 한 번씩 받아 두세요. 학교 코드를 잃거나 학교를 지워도 이 파일로 되살릴 수 있습니다. 파일에는 학생 정보가 들어 있으니 학교 컴퓨터·USB에만 보관하세요."));
+
+  // 새 학년도로 넘기기
+  var rt=tile("새 학년도로 넘기기","입시가 다 끝난 2월 말에 한 번","wide");
+  if(!roll.open){ var ro2=el("button","ghost","넘기기 시작…"); ro2.onclick=function(){ roll.open=true; renderSchoolPanel(); }; var rr=el("div","astep"); rr.appendChild(ro2); rr.appendChild(el("span","shint","올해 자료를 받아 두고 학생 자료를 비웁니다. 선생님 가입은 그대로, 담당 반만 새로 정합니다.")); rt.appendChild(rr); }
+  else { var rbx=el("div","rbox"); renderRollover(rbx); rt.appendChild(rbx); var rc=el("button","ghost","그만두기"); rc.onclick=function(){ roll.open=false; renderSchoolPanel(); }; rt.appendChild(rc); }
 
   // 학교 정보
   var it=tile("학교 정보","화면 위에 보이는 이름표");
