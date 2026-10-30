@@ -469,7 +469,7 @@ function buildTestPage() {
   check("상담 기록: 줄 머리에 상담 수, 반 CSV 단추", await p.evaluate(() => [document.querySelector(".row .cnote") && document.querySelector(".row .cnote").textContent, !document.getElementById("btnNotesCsv").hidden]), ["상담 1", true]);
   await p.click(".row >> nth=0 >> .rowhead"); await p.waitForTimeout(100);
 
-  await p.click("#btnJungsi"); await p.waitForTimeout(300);
+  await p.click(".tmenu > summary"); await p.click("#btnJungsi"); await p.waitForTimeout(300);
   const jrow = await p.evaluate(() => { const b = document.querySelector("#jungsiPanel .jcadd"); if (!b) return null; const tr = b.closest("tr"); return [...document.querySelectorAll("#jungsiPanel tbody tr")].indexOf(tr); });
   if (jrow === null) check("정시 후보: 후보 칸이 있음", false, true); else {
     const R2 = (sel) => "#jungsiPanel tbody tr >> nth=" + jrow + " >> " + sel;
@@ -481,7 +481,7 @@ function buildTestPage() {
     const filed = await p.evaluate(() => window.__dev.students().some((s) => (s.apps || []).some((a) => a.kind === "정시" && a.univ === "부경대학교" && a.major === "경영학부" && a.filed && a.group)));
     check("정시 후보: 적고 → 확정하면 그 군 지원, 접수 ✓ 저장", [cand, after, filed], ["후보 · 부경대 경영학부", [false, true, "접수 전"], true]);
   }
-  await p.click("#btnJungsi"); await p.waitForTimeout(100);
+  await p.click(".tmenu > summary"); await p.click("#btnJungsi"); await p.waitForTimeout(100);
 
   check("앱 흔적 없음(설치 단추·manifest·아이콘·서비스 워커 파일 없음, 남은 서비스 워커는 앱이 지움)", [await p.evaluate(() => !document.querySelector("link[rel=manifest],link[rel=icon],link[rel=apple-touch-icon]") && !document.getElementById("btnInstall")), ["manifest.webmanifest", "sw.js", "icons"].some((f) => fs.existsSync(path.join(ROOT, f))), /getRegistrations[\s\S]*unregister/.test(fs.readFileSync(path.join(ROOT, "index.html"), "utf8"))], [true, false, true]);
 
@@ -574,8 +574,16 @@ function buildTestPage() {
     const empty = await x.$eval("#viewClass .ctab[data-t=prp] .ctabempty", (e) => !e.hidden && e.textContent);
     await x.click("#clsTabs button >> text=결과·등록"); await x.click("#todo .who >> text=가나"); await x.waitForTimeout(200);
     const s2 = [await shown("#rows"), await x.$eval("#clsTabs button[aria-selected=true]", (b) => b.dataset.t)];
+    check("요약: 학생 수·확인 필요 인원을 실제 반 자료에서 계산", await x.$$eval("#overview .ov-number", (ns) => ns.map((e) => e.textContent)), ["2명", "1명", "0건", "0명"]);
+    await x.fill("#rfilter input", "다라");
+    await x.click("#overview [data-overview=warn]");
+    check("확인 필요 요약: 이전 검색을 비우고 해당 학생으로 이동", [await x.locator("#rows .row").count(), await x.textContent("#rows .nm"), await x.inputValue("#rfilter input")], [1, "가나", ""]);
+    await x.click("#overview [data-overview=schedule]");
+    check("일정 요약: 일정 탭으로 이동", await x.getAttribute("#viewClass", "data-tab"), "sch");
+    await x.click("#overview [data-overview=all]");
+    check("전체 학생 요약: 학생 목록과 필터를 복원", [await x.locator("#rows .row").count(), await x.getAttribute("#viewClass", "data-tab")], [2, "stu"]);
     check("우리 반 탭: 학생 목록이 먼저, '결과 넣을 것 →'은 결과 탭, 빈 탭은 흐리게·안내, 학생 이름 누르면 학생 탭",
-      [tabs, s0, s1, empty, s2], [["학생2", "일정", "면접 준비-", "결과·등록1", "숫자·그래프"], [true, false], [true, false, "res"], "2주 안에 준비할 면접·고사가 없습니다.", [true, "stu"]]);
+      [tabs, s0, s1, empty, s2], [["학생2", "일정", "결과·등록1", "면접 준비-", "통계"], [true, false], [true, false, "res"], "2주 안에 준비할 면접·고사가 없습니다.", [true, "stu"]]);
     await c.close();
   }
 
@@ -588,7 +596,7 @@ function buildTestPage() {
       [{ id: "s1", cls: 2, no: "30201", name: "가나", csat: G, apps: [A("a1", "최초합")] }, { id: "s2", cls: 2, no: "30202", name: "다라", csat: G, apps: [A("a2", "불합격")] }]);
     await x.goto("file://" + page404); await x.waitForTimeout(500);
     const nudge = await x.$eval("#csatNudge", (e) => !e.hidden && e.innerText);
-    await x.click("#btnJungsi"); await x.waitForTimeout(200);
+    await x.click(".tmenu > summary"); await x.click("#btnJungsi"); await x.waitForTimeout(200);
     const cells = await x.$$eval("#jungsiPanel tbody tr", (r) => r.map((tr) => [...tr.querySelectorAll("td.gun")].map((td) => td.innerText.replace(/\s+/g, " ").trim())));
     const bar = await x.evaluate(() => [...document.querySelectorAll("#viewClass .listhead .sp > button:not([hidden])")].map((b) => b.textContent));
     check("정시: 성적표 알림에서 수시 합격자는 빼고, 4년제 군 칸은 '+ 후보' 하나, 단추 줄은 4개 + 더보기",
@@ -673,7 +681,7 @@ function buildTestPage() {
   };
   const stu = (id, cls, name) => ({ id, cls, no: id, name, updatedAt: "2026-10-01T00:00:00Z", apps: [{ id: "a" + id, kind: "수시", univ: "부산대학교", major: "국어국문학과", type: "학종", status: "지원완료", c6: true, itv: "2026-11-21" }] });
   const adm = await who({ email: "admin@x.com", local: [stu("30201", 2, "김예시"), stu("30501", 5, "박예시")] });
-  check("처음: 선생님/관리자 고르기", await gateTitle(adm), "진학 현황판");
+  check("처음: 선생님/관리자 고르기", await gateTitle(adm), "우리 반의 다음 길, 한눈에 챙기세요.");
   const vis = (x) => x.evaluate(() => getComputedStyle(document.getElementById("viewClass")).display !== "none");
   check("시작 화면: 카드 세 장, 뒤의 예시 화면은 감춤", [await adm.evaluate(() => document.querySelectorAll("#banner .land .choice").length), await vis(adm)], [3, false]);
   await adm.click("#banner .linkbtn >> text=예시 화면 둘러보기"); await adm.waitForTimeout(300);
@@ -856,18 +864,18 @@ function buildTestPage() {
   check("담임에게는 학교 관리 탭이 없음", await t2.$eval("#tabAdmin", (e) => e.hidden), true);
   await adm.click("#tabAdmin"); await adm.waitForTimeout(500);
   await adm.evaluate(() => { const u = [...document.querySelectorAll("#schoolPanel .uitem")].find((x) => /박담임/.test(x.textContent) && x.querySelector("select[name=cls]") && x.querySelector("select[name=cls]").value === "2" && /빼기/.test(x.textContent)); [...u.querySelectorAll("button")].find((b) => b.textContent === "빼기").click(); }); await t2.waitForTimeout(2500);
-  check("관리자가 빼면 담임 화면이 막힘", [await gateTitle(t2), (await rowNames(t2)).includes("김예시")], ["진학 현황판", false]);
+  check("관리자가 빼면 담임 화면이 막힘", [await gateTitle(t2), (await rowNames(t2)).includes("김예시")], ["우리 반의 다음 길, 한눈에 챙기세요.", false]);
   await adm.click("#whoChip button >> text=나가기"); await adm.waitForTimeout(1500);
-  check("나가기: 관리자도 코드 잊고 로그아웃해 시작 화면으로", [await gateTitle(adm), await adm.evaluate(() => localStorage.getItem("jh.code"))], ["진학 현황판", null]);
+  check("나가기: 관리자도 코드 잊고 로그아웃해 시작 화면으로", [await gateTitle(adm), await adm.evaluate(() => localStorage.getItem("jh.code"))], ["우리 반의 다음 길, 한눈에 챙기세요.", null]);
   await adm.reload(); await adm.waitForTimeout(1000);
-  check("나가기: 다시 열어도 시작 화면", await gateTitle(adm), "진학 현황판");
+  check("나가기: 다시 열어도 시작 화면", await gateTitle(adm), "우리 반의 다음 길, 한눈에 챙기세요.");
   const solo = await who({});
   await solo.click("#banner .choice >> text=혼자 쓰기"); await solo.waitForTimeout(500);
   check("혼자 쓰기: 이 브라우저 저장으로 바로", [await solo.$eval("#whoChip", (e) => !e.hidden && /혼자 쓰기/.test(e.textContent)), await solo.$eval("#addPanel", (e) => !e.hidden)], [true, true]);
   await solo.reload(); await solo.waitForTimeout(800);
-  check("혼자 쓰기: 다시 열어도 코드 화면 없이", [await gateTitle(solo) === "진학 현황판", /혼자 쓰기/.test(await solo.innerText("#whoChip"))], [false, true]);
+  check("혼자 쓰기: 다시 열어도 코드 화면 없이", [await gateTitle(solo) === "우리 반의 다음 길, 한눈에 챙기세요.", /혼자 쓰기/.test(await solo.innerText("#whoChip"))], [false, true]);
   await solo.click("#whoChip button >> text=학교 장부로"); await solo.waitForTimeout(900);
-  check("혼자 쓰기 → 학교 장부로: 첫 화면", await gateTitle(solo), "진학 현황판");
+  check("혼자 쓰기 → 학교 장부로: 첫 화면", await gateTitle(solo), "우리 반의 다음 길, 한눈에 챙기세요.");
   await solo.click("#banner .choice >> text=혼자 쓰기"); await solo.waitForTimeout(500);
   await solo.click("#brandHome"); await solo.waitForTimeout(800);
   check("혼자 쓰기: 제목은 우리 반 맨 위(시작 화면으로 안 감)", [await gateTitle(solo), /혼자 쓰기/.test(await solo.innerText("#whoChip")), await solo.evaluate(() => !!document.getElementById("btnHome"))], ["", true, false]);

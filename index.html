@@ -778,6 +778,160 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
   .f input,.f select,.f textarea,.apptable select,input,select,textarea{font-size:16px}
 }
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+/* Focused workspace: quiet surfaces, clear hierarchy, fewer primary actions. */
+:root{
+  --bg:#F6F8F7; --surface-2:#F0F4F2; --surface-3:#E6EDE9;
+  --ink:#1B302B; --ink-2:#566B64; --ink-3:#687E75;
+  --line:#DFE7E2; --line-2:#C9D6CE;
+  --accent:#176B53; --accent-2:#218364; --accent-soft:#E6F2EB;
+  --shadow:0 2px 6px rgba(24,54,42,.025); --radius:14px;
+}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#111A17; --surface:#17231D; --surface-2:#1C2923; --surface-3:#273A30;
+  --ink:#E8F0EA; --ink-2:#B0C3B7; --ink-3:#8CA798;
+  --line:#2A3D32; --line-2:#3F594A; --accent:#91D4AF; --accent-2:#B4E7C9; --accent-soft:#213B2D;
+}}
+:root[data-theme="dark"]{
+  --bg:#111A17; --surface:#17231D; --surface-2:#1C2923; --surface-3:#273A30;
+  --ink:#E8F0EA; --ink-2:#B0C3B7; --ink-3:#8CA798;
+  --line:#2A3D32; --line-2:#3F594A; --accent:#91D4AF; --accent-2:#B4E7C9; --accent-soft:#213B2D;
+}
+body{letter-spacing:-.025em}
+button,a,input,select,textarea{touch-action:manipulation}
+button:disabled{cursor:default}
+.topbar{min-height:68px; padding:12px max(24px,calc((100% - 1152px)/2)); gap:18px}
+.brand{align-items:center; gap:12px}
+.brand:before{content:""; width:34px; height:34px; border-radius:10px; background:var(--accent); flex:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='34' height='34' viewBox='0 0 34 34' fill='none' stroke='white' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m8 13 9-4 9 4-9 4-9-4Zm4 2v6c3 3 7 3 10 0v-6M26 14v7'/%3E%3C/svg%3E")}
+.brand h1{font-size:17px; letter-spacing:-.05em}
+.brand .yr{font-family:inherit; font-size:11px; letter-spacing:0; background:var(--surface-2); padding:4px 8px; border-radius:6px; color:var(--ink-2)}
+.helpbtn{min-height:36px; background:transparent; border-color:var(--line)}
+.tabs{background:var(--surface-2); border-radius:10px}
+.tabs button{padding:8px 15px}
+.wrap{max-width:1200px; padding:22px 24px 72px}
+.keydates{padding:10px 16px; border:1px solid var(--line); border-radius:12px; background:var(--surface); gap:8px 18px; margin-bottom:18px}
+.keydates .kd{border:0; background:transparent; padding:0; border-radius:0; font-size:12px}
+.keydates .kdmore{margin-left:auto; border:0; color:var(--accent)}
+.classbar{gap:7px; margin:0 0 18px}
+.classbar .chip{min-width:40px; min-height:34px; border-radius:9px}
+.classbar .lab{color:var(--ink-2); margin-right:8px}
+.workspace-head{display:flex; justify-content:space-between; gap:12px; align-items:flex-end; margin:0 0 16px}
+.workspace-kicker{display:block; font-size:11px; font-weight:700; letter-spacing:.12em; color:var(--accent); margin-bottom:6px}
+.workspace-head h2{font-size:25px; line-height:1.35; letter-spacing:-.06em; margin:0 0 5px}
+.workspace-head p{font-size:13px; color:var(--ink-2); margin:0}
+.workspace-date{font-size:12px; color:var(--ink-3); white-space:nowrap; padding-bottom:3px}
+.overview{display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-bottom:18px}
+.overview-card{display:flex; flex-direction:column; text-align:left; border:1px solid var(--line); border-radius:14px; background:var(--surface); padding:14px 18px; gap:5px; transition:border-color .15s,background .15s}
+.overview-card:hover{border-color:var(--accent); background:var(--accent-soft)}
+.overview-card .ov-label{display:flex; justify-content:space-between; align-items:center; font-size:12px; font-weight:500; color:var(--ink-2)}
+.overview-card svg{width:17px; height:17px; color:var(--accent); stroke-width:1.6}
+.overview-card .ov-number{font-size:27px; font-weight:700; line-height:1.3; letter-spacing:-.04em; font-variant-numeric:tabular-nums}
+.overview-card .ov-number small{font-size:12px; font-weight:400; color:var(--ink-3); margin-left:5px}
+.overview-card .ov-hint{font-size:11px; color:var(--ink-3)}
+.overview-card.attention .ov-number{color:var(--warn)}
+.overview-card.complete .ov-number{color:var(--ok)}
+.alerts{gap:8px; margin-bottom:18px}
+.alert.kgrp{border-left-width:3px; border-radius:10px; padding:10px 14px; grid-template-columns:126px minmax(0,1fr); font-size:12px}
+.alert.kgrp .khead{flex-direction:row; align-items:center; gap:8px}
+#clsTabs,#addPanel,.sched{scroll-margin-top:100px}
+#clsTabs{width:100%; background:transparent; border-bottom:1px solid var(--line); border-radius:0; gap:6px; padding:0; margin-bottom:24px; flex-wrap:nowrap}
+#clsTabs button{white-space:nowrap; border-radius:0; padding:12px 15px; border-bottom:2px solid transparent; font-size:13px; font-weight:500}
+#clsTabs button[aria-selected="true"]{background:transparent; border-bottom-color:var(--accent); color:var(--accent); box-shadow:none; font-weight:700}
+#clsTabs button[data-t="prp"]{margin-left:auto}
+#clsTabs button.zero{opacity:1; color:var(--ink-3)}
+.listhead{align-items:center; margin-bottom:16px; gap:8px; flex-wrap:wrap}
+.listhead h2{font-size:17px; letter-spacing:-.04em}
+.listhead .sp{align-items:center; flex-wrap:wrap; gap:8px}
+#btnUndo:disabled{display:none}
+.ghost{border-color:var(--line); border-radius:8px; min-height:34px; padding:7px 12px; font-size:12px}
+.btn{border-radius:8px}
+#btnAddStudents{background:var(--accent); border:1px solid var(--accent); color:var(--on-accent); min-height:36px; padding:7px 13px; font-size:12px; font-weight:700}
+.tmenu-list{min-width:218px; padding:8px; border-radius:12px; max-height:min(70vh,520px); overflow:auto}
+.tmenu-list .ghost{min-height:38px; padding:8px 12px}
+.menu-label{font-size:10px; font-weight:700; color:var(--ink-3); letter-spacing:.05em; padding:6px 12px 2px}
+.tmenu-list .menu-label:not(:first-child){border-top:1px solid var(--line); margin-top:4px; padding-top:12px}
+.rfilter{gap:8px; margin-bottom:16px}
+.rfilter input{flex:1 1 250px; max-width:340px; padding:10px 14px; border-radius:9px; border-color:var(--line); font-size:12px; min-height:39px}
+.rfilter .rf{font-size:11.5px; padding:6px 10px; border-color:transparent; background:transparent; min-height:32px}
+.rfilter .rf[aria-pressed="true"]{background:var(--accent-soft); border-color:transparent; color:var(--accent); font-weight:700}
+.rfilter .rf.zero{opacity:1; color:var(--ink-3)}
+.rows{gap:10px}
+.row{box-shadow:none; border-radius:12px; overflow:hidden}
+.row.flag{border-color:var(--line); border-left:3px solid #C38B48}
+.rowhead{min-height:76px; padding:17px 19px; gap:16px}
+.rowhead .no{font-size:11px; width:50px}
+.rowhead .nm{font-size:14px; width:74px}
+.pill{padding:5px 9px; font-size:11px; border:0; border-radius:6px}
+.flagmark{font-size:10px; padding:3px 7px; white-space:nowrap; border-radius:5px}
+.caret{font-size:10px; color:var(--ink-3)}
+.panel{padding:22px; box-shadow:none; margin-top:24px}
+.apsteps{display:none}
+.aphead{margin-bottom:16px}
+.aphead h3{font-size:16px!important}
+.drop{padding:25px 18px; background:var(--bg); border-color:var(--line-2)}
+.drop .hint{max-width:660px}
+.banner{border:1px solid var(--line); background:var(--surface); font-size:12px; padding:12px 16px; border-radius:10px}
+.sched{padding:20px; box-shadow:none}
+.empty-state{padding:40px 20px; border:1px dashed var(--line-2); border-radius:12px; background:var(--surface); color:var(--ink-2)}
+/* Welcome: one concise introduction and three distinct ways to start. */
+body.landing .wrap{max-width:1120px; padding-top:36px}
+.land{max-width:none}
+.land-hero{display:grid; grid-template-columns:1.2fr 1fr; align-items:center; gap:48px; padding:30px 0 42px; text-align:left}
+.land-badge{font-size:11px; padding:6px 10px; border-radius:6px; margin-bottom:5px}
+.gate .land-title{font-size:43px; line-height:1.35; letter-spacing:-.065em; margin:15px 0 16px; max-width:560px; word-break:keep-all}
+.gate .land-sub{font-size:14px; line-height:1.9; max-width:430px}
+.hero-tour{display:inline-flex; align-items:center; gap:24px; margin-top:26px; border:0; border-radius:9px; padding:13px 18px; background:var(--accent); color:var(--on-accent); text-decoration:none; font-size:13px; font-weight:700}
+.hero-tour:after{content:"↗"; font-size:17px}
+.hero-note{font-size:11px; color:var(--ink-3); margin-top:10px}
+.land-preview{background:var(--surface); border:1px solid var(--line); border-radius:18px; padding:24px; box-shadow:0 14px 40px rgba(29,68,45,.05); position:relative}
+.preview-top{display:flex; align-items:center; justify-content:space-between; font-size:12px; color:var(--ink-2); padding-bottom:16px; border-bottom:1px solid var(--line); margin-bottom:6px}
+.preview-top b{color:var(--ink); font-size:13px}
+.preview-top span{font-size:10px; background:var(--accent-soft); color:var(--accent); padding:4px 8px; border-radius:5px}
+.preview-step{display:grid; grid-template-columns:36px 1fr 14px; gap:12px; align-items:center; padding:18px 0; border-bottom:1px solid var(--line)}
+.preview-step:last-child{border:0; padding-bottom:0}
+.preview-step .step-icon{width:36px; height:36px; display:grid; place-items:center; background:var(--accent-soft); border-radius:10px; color:var(--accent)}
+.preview-step svg{width:18px; height:18px}
+.preview-step b{display:block; font-size:13px; margin-bottom:4px}
+.preview-step p{font-size:11px; color:var(--ink-3); margin:0}
+.preview-step .step-arrow{color:var(--ink-3); font-size:14px}
+.start-label{font-size:13px; font-weight:700; margin:0 0 13px}
+.land-cards{gap:12px}
+.land .choice{border-radius:12px; padding:20px; gap:5px; box-shadow:none}
+.land .choice:hover,.land .choice:focus-visible{box-shadow:0 5px 18px rgba(24,70,43,.07); transform:translateY(-2px)}
+.land .ic{width:34px; height:34px; border-radius:9px; margin-bottom:8px}
+.land .ic svg{width:18px; height:18px}
+.land .choice b{font-size:16px; letter-spacing:-.04em}
+.land .tag{font-size:10px; color:var(--ink-3)}
+.land .choice .d{font-size:12px; line-height:1.75; margin-top:3px}
+.land .cta{font-size:12px; margin-top:13px}
+.land-feats{background:transparent; border-radius:0; border-bottom:1px solid var(--line); grid-template-columns:repeat(3,minmax(0,1fr)); gap:20px; padding:23px 0; margin-top:5px}
+.land-feat{font-size:11px; align-items:center}
+.land-feat b{font-size:12px; margin:0}
+.land-foot{justify-content:space-between; font-size:11px; margin-top:18px; color:var(--ink-3)}
+.land-foot a{color:var(--ink-2); text-decoration:none}
+@media(min-width:1000px){.land .choice{display:grid; grid-template-columns:38px 1fr; column-gap:12px}.land .ic{grid-row:1/3}.land .choice .d,.land .choice .cta{grid-column:1/-1}}
+@media(max-width:820px){
+  .topbar{padding:12px 18px; gap:10px; min-height:68px}.brand h1{font-size:15px}.brand .yr{font-size:10px}
+  .land-hero{gap:24px; grid-template-columns:1.1fr 1fr}.gate .land-title{font-size:32px}
+  .land-cards{grid-template-columns:repeat(3,minmax(0,1fr))}.land .choice{padding:16px}
+  .overview-card{padding:14px}.overview-card .ov-hint{font-size:10px}
+}
+@media(max-width:640px){
+  .wrap{padding:20px 16px 56px}.topbar{gap:10px;padding:12px 16px}.brand{gap:8px}.brand:before{width:30px;height:30px;background-position:center}.brand .yr{display:none}.brand h1{font-size:14px}.topbar .tabs button{font-size:12px;padding:7px 10px}.topbar .sync{font-size:10px}.helpbtn{font-size:11px;padding:6px 8px}
+  .workspace-head{align-items:start;margin-bottom:18px}.workspace-head h2{font-size:24px}.workspace-head p{font-size:12px}.workspace-date{font-size:10px}
+  .overview{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:20px}.overview-card{padding:13px 15px;gap:4px}.overview-card .ov-number{font-size:26px}.overview-card .ov-label{font-size:11px}
+  .classbar{gap:5px;margin-bottom:20px}.classbar .chip{min-width:34px;min-height:34px;padding:5px 9px}.classbar .lab{flex-basis:100%;margin-bottom:4px}
+  .keydates{gap:8px 12px;padding:12px}.keydates .kd{font-size:10px}.keydates .kdmore{font-size:10px;margin-left:0}
+  .alert.kgrp{grid-template-columns:1fr;padding:11px 13px}.alert.kgrp .khint{grid-column:1}
+  #clsTabs{overflow-x:auto;gap:0}#clsTabs button{padding:11px 12px;font-size:12px}#clsTabs button[data-t="prp"]{margin-left:8px}
+  .listhead .sp{gap:5px;width:100%;margin-left:0}.listhead h2{font-size:15px}.listhead .ghost{padding:7px 9px;font-size:11px}.listhead #btnAddStudents{padding:8px 10px;font-size:11px}.listhead .tmenu{margin-left:auto}
+  .rfilter input{flex-basis:100%;max-width:none}.rfilter{gap:4px}.rfilter .rf{padding:6px 8px;font-size:11px}
+  .rowhead{gap:8px;padding:15px 12px;flex-wrap:wrap}.rowhead .no{width:44px}.rowhead .nm{width:auto;margin-right:auto}.rowhead .pills{order:5;flex-basis:100%;margin-top:4px}.pill{white-space:normal}.rowhead .flagmark{margin-left:auto}.rowhead .caret{margin-left:5px}
+  .panel,.sched{padding:16px}.aphead span{font-size:11px}.drop{padding:20px 12px}
+  body.landing .wrap{padding-top:16px}.land-hero{grid-template-columns:1fr;padding:16px 0 28px;gap:28px}.gate .land-title{font-size:34px;max-width:400px}.gate .land-sub{font-size:13px}.land-preview{padding:18px}.preview-step{padding:13px 0}
+  .land-cards{grid-template-columns:1fr}.land .choice{display:grid;grid-template-columns:36px 1fr;column-gap:12px;padding:16px}.land .ic{grid-row:1/3;margin:0}.land .choice .d,.land .choice .cta{grid-column:2}.land .choice .cta{margin-top:6px}.land .choice b{font-size:15px}
+  .land-feats{grid-template-columns:1fr;gap:13px;padding:20px 0}.land-foot{font-size:10px}.land-feat{gap:12px}
+}
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;transition:none!important}}
 </style>
 
 <div class="topbar">
@@ -802,7 +956,7 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
     <li><b>들어가기</b> — 초대 링크 → 이름·담당 반 → 가입 요청 → 관리자 승인. 같은 컴퓨터는 다음부터 열기만, 다른 컴퓨터는 위쪽 <b>다른 컴퓨터</b> 링크로.</li>
     <li><b>학생·지원 넣기</b> — 지원 현황 파일(PDF·엑셀·한글)을 끌어다 놓고 <b>미리 보기</b>를 확인한 뒤 <b>넣기</b>.</li>
     <li><b>매일</b> — 맨 위 <b>오늘 할 일</b>과 경고를 보고, 발표가 나면 <b>결과 한꺼번에</b>로 결과를 고릅니다.</li>
-    <li><b>시기마다</b> — 수능 뒤 <b>수능 성적 넣기</b>(응시 판단), 12월 <b>수시 합격·등록</b>, 1월 <b>정시 현황</b>(원서 접수 ✓).</li>
+    <li><b>시기마다</b> — <b>더보기</b>에서 수능 성적 입력과 정시 현황을 확인합니다. 합격·등록 관리는 <b>결과·등록</b> 탭에 있습니다.</li>
   </ol>
   <h3>관리자</h3>
   <ol>
@@ -826,12 +980,17 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
   <div class="keydates" id="keydates"></div>
   <div id="viewClass" data-tab="stu">
     <div class="classbar" id="classbar"></div>
+    <div class="workspace-head">
+      <div><span class="workspace-kicker">우리 반 한눈에</span><h2 id="workspaceTitle">우리 반 진학 현황</h2><p>지원부터 최종 등록까지, 지금 필요한 일부터 확인하세요.</p></div>
+      <time class="workspace-date" id="workspaceDate"></time>
+    </div>
+    <div class="overview" id="overview" aria-label="우리 반 진학 요약"></div>
     <div class="lockbar" id="lockbar" hidden></div>
     <div class="backupbar due" id="csatNudge" hidden></div>
     <div class="today" id="today" hidden></div>
     <div class="alerts" id="alerts"></div>
     <div class="otabs" role="tablist" id="clsTabs">
-      <button role="tab" data-t="stu">학생</button><button role="tab" data-t="sch">일정</button><button role="tab" data-t="prp">면접 준비</button><button role="tab" data-t="res">결과·등록</button><button role="tab" data-t="num">숫자·그래프</button>
+      <button role="tab" data-t="stu">학생</button><button role="tab" data-t="sch">일정</button><button role="tab" data-t="res">결과·등록</button><button role="tab" data-t="prp">면접 준비</button><button role="tab" data-t="num">통계</button>
     </div>
     <div class="ctab" data-t="sch"><div class="sched" id="sched"></div></div>
     <div class="ctab" data-t="prp"><div class="sched" id="afterCsat" hidden></div><div class="sched" id="prep" hidden></div></div>
@@ -843,15 +1002,19 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
       <span class="cnt" id="listCount"></span>
       <span class="sp">
         <button class="ghost" id="btnUndo" hidden disabled>↶ 되돌리기</button>
-        <button class="ghost" id="btnJungsi" title="학생마다 수시 결과와 정시 가·나·다군 지원을 한눈에 봅니다">정시 현황</button>
         <button class="ghost" id="btnBulkRes" title="대학이나 발표일을 고르면 그 지원 학생들의 결과를 한 화면에서 넣습니다">결과 한꺼번에</button>
-        <button class="ghost" id="btnCsat" title="반 학생 전체의 수능(가채점) 등급을 표 한 장에 넣고 최저 충족을 바로 봅니다">수능 성적 넣기</button>
+        <button class="btn" id="btnAddStudents" type="button">＋ 학생·지원 추가</button>
         <details class="tmenu"><summary class="ghost">더보기 ▾</summary><div class="tmenu-list">
+        <span class="menu-label">입시 도구</span>
+        <button class="ghost" id="btnJungsi" title="학생마다 수시 결과와 정시 가·나·다군 지원을 한눈에 봅니다">정시 현황</button>
+        <button class="ghost" id="btnCsat" title="반 학생 전체의 수능(가채점) 등급을 표 한 장에 넣고 최저 충족을 바로 봅니다">수능 성적 넣기</button>
         <button class="ghost" id="btnNotice" title="학생마다 남은 면접·발표·충원 마감 일정을 문자로 보내기 좋은 글로 만들어 복사합니다">일정 안내 문자</button>
+        <span class="menu-label">내보내기·백업</span>
         <button class="ghost" id="btnClassFile" title="이 반 학생·지원 자료를 파일 하나로 받습니다. 학교 메신저·공유 폴더로 다른 선생님과 주고받으세요">우리 반 파일 받기</button>
         <button class="ghost" id="btnCsv">CSV 내려받기</button>
         <button class="ghost" id="btnNotesCsv" hidden title="이 반 학생들의 상담 기록을 엑셀(CSV)로 받습니다">상담 기록 받기</button>
         <button class="ghost" id="btnPrint" title="이 반의 지원·결과를 A4 로 인쇄합니다">인쇄</button>
+        <span class="menu-label">화면·자료 관리</span>
         <button class="ghost" id="btnView" title="반 화면에 보일 칸을 고릅니다">보기 설정</button>
         <button class="ghost" id="btnRollover" hidden title="올해 자료를 파일로 받아 두고 학생 자료를 비워 새 고3을 맞을 준비를 합니다">새 학년도로 넘기기</button>
         <button class="ghost" id="btnClearLocal" hidden title="이 브라우저에 저장된 자료만 지웁니다">이 브라우저 자료 지우기</button>
@@ -1523,6 +1686,30 @@ function setSync(kind,text){
 }
 
 /* ── render: class view ────────────────────── */
+function renderOverview(mine,cls){
+  document.getElementById("workspaceTitle").textContent=cls?"3학년 "+cls+"반 진학 현황":"우리 반 진학 현황";
+  var date=document.getElementById("workspaceDate"), now=new Date();
+  date.textContent=new Intl.DateTimeFormat("ko-KR",{timeZone:"Asia/Seoul",month:"long",day:"numeric",weekday:"long"}).format(now);
+  date.dateTime=new Intl.DateTimeFormat("sv-SE",{timeZone:"Asia/Seoul",year:"numeric",month:"2-digit",day:"2-digit"}).format(now);
+  var host=document.getElementById("overview"); host.innerHTML="";
+  var warnings=mine.filter(function(st){return checkStudent(st).length>0;}).length;
+  var passed=mine.filter(function(st){return rfTest("pass",st);}).length;
+  var registered=mine.filter(function(st){return (st.apps||[]).some(function(a){return a.status==="등록완료";});}).length;
+  [["all","전체 학생",mine.length,"명","우리 반 전체 지원 현황","teacher",""],
+   ["warn","확인 필요",warnings,"명","자동 점검에서 확인할 학생","warn","attention"],
+   ["schedule","7일 이내 일정",upcoming(mine,7).length,"건","면접·고사·발표·충원 마감","cal",""],
+   ["pass","합격·등록 학생",passed,"명","등록 완료 "+registered+"명","check","complete"]].forEach(function(x){
+    var b=el("button","overview-card "+x[6]); b.type="button"; b.dataset.overview=x[0];
+    var label=el("span","ov-label",x[1]), icon=el("span"); icon.innerHTML=LANDICON[x[5]]; icon.setAttribute("aria-hidden","true"); label.appendChild(icon); b.appendChild(label);
+    var num=el("span","ov-number",String(x[2])); num.appendChild(el("small",null,x[3])); b.appendChild(num); b.appendChild(el("span","ov-hint",x[4]));
+    b.onclick=function(){
+      if(x[0]==="schedule") setClsTab("sch");
+      else {rowsQ=""; rowsF=x[0]; var q=document.querySelector("#rfilter input"); if(q)q.value=""; setClsTab("stu"); render();}
+      document.getElementById("clsTabs").scrollIntoView({block:"start"});
+    };
+    host.appendChild(b);
+  });
+}
 function render(){
   persistLocal();
   if(pendingRender) return;
@@ -1535,9 +1722,11 @@ function render(){
   renderClassbar(cls);
   renderLockBar(cls);
   var mine = cls?byClass(cls):[];
+  renderOverview(mine,cls);
   document.getElementById("listTitle").textContent = cls? (cls+"반 학생") : "반을 선택하세요";
   document.getElementById("listCount").textContent = cls? (mine.length+"명") : "";
   document.getElementById("addPanel").hidden = !cls || canWrite===false || locked(cls);
+  document.getElementById("btnAddStudents").hidden=document.getElementById("addPanel").hidden;
   renderCsatNudge(document.getElementById("csatNudge"), mine);
   renderToday(document.getElementById("today"), cls?mine:[], false);
   renderAlerts(document.getElementById("alerts"), mine, false);
@@ -1728,7 +1917,13 @@ function doRollover(){
 /* 우리 반 탭: 학생 목록이 먼저. 일정·면접 준비·결과·숫자는 탭으로 */
 function setClsTab(t){
   document.getElementById("viewClass").dataset.tab=t; lsSet("jh.clstab",t==="stu"?null:t);
-  [].forEach.call(document.querySelectorAll("#clsTabs button"),function(b){ b.setAttribute("aria-selected",String(b.dataset.t===t)); });
+  [].forEach.call(document.querySelectorAll("#clsTabs button"),function(b){
+    var selected=b.dataset.t===t, id="class-panel-"+b.dataset.t;
+    b.setAttribute("aria-selected",String(selected)); b.tabIndex=selected?0:-1;
+    b.id="class-tab-"+b.dataset.t; b.setAttribute("aria-controls",id);
+    var panel=document.querySelector('#viewClass .ctab[data-t="'+b.dataset.t+'"]');
+    panel.id=id; panel.setAttribute("role","tabpanel"); panel.setAttribute("aria-labelledby",b.id);
+  });
 }
 // 탭마다 지금 보일 칸이 있는지: 없으면 흐리게, 열면 '볼 내용 없음'. 학생 탭은 인원, 면접 준비·결과·등록은 건수
 function markClsTabs(n){
@@ -1738,7 +1933,7 @@ function markClsTabs(n){
     var on=[].filter.call(c.children,function(x){ return !x.hidden&&!x.classList.contains("ctabempty")&&!document.body.classList.contains("hide-"+x.id); });
     var cnt=on.map(function(x){ var k=x.querySelector(".schedhead .cnt"); var m=k&&k.textContent.match(/^(\d+)/); return m?+m[1]:0; }).reduce(function(p,q){ return p+q; },0);
     b.classList.toggle("zero",!on.length);
-    var label={sch:"일정",prp:"면접 준비",res:"결과·등록",num:"숫자·그래프"}[t];
+    var label={sch:"일정",prp:"면접 준비",res:"결과·등록",num:"통계"}[t];
     b.innerHTML=""; b.appendChild(document.createTextNode(label)); if(cnt&&(t==="prp"||t==="res")) b.appendChild(el("span","tn",String(cnt)));
     var em=c.querySelector(".ctabempty");
     if(!on.length&&!em){ em=el("div","ctabempty"); c.appendChild(em); }
@@ -4330,6 +4525,10 @@ function bindStatic(){
     jungsiOpen=!jungsiOpen; render();
     if(jungsiOpen) document.getElementById("jungsiPanel").scrollIntoView({block:"start"});
   };
+  document.getElementById("btnAddStudents").onclick=function(){
+    var panel=document.getElementById("addPanel");
+    panel.scrollIntoView({block:"start"}); document.getElementById("btnPick").focus({preventScroll:true});
+  };
   document.getElementById("btnNotice").onclick=function(){
     noticeOpen=!noticeOpen; render();
     if(noticeOpen) document.getElementById("noticePanel").scrollIntoView({block:"start"});
@@ -4356,7 +4555,18 @@ function bindStatic(){
   document.querySelectorAll(".tmenu").forEach(function(m){ m.addEventListener("click",function(e){ if(e.target.closest(".tmenu-list button")) m.open=false; }); });
   document.addEventListener("click",function(e){ document.querySelectorAll(".tmenu[open]").forEach(function(m){ if(!m.contains(e.target)) m.open=false; }); });
   document.getElementById("btnBulkRes").onclick=function(){ bulkC.open=!bulkC.open; render(); if(bulkC.open) document.getElementById("bulkPanel").scrollIntoView({block:"start"}); };
-  [].forEach.call(document.querySelectorAll("#clsTabs button"),function(b){ b.onclick=function(){ setClsTab(b.dataset.t); }; });
+  [].forEach.call(document.querySelectorAll("#clsTabs button"),function(b){
+    b.onclick=function(){ setClsTab(b.dataset.t); };
+    b.onkeydown=function(e){
+      var buttons=[].slice.call(document.querySelectorAll("#clsTabs button")), i=buttons.indexOf(b);
+      if(e.key==="ArrowRight")i=(i+1)%buttons.length;
+      else if(e.key==="ArrowLeft")i=(i+buttons.length-1)%buttons.length;
+      else if(e.key==="Home")i=0;
+      else if(e.key==="End")i=buttons.length-1;
+      else return;
+      e.preventDefault(); setClsTab(buttons[i].dataset.t); buttons[i].focus();
+    };
+  });
   setClsTab(lsGet("jh.clstab")||"stu");
   var allTab=lsGet("jh.alltab")||"sum", va=document.getElementById("viewAll");
   var setAllTab=function(t){ allTab=t; va.dataset.tab=t; lsSet("jh.alltab",t); [].forEach.call(document.querySelectorAll("#allTabs button"),function(b){ b.setAttribute("aria-selected",String(b.dataset.t===t)); }); };
@@ -5540,11 +5750,22 @@ function clsSelect(val){
 var LANDICON={"teacher":"<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"8\" r=\"4\"/><path d=\"M4 21c0-4 3.6-7 8-7s8 3 8 7\"/></svg>","admin":"<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M3 21h18M5 21V10l7-5 7 5v11M9 21v-6h6v6\"/></svg>","solo":"<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"3\" y=\"4\" width=\"18\" height=\"12\" rx=\"2\"/><path d=\"M8 20h8M12 16v4\"/></svg>","warn":"<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 3 2 20h20L12 3z\"/><path d=\"M12 10v4M12 17h.01\"/></svg>","cal":"<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"3\" y=\"5\" width=\"18\" height=\"16\" rx=\"2\"/><path d=\"M3 10h18M8 3v4M16 3v4\"/></svg>","check":"<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"m8 12 3 3 5-6\"/></svg>","lock":"<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"4\" y=\"11\" width=\"16\" height=\"10\" rx=\"2\"/><path d=\"M8 11V7a4 4 0 0 1 8 0v4\"/></svg>"};
 function landingPage(err){
   var land=el("div","land"), hero=el("div","land-hero");
-  hero.appendChild(el("span","land-badge",YEAR+"학년도 · 고3 담임용"));
-  hero.appendChild(el("h2","land-title","진학 현황판"));
-  hero.appendChild(el("p","land-sub","수시·정시 지원부터 합격·등록까지, 우리 반 진학을 한 화면에서 챙깁니다."));
+  var copy=el("div","hero-copy");
+  copy.appendChild(el("span","land-badge",YEAR+"학년도 · 고3 담임을 위한 진학 관리"));
+  copy.appendChild(el("h2","land-title","우리 반의 다음 길, 한눈에 챙기세요."));
+  copy.appendChild(el("p","land-sub","수시·정시 지원부터 합격과 등록까지. 흩어진 진학 자료를 모으고, 놓치기 쉬운 일정과 확인할 학생을 먼저 보여 드립니다."));
+  var tour=el("button","linkbtn hero-tour","예시 화면 둘러보기");
+  copy.appendChild(tour); copy.appendChild(el("div","hero-note","가입 없이, 예시 학생으로 먼저 살펴보세요.")); hero.appendChild(copy);
+  var preview=el("div","land-preview"), top=el("div","preview-top");
+  top.appendChild(el("b",null,"매일의 진학 관리, 세 가지면 충분해요")); top.appendChild(el("span",null,"사용 흐름")); preview.appendChild(top);
+  [["teacher","학생별 지원 현황","학생을 선택해 대학·전형·진행 상태 확인"],["cal","다가오는 일정","면접·발표·충원 마감을 날짜순으로"],["check","합격부터 최종 등록까지","결과를 입력하고 등록 여부까지 점검"]].forEach(function(x){
+    var step=el("div","preview-step"), icon=el("span","step-icon"); icon.innerHTML=LANDICON[x[0]]; icon.setAttribute("aria-hidden","true"); step.appendChild(icon);
+    var text=el("div"); text.appendChild(el("b",null,x[1])); text.appendChild(el("p",null,x[2])); step.appendChild(text); step.appendChild(el("span","step-arrow","↗")); preview.appendChild(step);
+  });
+  hero.appendChild(preview);
   land.appendChild(hero);
   if(err) land.appendChild(el("p","err",err));
+  land.appendChild(el("p","start-label","선생님에게 맞는 방법으로 시작하세요"));
   var cards=el("div","land-cards");
   var card=function(cls,icon,tag,title,desc,cta,fn){
     var c=el("button","choice"+(cls?" "+cls:"")); c.type="button";
@@ -5552,26 +5773,25 @@ function landingPage(err){
     c.appendChild(el("span","tag",tag)); c.appendChild(el("b",null,title)); c.appendChild(el("span","d",desc)); c.appendChild(el("span","cta",cta+" →"));
     c.onclick=fn; cards.appendChild(c);
   };
-  card("","teacher","초대 링크를 받았다면","선생님입니다","관리자가 보낸 링크와 가입 암호로 가입해요. 승인되면 우리 반 학생만 보고 고칩니다.","가입하기",function(){ codeGate("","teacher"); });
-  card("","admin","학교에서 처음 시작한다면","관리자입니다","구글로 로그인해 학교를 만들고 담임 선생님들을 초대해요. 모든 반을 봅니다.","학교 만들기",function(){ codeGate("","admin"); });
-  card("solo","solo","로그인 없이 바로","혼자 쓰기","이 컴퓨터(브라우저)에만 저장해요. 나중에 학교 장부로 옮길 수 있어요.","바로 시작",function(){
+  card("","teacher","학교 초대를 받으셨나요?","선생님입니다","초대 링크로 가입하고, 승인 후 우리 반 자료를 관리합니다.","초대받은 학교에 참여",function(){ codeGate("","teacher"); });
+  card("","admin","학교에서 함께 사용하려면","관리자입니다","학교를 만들고 담임 선생님을 초대해 학년 전체를 확인합니다.","학교 만들기",function(){ codeGate("","admin"); });
+  card("solo","solo","로그인 없이 내 컴퓨터에서","혼자 쓰기","이 브라우저에 저장합니다. 다른 기기로 옮길 때는 백업 파일을 이용하세요.","바로 시작",function(){
     setLocalMode("local"); leaveSchool(); canWrite=null; setLanding(false);
     var b=document.getElementById("banner"); b.className="banner"; b.hidden=false;
     startPractice();
   });
   land.appendChild(cards);
   var feats=el("div","land-feats");
-  [["warn","저절로 점검","6장 초과·군 중복·이중등록·최저 미충족을 바로 알려 줘요"],
-   ["cal","일정 챙기기","면접·발표·충원 마감을 D-day와 달력으로, 휴대폰 달력에도"],
-   ["check","수능최저 판정","등급만 넣으면 지원마다 충족·미충족을 가려요"],
-   ["lock","안전하게 저장","학생 자료는 학교 코드로 잠가서 저장해요"]].forEach(function(x){
+  [["warn","지원·등록 자동 점검","6장 초과 · 군 중복 · 이중등록"],
+   ["cal","놓치기 쉬운 마감 확인","면접 · 합격자 발표 · 충원 일정"],
+   ["lock","학교 자료는 암호화 저장","담임은 우리 반, 관리자는 전체 반"]].forEach(function(x){
     var f0=el("div","land-feat"), sv=el("span"); sv.innerHTML=LANDICON[x[0]]; f0.appendChild(sv.firstChild);
     var tx=el("div"); tx.appendChild(el("b",null,x[1])); tx.appendChild(document.createTextNode(x[2])); f0.appendChild(tx); feats.appendChild(f0);
   });
   land.appendChild(feats);
   var foot=el("div","land-foot");
+  foot.appendChild(el("span",null,"진학 현황판 · 선생님의 기록이 학생의 다음을 잇습니다."));
   var g=document.createElement("a"); g.href="guide.html"; g.target="_blank"; g.rel="noopener"; g.textContent="사용 설명서 보기"; foot.appendChild(g);
-  var tour=el("button","linkbtn","예시 화면 둘러보기");
   tour.onclick=function(){
     setLanding(false);
     var b=document.getElementById("banner"); b.className="banner"; b.hidden=false; b.innerHTML="";
@@ -5580,7 +5800,6 @@ function landingPage(err){
     var bk=el("button","linkbtn","← 시작 화면으로"); bk.onclick=function(){ codeGate("",""); window.scrollTo(0,0); }; b.appendChild(bk);
     render(); window.scrollTo(0,0);
   };
-  foot.appendChild(tour);
   land.appendChild(foot);
   var b=document.getElementById("banner"); setLanding(true);
   b.hidden=false; b.className="gate hero"; b.innerHTML=""; b.appendChild(land);

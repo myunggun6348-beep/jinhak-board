@@ -7,8 +7,8 @@
 <meta name="description" content="고3 담임·관리자를 위한 진학 현황판 짧은 사용 설명서">
 <style>
 :root{
-  --bg:#F5F7FA; --surface:#FFFFFF; --surface-2:#EDF1F6; --ink:#151E2B; --ink-2:#4F5D6E; --ink-3:#8593A4;
-  --line:#DCE3EC; --accent:#2F4B7C; --accent-2:#41639C; --accent-soft:#E6EDF9; --on-accent:#FFFFFF;
+  --bg:#F6F8F7; --surface:#FFFFFF; --surface-2:#F0F4F2; --ink:#1B302B; --ink-2:#566B64; --ink-3:#687E75;
+  --line:#DFE7E2; --accent:#176B53; --accent-2:#218364; --accent-soft:#E6F2EB; --on-accent:#FFFFFF;
   --ok:#136B49; --ok-soft:#DFF1E8; --warn:#8F5400; --warn-soft:#FBECD5; --bad:#A02A21; --bad-soft:#FAE5E2;
 }
 @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
@@ -33,7 +33,7 @@ a{color:var(--accent)}
 .top nav a:hover{background:var(--surface-2); color:var(--ink)}
 .btn{display:inline-flex; align-items:center; gap:6px; border-radius:9px; padding:8px 14px; font-size:14px; font-weight:700; text-decoration:none; background:var(--accent); color:var(--on-accent); border:0; cursor:pointer; font-family:inherit}
 .wrap{max-width:980px; margin:0 auto; padding:22px 16px 70px}
-.hero{border-radius:18px; padding:26px 26px; background:linear-gradient(135deg,#2F4B7C,#41639C); color:#fff; margin-bottom:28px}
+.hero{border-radius:18px; padding:26px 26px; background:linear-gradient(135deg,#176B53,#218364); color:#fff; margin-bottom:28px}
 .hero h1{margin:0 0 6px; font-size:26px; line-height:1.3}
 .hero p{margin:0; opacity:.92}
 .hero .addr{display:inline-block; margin-top:12px; background:rgba(255,255,255,.16); border-radius:10px; padding:6px 12px; font-weight:700}
@@ -159,9 +159,11 @@ details p{margin:8px 0 2px; color:var(--ink-2)}
     <tr><th>보이는 것</th><th>하는 일</th></tr>
     <tr><td>오른쪽 위 둥근 표시</td><td>지금 누가 들어와 있는지(관리자 / ○반 담임 / 혼자 쓰기)와 학교 이름. 옆 <span class="ui">나가기</span>는 공용 컴퓨터에서 다 쓴 뒤에만.</td></tr>
     <tr><td>제목 누르기</td><td>언제든 ‘우리 반’ 맨 위로</td></tr>
-    <tr><td>우리 반 · 전체 현황 · 학교 관리</td><td>우리 반: 맨 위 오늘 할 일·경고, 아래 탭 학생·일정·면접 준비·결과·등록·숫자·그래프(학생 목록에서 이름·대학 찾기, 경고·결과 기다림·합격만 보기) / 전체 현황: 탭으로 한눈에·반별·대학별·고사 시간표·정시·수능최저·실적 / (관리자만) 초대·승인·진행 현황</td></tr>
+    <tr><td>우리 반 · 전체 현황 · 학교 관리</td><td>우리 반: 상단 요약에서 전체 학생·확인 필요·7일 이내 일정·합격 및 등록 학생을 확인합니다. 학생·일정·결과·등록을 먼저 배치하고, 면접 준비·통계는 오른쪽 탭으로 모았습니다.(학생 목록에서 이름·대학 찾기, 경고·결과 기다림·합격만 보기) / 전체 현황: 탭으로 한눈에·반별·대학별·고사 시간표·정시·수능최저·실적 / (관리자만) 초대·승인·진행 현황</td></tr>
+    <tr><td>상단 요약 카드</td><td>전체 학생·확인 필요·합격 및 등록 학생을 누르면 해당 학생만 보입니다. 7일 이내 일정을 누르면 일정 탭이 열립니다. 인원은 학생 수, 일정은 지원별 일정 건수입니다.</td></tr>
+    <tr><td>학생·지원 추가</td><td>학생 목록 오른쪽 버튼을 누르면 파일 가져오기·표 붙여넣기·직접 입력 영역으로 이동합니다. 파일은 미리 보기를 확인한 뒤 넣습니다.</td></tr>
     <tr><td>학생 줄 누르기</td><td>펼쳐서 지원을 고치고, 상담 기록을 남깁니다.</td></tr>
-    <tr><td>더보기 ▾</td><td>일정 안내 문자, 반 파일·CSV·상담 기록 받기, 인쇄, 보기 설정(반 화면에 보일 칸 고르기)</td></tr>
+    <tr><td>더보기 ▾</td><td>입시 도구: 정시 현황·수능 성적 넣기·일정 안내 문자 / 내보내기·백업: 반 파일·CSV·상담 기록·인쇄 / 화면·자료 관리: 보기 설정·새 학년도 준비</td></tr>
     <tr><td>↶ 되돌리기</td><td>방금 한 일을 무르기</td></tr>
   </table>
 
