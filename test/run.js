@@ -1044,11 +1044,28 @@ function buildTestPage() {
     await x.click("#listTitle"); const closed = await x.$eval(".tmenu", (d) => !d.open);
     check("받기·인쇄 메뉴: 단추를 한 메뉴에, 바깥 누르면 닫힘", [menu, opened, closed], [[true, true], true, true]);
     await c.close();
-    const m = await browser.newContext({ viewport: { width: 390, height: 800 } });
+    const m = await browser.newContext({ viewport: { width: 360, height: 780 } });
     const y = await m.newPage(); y.on("pageerror", (e) => errors.push(String(e)));
-    await y.addInitScript(() => localStorage.setItem("jh.cls", "2"));
+    await y.clock.install({time:new Date("2026-12-27T09:00:00+09:00")});
+    await y.addInitScript(() => {
+      localStorage.setItem("jh.cls", "2");
+      localStorage.setItem("jh.local.students", JSON.stringify([["지난발표","2026-12-26"],["오늘발표","2026-12-27T14:00"],["다음발표","2026-12-28"],["미정발표",""]].map(([name,addAnn],i) => ({
+        id:"3020"+(i+1), no:"3020"+(i+1), cls:2, name, apps:[{id:"mobile"+i,kind:"수시",univ:"예시대학교",status:"충원대기",addAnn}]
+      }))));
+    });
     await y.goto("file://" + page404); await y.waitForTimeout(500);
-    check("휴대폰: 처음엔 숫자 요약·한눈에 보기·일정 목록을 숨김", await y.evaluate(() => ["stats", "glance", "sched"].map((id) => getComputedStyle(document.getElementById(id)).display === "none")), [true, true, true]);
+    const mobileStart = await y.evaluate(() => {
+      const nav=document.getElementById("classNav"), r=nav.getBoundingClientRect();
+      return [[...nav.querySelectorAll("#clsTabs button")].filter(b=>b.offsetWidth>0).map(b=>b.dataset.t), r.bottom<innerHeight, document.documentElement.scrollWidth===document.documentElement.clientWidth, document.getElementById("classSnapshot").open];
+    });
+    check("휴대폰: 첫 화면에 핵심 탭 세 개, 가로 넘침 없이 요약은 접힘", mobileStart, [["stu","sch","res"],true,true,false]);
+    await y.click("#clsTabs [data-t=sch]");
+    check("휴대폰: 일정 탭이 일정 목록을 바로 열고 탭이 상단에 고정", [await y.locator("#sched").isVisible(), await y.locator("#classNav").evaluate(e=>e.getBoundingClientRect().top<=1)], [true,true]);
+    await y.click("#classFocus button:has-text('충원 대기')");
+    const order = await y.locator("#waitlist .wait-row .who").allTextContents();
+    check("휴대폰: 충원 대기 바로가기가 오늘·지난 발표·예정·미정 순서로 표시", [await y.locator("#waitlist").isVisible(),order.map(s=>s.split(" ")[1])], [true,["오늘발표","지난발표","다음발표","미정발표"]]);
+    await y.click(".class-tools summary"); await y.click(".class-tools [data-go=num]");
+    check("휴대폰: 더보기에서 통계 열기", [await y.locator("#stats").isVisible(),await y.locator(".class-tools").evaluate(e=>e.open)], [true,false]);
     await m.close();
   }
   console.log("\n[결과 한꺼번에 · 오늘 할 일]");
