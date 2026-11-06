@@ -976,7 +976,37 @@ function buildTestPage() {
     };
     let t = await at("2026-12-14T09:00:00+09:00");
     check("12/14: 발표일 없는 지원은 아직 안 잡음, 충원 마감 없는 충원 대기도 아직 경고 아님", [t.r.codes[0], t.r.pend], [[], []]);
-    await t.c.close();
+    const w = t.x, form = w.locator("#waitDlg");
+    await w.locator("#rows .rowhead").filter({hasText: "가나"}).click();
+    await w.locator(".wait-status button").click();
+    await form.locator("[name=rank]").fill("9");
+    await form.locator("[name=addDate]").fill("2026-12-24");
+    await form.locator("[name=addTime]").fill("15:30");
+    await form.locator("[name=addMethod]").selectOption("입학처 홈페이지");
+    await form.locator("[name=addUrl]").fill("https://example.edu/admission");
+    await form.locator("[name=due]").fill("2026-12-23T18:00");
+    await form.getByRole("button", {name:"저장",exact:true}).click();
+    check("충원 수정: 최종 통보 마감보다 늦은 발표는 저장하지 않음", [await form.isVisible(), /마감보다 늦습니다/.test(await form.getByRole("alert").textContent())], [true,true]);
+    await form.locator("[name=due]").fill("2026-12-29T18:00");
+    await form.getByRole("button", {name:"저장",exact:true}).click();
+    await w.reload(); await w.locator("#rows .rowhead").first().waitFor();
+    await w.locator("#clsTabs [data-t=res]").click();
+    const ww = await w.locator("#waitlist").innerText();
+    check("학생별 충원 일정: 저장한 예비번호·발표 시각·통보 마감·확인 방법이 새로고침 후에도 표시",
+      [/예비 9/.test(ww), /다음 발표.*15:30/.test(ww), /최종 통보 마감.*18:00/.test(ww), /입학처 홈페이지/.test(ww), await w.locator("#waitlist a").getAttribute("href")],
+      [true,true,true,true,"https://example.edu/admission"]);
+    await w.locator("#clsTabs [data-t=sch]").click();
+    check("일정 탭에 최종 통보 마감과 별도로 충원 발표 시각 표시", await w.locator("#sched .sk.addAnn").innerText(), "충원 발표 15:30");
+    const imported = await w.evaluate(() => window.__dev.readApps([
+      ["학번","이름","대학","모집단위","상태","충원발표일시","충원확인방법","입학처공지링크"],
+      ["30201","가나","부산대","경영학과","충원대기","2026-12-24","전화","javascript:alert(1)"]
+    ]).apps.map(({app:a}) => [a.addAnn,a.addMethod,a.addUrl||""]));
+    check("파일 가져오기: 날짜만 있는 충원 발표에 시각을 만들지 않고 위험한 링크 제외", imported, [["2026-12-24","전화",""]]);
+    await w.locator("#clsTabs [data-t=res]").click();
+    await w.locator("#waitlist").getByRole("button", {name:"충원 대기 수정"}).click();
+    await form.locator("[name=status]").selectOption("충원합");
+    await form.getByRole("button", {name:"저장",exact:true}).click();
+    check("충원 합격으로 수정하면 충원 대기와 예정 일정에서 빠짐", [await w.locator("#waitlist").isHidden(), await w.locator("#sched .sk.addAnn").count()], [true,0]);
     await t.c.close();
     t = await at("2026-12-27T09:00:00+09:00");
     const addRow = await t.x.$$eval("#today .tadd .sitem", (r) => r.map((e) => e.innerText.replace(/\s+/g, " ")));
