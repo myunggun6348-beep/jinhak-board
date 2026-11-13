@@ -123,8 +123,16 @@ function buildTestPage() {
         shortTrack:[
           announcement(app("s1","부산대학교","학생부교과(학교장추천)",""),"ann"),
           itvDate(app("s2","부산대학교","논술","")),
-          itvDate(app("s3","경북대학교","학생부종합(일반)",""))
+          itvDate(app("s3","경북대학교","학생부종합(일반)","")),
+          announcement(app("s4","국립부경대학교(부산)","학생부교과(일반)",""),"ann"),
+          announcement(app("s5","국립부경대학교(부산)","학생부교과(교과성적우수인재)",""),"ann"),
+          announcement(app("s6","국립부경대학교(부산)","학생부교과(지역혁신인재)",""),"ann"),
+          announcement(app("s7","국립부경대학교(부산)","학생부종합(학교생활우수인재)",""),"ann"),
+          announcement(app("s8","인제대학교(김해)","학생부교과(학생부교과전형)","",{major:"의생명보건의료공학계열"}),"ann"),
+          itvDate(app("s9","고려대학교(서울)","논술(일반전형)","")),
+          announcement(app("s10","경남정보대학교","일반고교과전형","",{jc:true}),"ann")
         ],
+        minBuiltinAll:window.__dev.MIN_BUILTIN.every(e=>!!announcement({kind:"수시",univ:e.univ,major:e.major,jh:e.jh,ann:""},"ann")),
         pending:pending([st]).map(e=>[e.a.id,e.when,e.late]),
         links:[...root.querySelectorAll("a")].map(a=>new URL(a.href).hostname).sort(),
         oldDate:upcoming([st],45).some(e=>e.a.id==="early"),
@@ -136,8 +144,8 @@ function buildTestPage() {
   });
   check("발표일 대조: 조기 발표, 전형·캠퍼스·학과 구분, 1단계, 빈칸 및 수동 입력", audit.dates,
     ["2026-11-06","2026-12-18","2026-11-06","2026-12-18","2026-12-18","2026-11-20T14:00","2026-12-18T16:00","2026-11-05","2026-12-18"]);
-  check("면접·고사일 자동 채움 및 줄임 전형명 매칭", [audit.datesItv, audit.shortTrack],
-    [["2026-11-21","2026-12-05"],["2026-12-18T16:00","2026-11-21","2026-11-28"]]);
+  check("면접·고사일 자동 채움 및 줄임 전형명·내장 대학 전체 매칭", [audit.datesItv, audit.shortTrack, audit.minBuiltinAll],
+    [["2026-11-21","2026-12-05"],["2026-12-18T16:00","2026-11-21","2026-11-28","2026-12-18T17:00","2026-12-18T17:00","2026-12-18T17:00","2026-12-18T17:00","2026-11-20","2026-11-14","2026-10-29"],true]);
   check("교정한 날짜로 결과 미입력·공지 링크·안내 문자를 표시", [audit.datesFirst,audit.pending,audit.links,audit.oldDate,audit.notice],
     [["2026-12-01T16:00"],[["early","2026-11-06",4],["wise","2026-11-06",4]],["ipsi.dongseo.ac.kr","web.dongguk.ac.kr"],false,true]);
   check("원래 입력과 충원 대기는 보존하고 오늘은 한국 날짜 기준", [audit.unchanged,audit.today],
