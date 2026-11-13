@@ -96,6 +96,52 @@ function buildTestPage() {
     ["", false, ""],
   ];
   const dateGot = await p.evaluate((cs) => cs.map((c) => window.__dev.parseDate(c[0], c[1])), dateCases);
+  const audit = await p.evaluate(() => {
+    const {announcement, itvDate, daysTo, renderTodo, pending, upcoming, noticeItems} = window.__dev;
+    const previous = Date.now;
+    Date.now = () => Date.parse("2026-11-09T15:00:00Z"); // 서울 11/10 자정
+    const app = (id, univ, jh, ann, extra = {}) => ({id, univ, jh, ann, kind:"수시", status:"지원완료", ...extra});
+    const apps = [
+      app("early", "동서대학교(부산)", "학생부교과(고교생활우수자전형)", "2026-11-13"),
+      app("interview", "동서대", "학생부교과(학생부면접전형)", "2026-12-18"),
+      app("wise", "동국대학교(WISE)", "학생부위주(교과)-학업성적우수자전형", "2026-12-24", {major:"행정경찰공공학부"}),
+      app("medical", "동국대학교(WISE)", "학생부위주(교과)-학업성적우수자전형", "", {major:"한의예과"}),
+      app("main", "동국대학교(서울)", "학생부위주(교과)-학업성적우수자전형", "2026-12-18", {major:"행정경찰공공학부"}),
+      app("donga", "동아대", "학생부교과(교과진로우수자전형)", "2026-12-18"),
+      app("fill", "부산대", "학생부종합(학생부종합전형)", ""),
+      app("manual", "동서대", "학생부교과(일반계교과전형)", "2026-11-05", {status:"충원대기", rank:"7", addAnn:"2026-12-24T14:00"}),
+      app("unchanged", "경북대학교(대구)", "학생부종합(일반학생전형)", "2026-12-18")
+    ];
+    const st = {id:"audit", cls:1, name:"예시 학생", apps};
+    const root = document.createElement("div");
+    try {
+      renderTodo(root,[st],false);
+      return {
+        dates:apps.map(a=>announcement(a,"ann")),
+        datesFirst:apps.map(a=>announcement(a,"ann1")).filter(Boolean),
+        datesItv:apps.map(a=>itvDate(a)).filter(Boolean),
+        shortTrack:[
+          announcement(app("s1","부산대학교","학생부교과(학교장추천)",""),"ann"),
+          itvDate(app("s2","부산대학교","논술","")),
+          itvDate(app("s3","경북대학교","학생부종합(일반)",""))
+        ],
+        pending:pending([st]).map(e=>[e.a.id,e.when,e.late]),
+        links:[...root.querySelectorAll("a")].map(a=>new URL(a.href).hostname).sort(),
+        oldDate:upcoming([st],45).some(e=>e.a.id==="early"),
+        notice:noticeItems(st,45).some(e=>e.when==="2026-11-20T14:00"&&e.t.includes("동아대")),
+        unchanged:[apps[0].ann,apps[7].status,apps[7].rank,apps[7].addAnn],
+        today:daysTo("2026-11-10")
+      };
+    } finally { Date.now = previous; }
+  });
+  check("발표일 대조: 조기 발표, 전형·캠퍼스·학과 구분, 1단계, 빈칸 및 수동 입력", audit.dates,
+    ["2026-11-06","2026-12-18","2026-11-06","2026-12-18","2026-12-18","2026-11-20T14:00","2026-12-18T16:00","2026-11-05","2026-12-18"]);
+  check("면접·고사일 자동 채움 및 줄임 전형명 매칭", [audit.datesItv, audit.shortTrack],
+    [["2026-11-21","2026-12-05"],["2026-12-18T16:00","2026-11-21","2026-11-28"]]);
+  check("교정한 날짜로 결과 미입력·공지 링크·안내 문자를 표시", [audit.datesFirst,audit.pending,audit.links,audit.oldDate,audit.notice],
+    [["2026-12-01T16:00"],[["early","2026-11-06",4],["wise","2026-11-06",4]],["ipsi.dongseo.ac.kr","web.dongguk.ac.kr"],false,true]);
+  check("원래 입력과 충원 대기는 보존하고 오늘은 한국 날짜 기준", [audit.unchanged,audit.today],
+    [["2026-11-13","충원대기","7","2026-12-24T14:00"],0]);
   dateCases.forEach((c, i) => check('"' + c[0] + '"' + (c[1] ? " (시각 포함)" : ""), dateGot[i], c[2]));
 
   /* ── 4. 파일에서 명단 읽기 ─────────────────── */
@@ -647,6 +693,13 @@ function buildTestPage() {
     return { upd: r.upd, keep: r.keep, status: a.apps[0].status, log: a.log.map((e) => e.w[0]), dup: b2.length, nAppsB: b2[0].apps.length };
   });
   check("반 파일 합치기: 최근 쪽 남김·기록 합침·같은 학생 중복 없음", mg, { upd: 1, keep: 1, status: "최초합", log: ["처음", "합격"], dup: 1, nAppsB: 0 });
+  const uSched = await p.evaluate(() => {
+    window.__dev.mergeData([{ name: "u.json", b: { app: "jinhak-board", students: [{ id: "u1", cls: 2, no: "30299", name: "최대학", updatedAt: "2026-11-12T00:00:00Z",
+      apps: [{ id: "ua1", kind: "수시", univ: "부산대학교", major: "국어국문학과", jh: "논술", type: "논술", status: "지원완료" }] }] } }]);
+    document.getElementById("tabAll").click();
+    return [...document.querySelectorAll("#univTable .urow")].some((r) => /부산대/.test(r.textContent) && /면접 11\/21/.test(r.textContent) && /발표 12\/18/.test(r.textContent));
+  });
+  check("전체 현황 대학별 표: 각 대학 줄에 면접·발표 일정 요약 표시", uSched, true);
 
   /* ── 학교별 공용 장부(Vercel 판) ── 가짜 Firebase 로 학교 만들기·가입 승인·담임은 자기 반만·관리자는 전부·학교끼리 막힘 */
   console.log("\n[학교별 공용 장부]");

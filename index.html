@@ -712,6 +712,7 @@ td.num{text-align:right; font-variant-numeric:tabular-nums}
 #univTable tr.urow:hover td,#univTable tr.urow.open td{background:var(--surface-2)}
 #univTable tr.urow td:first-child{font-weight:600}
 #univTable .ucaret{color:var(--ink-3); font-size:10px; margin-left:6px}
+#univTable .usched{color:var(--ink-2); font-size:11.5px; font-weight:400; margin-left:8px}
 #univTable td.udetail{background:var(--surface-2); padding:4px 14px 12px; white-space:normal}
 .uvar{font-size:11.5px; color:var(--ink-3); margin-top:8px}
 .umajor{font-weight:700; font-size:12.5px; margin:10px 0 2px; color:var(--ink)}
@@ -1245,9 +1246,153 @@ function setMyCls(v){try{localStorage.setItem("jh.mycls",String(v));}catch(e){}}
 // 지금 그리는 칸의 반. 내 담당 반이 아니면(이번만 고치기 전까지) 입력 칸을 잠근다.
 var curCls=null, unlocked={};
 function locked(c){ var m=getMyCls(); return !!(m&&c&&c!==m&&!unlocked[c]&&!(demo&&!practice)); }
-function daysTo(s){ if(!s) return null; var d=new Date(s); if(isNaN(d)) return null;
-  var t=new Date(); t.setHours(0,0,0,0); var x=new Date(d); x.setHours(0,0,0,0);
-  return Math.round((x-t)/86400000); }
+function dateKey(s){ return String(s||"").slice(0,10); }
+function daysTo(s){
+  var day=dateKey(s), n=/^\d{4}-\d{2}-\d{2}$/.test(day)?Date.parse(day):NaN;
+  return isNaN(n)?null:(n-Date.parse(ymdNow()))/86400000;
+}
+/* 2027 수시, 2026-11-10 대조. 발표 공지가 있으면 모집요강보다 우선한다.
+   규칙은 대학·캠퍼스·전형별이며, 1단계 발표(first)·면접·논술·실기일(itv)·최초 발표일(ann)을 채우고 from에 적힌 이전 날짜와 빈칸만 교정한다. */
+var ADMISSION_2027={
+  "경성대":[/^(부산)?$/,"https://kscms.ks.ac.kr/ipsi/CMS/Contents/Contents.do?mCode=MN026",[
+    [/^(학생부교과)?(교과|일반계고교과|지역인재|학교장추천)?$|^학생부종합(종합|지역인재II?|학교생활우수자|일반)?$/,"12-17"]]],
+  "동서대":[/^(부산)?$/,"https://ipsi.dongseo.ac.kr/ipsi/",[
+    [/^(학생부교과)?(교과|일반계고?교과|고교생활우수자|특성화교과|사회기여배려자|고른기회|농어촌출신자|특성화동일계출신자|평생학습자|성인학습자|특성화고졸재직자)$/,"11-06",{from:"11-13",released:true}],
+    [/^(학생부교과)?학생부면접$/,"12-18",{itv:"11-21"}],
+    [/^학생부종합(학생부종합|종합|일반)?$/,"12-18",{itv:"11-28"}],
+    [/^(실기|포트폴리오)$/,"12-18",{itv:"11-21"}]]],
+  "동아대":[/^(부산)?$/,"https://ent.donga.ac.kr/admission/html/counsel/noticeView.asp?BOARD_IDX=31292",[
+    [/^(학생부교과)?교과진로우수자$/,"11-20T14:00",{from:"12-18"}],
+    [/^학생부종합(학교생활우수자|종합|일반)?$/,"12-18T14:00",{first:"11-20T14:00",itv:"11-28"}],
+    [/^학생부교과(교과|교과성적우수자|지역인재교과|지역인재|일반)?$/,"12-18T14:00"]]],
+  "동의대":[/^(부산)?$/,"https://ipsi.deu.ac.kr/submenu.do?menuUrl=jVMGmOh68Pir%2BuTpFrHJYA%3D%3D",[
+    [/^학생부종합(학교생활우수자면접|면접)$/,"12-16T14:00",{first:"11-20T14:00",itv:"11-28"}],
+    [/^학생부교과(교과|일반고교과|지역인재교과|지역인재|일반)?$|^학생부종합(지역인재종합|지역인재|학교생활우수자|서류|종합|일반)?$/,"12-16T14:00"]]],
+  "부경대":[/^(부산)?$/,"https://iphak.pknu.ac.kr/pknu/board/board.htm?bbsid=notice&ctg_cd=oa&mode=view&code=iphak_help&bltn_seq=1163",[
+    [/^학생부교과(교과|교과성적우수인재|일반|지역혁신인재|지역인재)?$|^학생부종합(학교생활우수인재|지역혁신인재|학종|종합|일반)?$|^논술(논술|일반)?$/,"12-18T17:00"]]],
+  "부산대":[/^(부산|양산|밀양)?$/,"https://go.pusan.ac.kr/down/mojib/RF%280%29_260611154120.pdf",[
+    [/^학생부종합(학생부종합|학종|종합|지역인재|일반)?$/,"12-18T16:00",{first:"12-01T16:00",itv:"12-05"}],
+    [/^논술(논술|일반|지역인재)?$/,"12-18T16:00",{itv:"11-21"}],
+    [/^학생부교과(학생부교과|교과|지역인재|학교장추천|일반)?$/,"12-18T16:00"]]],
+  "경북대":[/^(대구|상주)?$/,"https://ipsi1.knu.ac.kr/notice/view.php?r=FxlcTx5IV0VHAHIcEBQAECVnJj4",[
+    [/^학생부종합일반$/,"12-18",{first:"11-20",itv:"11-28"}],
+    [/^학생부종합(일반학생|지역인재|학종|종합)?$|^학생부교과(교과우수자|지역인재|학교장추천|교과|일반)?$/,"12-18"],
+    [/^논술(AAT|논술|일반)?$/,"12-18",{itv:"11-21"}]]],
+  "동명대":[/^(부산)?$/,"https://www.tu.ac.kr/iphak/sub01_02.do",[
+    [/^학생부교과면접$/,"12-15",{itv:"10-24",major:/^간호학과$/}],
+    [/^학생부교과(교과|일반고교과|일반)?$/,"12-15",{major:/^간호학과$/}],
+    [/^학생부교과면접$/,"10-30",{itv:"10-24",major:/^(?!간호학과$).+$/}],
+    [/^학생부교과(교과|일반고교과|일반)?$/,"10-30",{major:/^(?!간호학과$).+$/}],
+    [/^학생부종합(창의인재|종합|일반)?$/,"10-30"]]],
+  "신라대":[/^(부산)?$/,"https://ipsi.silla.ac.kr/ipsi/index.php?pCode=1692581907",[
+    [/면접/,"11-13T16:00",{itv:"10-24"}],
+    [/./,"11-13T16:00"]]],
+  "건국대":[/^(서울)?$/,"https://enter.konkuk.ac.kr/",[
+    [/^논술(KU논술우수자|논술|일반)?$/,"12-18",{itv:"11-14"}],
+    [/^학생부종합(KU자기추천|자기추천|학종|종합)?$/,"12-18",{first:"11-20",itv:"11-28"}],
+    [/^학생부교과(KU지역균형|지역균형|교과|학교장추천)?$/,"12-18"]]],
+  "한국해양대":[/^(부산)?$/,"https://www.kmou.ac.kr/ipsi/cm/cntnts/cntntsView.do?cntntsId=5400&mi=3323",[
+    [/^학생부교과(교과성적우수자|일반|지역인재|교과)?$|^학생부종합(아치해양인재|해양인재|학종|종합|일반)?$/,"12-18"]]],
+  "부산외국어대":[/^(부산)?$/,"https://enter.bufs-old.codeidea.io/bbs/board.php?bo_table=susi_viewer&wr_id=3",[
+    [/면접/,"12-04",{itv:"11-21"}],
+    [/^학생부교과(일반고교과|교과|일반)?$|^학생부종합(학생부종합|종합|일반)?$/,"12-04"]]],
+  "중앙대":[/^(서울|다빈치|안성)?$/,"https://admission.cau.ac.kr/submenu.do?board_seq=3180&menuurl=n5%2FP1yX8Zyh%2Fvtvla1KeyA%3D%3D",[
+    [/^논술(일반형|창의형|논술)?$/,"12-18T14:00",{itv:"11-21"}],
+    [/^학생부교과(지역균형|학교장추천|교과)?$|^학생부종합(CAU융합형인재|CAU탐구형인재|융합형인재|탐구형인재|학종|종합)?$/,"12-18T14:00"]]],
+  "경상국립대":[/^(진주|창원|통영)?$/,"https://www.gnu.ac.kr/intro/www/susi/index.html",[
+    [/^학생부종합(일반|지역인재|학종|종합)?$/,"12-18T16:00",{first:"11-20T16:00",itv:"11-27"}],
+    [/^학생부교과(일반|지역인재|교과)?$/,"12-18T16:00"]]],
+  "경희대":[/^(서울|국제)?$/,"https://iphak.khu.ac.kr/detail.do?board_seq=17324&categoryid=1&menuurl=RnNfVbLHUGrJz9kJgEyRDQ%3D%3D&pageNo=1",[
+    [/^논술(논술우수자|논술)?$/,"12-18T18:00",{itv:"11-14"}],
+    [/^학생부종합(네오르네상스|학종|종합)?$/,"12-18T18:00",{first:"11-20T18:00",itv:"11-28"}],
+    [/^학생부교과(지역균형|학교장추천|교과)?$/,"12-18T18:00"]]],
+  "성균관대":[/^(서울|수원)?$/,"https://admission.skku.edu/upload/guide/20260529115520H43SMR.pdf",[
+    [/^논술(위주)?(논술우수)?(언어형|수리형|논술)?$/,"12-18",{by:true,itv:"11-14"}],
+    [/^학생부교과(추천인재|학교장추천|교과)?$|^학생부종합(서류형)?(융합인재|탐구인재|학종|종합)?$/,"12-18",{by:true}]]],
+  "을지대":[/^(성남|의정부|대전)?$/,"https://admission.eulji.ac.kr/",[
+    [/^학생부종합(EU면접형|면접형|면접)$/,"12-18",{first:"11-18",itv:"11-21"}],
+    [/^학생부종합(EU서류형|서류형|종합)?$|^학생부교과(교과성적우수자|지역균형|교과|일반)?$/,"12-18"]]],
+  "창신대":[/^(창원)?$/,"https://admission.cs.ac.kr/",[
+    [/^학생부교과창신인재면접$|면접/,"11-20",{itv:"10-31"}],
+    [/^학생부교과(기회균형|일반고교과|교과|일반)?$/,"11-20"]]],
+  "동국대":[/^(WISE|경주)$/i,"https://web.dongguk.ac.kr/article/generalnotice/detail/521114",[
+    [/학업성적우수자$|^학생부교과(교과|일반)?$/,"12-18",{from:"12-24",major:/^(한의예과|의예과|간호학과)$/}],
+    [/학업성적우수자$|^학생부교과(교과|일반)?$/,"11-06",{from:"12-24",major:/^(?!(한의예과|의예과|간호학과)$).+$/,released:true}],
+    [/참사람|면접/,"12-18",{first:"11-20",itv:"11-28"}]]],
+  "부산가톨릭대":[/^(부산)?$/,"https://ipsi.cup.ac.kr/ipsi/main.do",[
+    [/면접/,"11-25T14:00",{itv:"10-24"}],
+    [/^학생부교과(교과우수I+|교과|일반고교과|지역인재|일반)?$|^학생부종합(학교생활우수자|종합|일반)?$/,"11-25T14:00"]]],
+  "서강대":[/^(서울)?$/,"https://admission.sogang.ac.kr/",[
+    [/^논술(일반|논술)?$/,"12-18",{itv:"11-14"}],
+    [/^학생부교과(지역균형|학교장추천|교과)?$|^학생부종합(일반|학종|종합)?$/,"12-18"]]],
+  "숭실대":[/^(서울)?$/,"https://iphak.ssu.ac.kr/upload/SSU%281%29_260617194322.pdf",[
+    [/^논술(논술우수자|논술)?$/,"12-18",{itv:"11-14"}],
+    [/^학생부종합(SSU미래인재|미래인재|학종|종합)?$/,"12-18",{first:"11-24",itv:"11-28"}],
+    [/^학생부교과(학생부우수자|지역균형|학교장추천|교과)?$/,"12-18"]]],
+  "아주대":[/^(수원)?$/,"https://www.iajou.ac.kr/main/",[
+    [/^논술(논술우수자|논술)?$/,"12-18",{itv:"11-21"}],
+    [/^학생부종합(ACE|첨단융합인재|학종|종합)?$/,"12-18",{first:"11-20",itv:"11-28"}],
+    [/^학생부교과(고교추천|학교장추천|교과)?$/,"12-18"]]],
+  "연세대":[/^(서울)?$/,"https://admission.yonsei.ac.kr/seoul/admission/html/counsel/calendar.asp?s_year=2026",[
+    [/^논술(논술)?$/,"12-18T18:00",{itv:"10-10"}],
+    [/^학생부종합(활동우수형|국제형|학종|종합)?$/,"12-18T18:00",{first:"11-09",itv:"11-14"}],
+    [/^학생부교과(추천형|학교장추천|교과)?$/,"12-18T18:00"]]],
+  "인제대":[/^(김해|부산)?$/,"https://iphak.inje.ac.kr/",[
+    [/^학생부교과(의예약학|면접)$/,"12-18",{first:"11-13",itv:"11-21"}],
+    [/^학생부교과(학생부교과|교과|일반)?$/,"11-20",{major:/^의생명보건의료공학계열$/}],
+    [/^학생부교과(학생부교과|교과|일반|지역인재)?$|^학생부종합(자기추천|학교생활우수자|종합)?$/,"12-18"]]],
+  "인하대":[/^(인천)?$/,"https://admission.inha.ac.kr/",[
+    [/^논술(논술우수자|논술)?$/,"12-18",{itv:"11-28"}],
+    [/^학생부종합(인하미래인재|미래인재|학종|종합)?$/,"12-18",{first:"11-20",itv:"11-28"}],
+    [/^학생부교과(지역균형|학교장추천|교과)?$/,"12-18"]]],
+  "한국외국어대":[/^(서울|글로벌|용인)?$/,"https://adms.hufs.ac.kr/",[
+    [/^논술(논술|일반)?$/,"12-18",{itv:"11-21"}],
+    [/^학생부종합(면접형|면접)$/,"12-18",{first:"11-16",itv:"11-22"}],
+    [/^학생부교과(학교장추천|지역균형|교과)?$|^학생부종합(서류형|학종|종합)?$/,"12-18"]]],
+  "한양대":[/^(서울)?$/,"https://go.hanyang.ac.kr/web/mojib/mojib.do?m_type=SUSI&m_year=2027",[
+    [/^논술(논술|일반)?$/,"12-18",{itv:"11-21"}],
+    [/^학생부종합(면접형|면접)$/,"12-18",{first:"11-17",itv:"11-28"}],
+    [/^학생부교과(추천형|학교장추천|교과)?$|^학생부종합(추천형|서류형|학종|종합)?$/,"12-18"]]]
+};
+function officialAnnouncement(a,key){
+  if(YEAR!==2027||a.kind!=="수시"||a.jc) return null;
+  var uni=univKey(a.univ).split("|"), catalog=ADMISSION_2027[uni[0]];
+  if(!catalog||!catalog[0].test(uni[1])) return null;
+  var track=String(a.jh||"").normalize("NFKC").replace(/전형|[\s()[\]·ㆍ-]/g,"");
+  if(!track) return null;
+  var major=String(a.major||"").normalize("NFKC").replace(/\s+/g,"");
+  var rule=catalog[2].find(function(x){return x[0].test(track)&&(!x[2]||!x[2].major||x[2].major.test(major));});
+  if(!rule) return null;
+  var opts=rule[2]||{}, isFinal=key==="ann", when=isFinal?rule[1]:key==="ann1"?opts.first:key==="itv"?opts.itv:"";
+  if(!when) return null;
+  var from=isFinal?opts.from:key==="ann1"?opts.firstFrom:key==="itv"?opts.itvFrom:"";
+  return {when:"2026-"+when,url:catalog[1],released:isFinal&&opts.released,by:isFinal&&opts.by,from:from?"2026-"+from:""};
+}
+function appliedAnnouncement(a,key){
+  var r=officialAnnouncement(a,key), saved=dateKey(a[key]);
+  return r&&(!saved||saved===dateKey(r.when)||saved===r.from)?r:null;
+}
+function announcement(a,key){ var r=appliedAnnouncement(a,key); return r?r.when:(a[key]||""); }
+function itvDate(a){ return dateKey(announcement(a,"itv")); }
+function announcementLink(a,key,label){
+  var r=appliedAnnouncement(a,key);
+  if(!r) return null;
+  var link=el("a","linkbtn",label||"입학처 ↗");
+  link.href=r.url; link.target="_blank"; link.rel="noopener noreferrer";
+  link.title=r.released?"입학처 발표 공지":r.by?"입학처 발표 기한":key==="itv"?"입학처 전형 일정":"입학처 발표 일정";
+  return link;
+}
+function announcementField(st,a,key,label,onSet){
+  var when=announcement(a,key);
+  var f=field(label,dateInput("date",dateKey(when),function(v){ if(onSet) onSet(v); else a[key]=v; save(st); render(); }));
+  var r=appliedAnnouncement(a,key), link=announcementLink(a,key,r&&(r.released?"발표 공지 ↗":r.by?"발표 기한 ↗":"입학처 일정 ↗"));
+  if(link){
+    var hint=el("div","sub"); hint.appendChild(link);
+    if(String(when).slice(11)) hint.appendChild(document.createTextNode(" "+String(when).slice(11)));
+    f.appendChild(hint);
+  }
+  return f;
+}
 // 오늘 마감인데 시각이 있으면 남은 시간
 function leftText(s){
   if(!/[T ]\d{2}:\d{2}/.test(String(s||""))||/[T ]00:00/.test(String(s))) return "";
@@ -1276,11 +1421,12 @@ function checkStudent(st){
     if(a.kind==="수시"&&PASS[a.status]) passed++;
     if(a.status==="등록완료") reg++;
     if(a.kind==="정시") jungsi++;
-    if(a.itv){ itv[a.itv]=itv[a.itv]||{}; itv[a.itv][a.univ||a.id]=1; }
+    var iv=itvDate(a);
+    if(iv){ itv[iv]=itv[iv]||{}; itv[iv][a.univ||a.id]=1; }
   });
   if(six>6) out.push({lv:"crit",code:"6장초과",msg:"수시 지원이 "+six+"건입니다. 6장 제한을 넘었습니다."});
   Object.keys(itv).forEach(function(d){ var u=Object.keys(itv[d]); if(u.length<2) return;
-    var L=u.map(function(k){ return apps.filter(function(a){ return a.itv===d&&(a.univ||a.id)===k; })[0]; }), ck=clashKind(L);
+    var L=u.map(function(k){ return apps.filter(function(a){ return itvDate(a)===d&&(a.univ||a.id)===k; })[0]; }), ck=clashKind(L);
     var tl=L.map(function(a){ return (a.itvTime?a.itvTime+" ":"")+shortUniv(a.univ); }).join(" · ");
     var rg=L.map(univRegion).filter(function(r,i,arr){ return r!=="미상"&&arr.indexOf(r)===i; });
     if(ck==="over") out.push({lv:"crit",code:"면접중복",msg:mdw(d)+" 면접·고사 시간이 겹칩니다("+tl+"). 하나만 응시할 수 있으니 학생과 정하세요."});
@@ -1297,16 +1443,17 @@ function checkStudent(st){
     if(a.kind==="수시"&&a.mmet==="미충족"&&LIVE[a.status])
       out.push({lv:"warn",code:"최저 미충족",
         msg:(a.univ||"한 곳")+" 수능최저를 채우지 못했습니다"+(a.mreq?"("+a.mreq+")":"")+(st.csat&&st.csat.src==="가채점"?". 가채점 기준이니 성적표(12/11)로 다시 확인하고, 그 전에 있는 고사는 ‘수능 뒤 응시 판단’을 보세요.":". 사실상 탈락이니 정시 준비로 돌려야 합니다.")});
-    if(a.ann&&AWAIT[a.status]&&daysTo(a.ann)<0)
-      out.push({lv:"warn",code:"결과 미입력",msg:(a.univ||"한 곳")+" 발표일("+a.ann+")이 지났는데 상태가 ‘"+a.status+"’ 그대로입니다. 학생에게 결과를 확인해 주세요."});
+    var ann=announcement(a,"ann");
+    if(finalLate(a,ann))
+      out.push({lv:"warn",code:"결과 미입력",msg:(a.univ||"한 곳")+" 최초 발표("+mdw(ann)+")가 지났는데 상태가 ‘"+(a.status||"지원완료")+"’ 그대로입니다. 학생에게 결과를 확인해 주세요."});
     else if(ann1Late(a))
-      out.push({lv:"warn",code:"결과 미입력",msg:(a.univ||"한 곳")+" 1단계 발표일("+a.ann1+")이 지났는데 상태가 ‘지원완료’ 그대로입니다. 1단계 합격·불합격을 넣어 주세요."});
+      out.push({lv:"warn",code:"결과 미입력",msg:(a.univ||"한 곳")+" 1단계 발표("+mdw(announcement(a,"ann1"))+")가 지났는데 상태가 ‘지원완료’ 그대로입니다. 1단계 합격·불합격을 넣어 주세요."});
     else if(annOver(a))
       out.push({lv:"warn",code:"결과 미입력",msg:(a.univ||"한 곳")+" 발표일이 없는데 수시 합격자 발표 마감("+mdw(kdOf("s-ann").s)+")이 지났고 상태가 ‘"+(a.status||"지원완료")+"’ 그대로입니다. 학생에게 결과를 확인해 주세요."});
     if(prepNeeds(a)&&prepLeft(a).length){
-      var pd=daysTo(a.itv), pv=afterCsatApp(a)?examVerdict(st,a):null;
+      var iv2=itvDate(a), pd=daysTo(iv2), pv=afterCsatApp(a)?examVerdict(st,a):null;
       if(pd!==null&&pd>=0&&pd<=2&&!(pv&&pv.v==="skip"))
-        out.push({lv:"warn",code:(a.type==="논술"?"논술":a.type==="실기"?"실기":"면접")+" 준비",msg:(a.univ||"한 곳")+" "+(a.type==="논술"?"논술":a.type==="실기"?"실기":"면접")+"이 "+(pd===0?"오늘":pd===1?"내일":"모레")+"입니다("+mdw(a.itv)+"). 남은 준비: "+prepLeft(a).join(", ")+"."});
+        out.push({lv:"warn",code:(a.type==="논술"?"논술":a.type==="실기"?"실기":"면접")+" 준비",msg:(a.univ||"한 곳")+" "+(a.type==="논술"?"논술":a.type==="실기"?"실기":"면접")+"이 "+(pd===0?"오늘":pd===1?"내일":"모레")+"입니다("+mdw(iv2)+"). 남은 준비: "+prepLeft(a).join(", ")+"."});
     }
     if(a.status==="충원대기"&&a.due){
       var d=daysTo(a.due);
@@ -1344,27 +1491,29 @@ function checkStudent(st){
   return out;
 }
 function appWarn(st,a){
-  var apps=st.apps||[];
+  var apps=st.apps||[], iv=itvDate(a);
   if(a.kind==="수시"&&a.mmet==="미충족"&&LIVE[a.status]) return "수능최저 미충족";
   if(a.kind==="정시"&&apps.some(function(x){return x.kind==="수시"&&PASS[x.status];})) return "수시 합격자는 정시 지원 불가";
   if(a.kind==="정시"&&!a.jc&&a.group&&apps.filter(function(x){return x.kind==="정시"&&!x.jc&&x.group===a.group;}).length>1) return a.group+"군 중복";
-  if(a.itv&&apps.some(function(x){return x.itv===a.itv&&x.univ!==a.univ;})) return "면접·고사일 중복";
+  if(iv&&apps.some(function(x){return itvDate(x)===iv&&x.univ!==a.univ;})) return "면접·고사일 중복";
   if(a.status==="등록완료"&&apps.filter(function(x){return x.status==="등록완료";}).length>1) return "이중등록";
   if(a.status==="충원대기"&&a.due){var d=daysTo(a.due); if(d!==null&&d>=0&&d<=3) return "충원 마감 임박";}
-  if(a.ann&&AWAIT[a.status]&&daysTo(a.ann)<0||ann1Late(a)||annOver(a)) return "결과 미입력";
+  if(finalLate(a)||ann1Late(a)||annOver(a)) return "결과 미입력";
   return "";
 }
 // 1단계 발표: 아직 지원완료(1단계 결과 전)일 때만 의미가 있다
-function ann1Wait(a){ return !!a.ann1&&(a.status||"지원완료")==="지원완료"; }
-function ann1Late(a){ return ann1Wait(a)&&daysTo(a.ann1)<0; }
+function ann1Wait(a){ return !!announcement(a,"ann1")&&(a.status||"지원완료")==="지원완료"; }
+function ann1Late(a){ return ann1Wait(a)&&daysTo(announcement(a,"ann1"))<0; }
+function finalLate(a,ann){ ann=ann===undefined?announcement(a,"ann"):ann; return !!ann&&!!AWAIT[a.status||"지원완료"]&&daysTo(ann)<0; }
 // 발표일을 안 넣은 수시 지원: 수시 합격자 발표 마감이 지나면 결과가 있어야 한다
-function annOver(a){ var k=kdOf("s-ann"); return a.kind==="수시"&&!a.ann&&!!AWAIT[a.status||"지원완료"]&&!!k&&daysTo(k.s)<0; }
+function annOver(a){ var k=kdOf("s-ann"); return a.kind==="수시"&&!announcement(a,"ann")&&!!AWAIT[a.status||"지원완료"]&&!!k&&daysTo(k.s)<0; }
 // 충원 마감을 안 넣은 충원 대기의 끝: 수시·정시 충원 합격 통보 마감
 function addEnd(a){ var k=kdOf(a.kind==="정시"?"j-add":"s-add"); return k?k.s+"T"+(k.time||"23:59"):""; }
 var KINDNAME={itv:"면접·고사", ann1:"1단계 발표", ann:"발표", addAnn:"충원 발표", due:"충원 통보 마감"};
 function kindName(e,withTime){
-  var time=e.kind==="itv"?e.a.itvTime:/^(addAnn|due)$/.test(e.kind)?String(e.when).match(/T(\d{2}:\d{2})/):null;
-  return KINDNAME[e.kind]+(withTime&&time?" "+(Array.isArray(time)?time[1]:time):"");
+  var time=e.kind==="itv"?e.a.itvTime:String(e.when).match(/T(\d{2}:\d{2})/);
+  var official=e.kind==="ann"&&appliedAnnouncement(e.a,"ann");
+  return (official&&official.by?"발표 기한":KINDNAME[e.kind])+(withTime&&time?" "+(Array.isArray(time)?time[1]:time):"");
 }
 /* ── 면접·고사 시각 ── 선생님이 입학처 공지나 학생(수험표)에게 확인해 넣는다. 앱은 비교만 한다 */
 function itvMin(a){ var m=String(a.itvTime||"").match(/^(\d{1,2}):(\d{2})/); return m?(+m[1])*60+(+m[2]):null; }
@@ -1376,7 +1525,7 @@ function clashKind(list){
   return "far";
 }
 function itvSrcText(a){ return !a.itvTime?"":a.itvSrc==="공지"?"입학처 공지 확인":a.itvSrc==="학생"?"학생에게 받음":"확인 필요"; }
-function itvCell(a){ return mmdd(a.itv)+(a.itvTime?" "+a.itvTime:""); }
+function itvCell(a){ return mmdd(itvDate(a))+(a.itvTime?" "+a.itvTime:""); }
 function itvSearchUrl(a){ return "https://www.google.com/search?q="+encodeURIComponent(shortUniv(a.univ)+" 입학처 "+YEAR+"학년도 "+(a.type==="논술"?"논술 고사":a.type==="실기"?"실기 고사":"면접")+" 고사장 시간 "+(a.major||"")); }
 function hhmm(v){ var m=String(v||"").match(/(\d{1,2})\s*[:시]\s*(\d{2})?/); if(!m||+m[1]>23) return ""; return pad2(+m[1])+":"+(m[2]||"00"); }
 
@@ -1620,7 +1769,7 @@ function diffLines(p,s){
       var x=o[f[0]], y=a[f[0]]; if(lnorm(x)===lnorm(y)) return;
       ch.push(f[0]==="mreq"||f[0]==="note"? f[1]+" 바뀜" : f[1]+" "+lval(x)+" → "+lval(y));
     });
-    if(a.itv&&a.kind==="수시"&&prepDone(o)!==prepDone(a)) ch.push("면접 준비 "+prepDone(o)+"→"+prepDone(a)+"/"+prepList(a).length);
+    if(itvDate(a)&&a.kind==="수시"&&prepDone(o)!==prepDone(a)) ch.push("면접 준비 "+prepDone(o)+"→"+prepDone(a)+"/"+prepList(a).length);
     if(ch.length) L.push(appName(a)+" — "+ch.join(", "));
   });
   (p.apps||[]).forEach(function(a){ if(!seen[a.id]) L.push("지원 삭제: "+appName(a)); });
@@ -1954,7 +2103,7 @@ function minShort(raw){
   else if(/평균/.test(t)) p.push("탐2 평균");
   return p.length? p.join(" · ") : (t.length>18?t.slice(0,17)+"…":t);
 }
-function annCell(a){ return [a.ann1?"1단계 "+mmdd(a.ann1):"", mmdd(a.ann)].filter(Boolean).join(" / "); }
+function annCell(a){ var first=announcement(a,"ann1"); return [first?"1단계 "+mdw(first):"", mdw(announcement(a,"ann"))].filter(Boolean).join(" / "); }
 function mmdd(s){ var m=String(s||"").match(/^\d{4}-(\d{2})-(\d{2})/); return m?(+m[1])+"/"+(+m[2]):""; }
 
 /* ── 새 학년도로 넘기기 ──
@@ -2249,19 +2398,20 @@ function detail(st){
     var tb=t.createTBody();
     // 면접·고사일이 겹치는 날마다 번호(①②…)를 붙여, 어느 지원끼리 겹치는지 한눈에
     var CIRC="①②③④⑤⑥⑦⑧⑨", clashNo={};
-    apps.map(function(a){ return a.itv; }).filter(function(d,i,arr){ return d&&arr.indexOf(d)===i&&apps.some(function(x){ return x.itv===d&&apps.some(function(y){ return y.itv===d&&y.univ!==x.univ; }); }); })
+    apps.map(function(a){ return itvDate(a); }).filter(function(d,i,arr){ return d&&arr.indexOf(d)===i&&apps.some(function(x){ return itvDate(x)===d&&apps.some(function(y){ return itvDate(y)===d&&y.univ!==x.univ; }); }); })
       .sort().forEach(function(d,i){ clashNo[d]=CIRC[i]||"("+(i+1)+")"; });
     apps.forEach(function(a){
-      var w=appWarn(st,a), open=(editAppId===a.id), cn=a.itv&&clashNo[a.itv];
+      var iv=itvDate(a), w=appWarn(st,a), open=(editAppId===a.id), cn=iv&&clashNo[iv];
       var tr=tb.insertRow(); tr.className="arow"+(w?" warn":"")+(open?" open":"");
       tr.insertCell().appendChild(el("span","kind"+(a.jc?" jc":""),(a.jc?"전문대 ":"")+(a.kind==="정시"?(a.group&&!a.jc?a.group+"군":"정시"):"수시")));
       tr.insertCell().textContent=a.univ||"미입력";
       tr.insertCell().textContent=a.major||"";
       var jc=tr.insertCell(); jc.textContent=a.jh||a.type||""; if(isRec(a)) jc.appendChild(el("span","recb","학교장추천"));
       var dc=tr.insertCell(), parts=[];
-      if(a.ann1) parts.push(document.createTextNode(mmdd(a.ann1)+" 1단계"));
-      if(a.itv){ var it=itvCell(a)+" 면접"; parts.push(cn?el("span","clash",cn+" "+it):document.createTextNode(it)); if(a.itvTime&&a.itvSrc!=="공지"&&a.itvSrc!=="학생"){ var q=el("span","itvq","확인 필요"); q.title="시각 출처를 아직 고르지 않았습니다(입학처 공지·학생 수험표로 확인)"; parts.push(q); } }
-      if(a.ann) parts.push(document.createTextNode(mmdd(a.ann)+" 발표"));
+      var first=announcement(a,"ann1"), final=announcement(a,"ann");
+      if(first) parts.push(document.createTextNode(mdw(first)+" 1단계"));
+      if(iv){ var it=itvCell(a)+" 면접"; parts.push(cn?el("span","clash",cn+" "+it):document.createTextNode(it)); if(a.itvTime&&a.itvSrc!=="공지"&&a.itvSrc!=="학생"){ var q=el("span","itvq","확인 필요"); q.title="시각 출처를 아직 고르지 않았습니다(입학처 공지·학생 수험표로 확인)"; parts.push(q); } }
+      if(final) parts.push(document.createTextNode(mdw(final)+" 발표"));
       if(!parts.length) dc.textContent="—";
       parts.forEach(function(p,i){ if(i) dc.appendChild(document.createTextNode(" · ")); dc.appendChild(p); });
       var mc=tr.insertCell();
@@ -2279,10 +2429,10 @@ function detail(st){
       }
       var ec=tr.insertCell(); ec.className="act";
       if(w==="면접·고사일 중복"&&cn){
-        var mA=apps.filter(function(x){ return x!==a&&x.itv===a.itv&&x.univ!==a.univ; }), mates=mA.map(function(x){ return shortUniv(x.univ)+(x.itvTime?" "+x.itvTime:""); });
+        var mA=apps.filter(function(x){ return x!==a&&itvDate(x)===iv&&x.univ!==a.univ; }), mates=mA.map(function(x){ return shortUniv(x.univ)+(x.itvTime?" "+x.itvTime:""); });
         var ck=clashKind([a].concat(mA));
         var cw=el("span","w"+(ck==="far"?" soft":""),ck==="over"?cn+" 시간 겹침: "+mates.join("·"):ck==="far"?cn+" 같은 날 · "+mates.join("·"):cn+" "+mA.map(function(x){ return shortUniv(x.univ); }).join("·")+"와 같은 날");
-        cw.title=ck==="unknown"?mmdd(a.itv)+" 면접·고사가 같은 날입니다. 시각을 넣으면 겹치는지 알려 드립니다(입학처 공지·수험표로 확인).":ck==="over"?"3시간 안이라 둘 다 보기 어렵습니다. 하나를 고르세요.":"시간은 다르지만 이동 시간을 확인하세요."; ec.appendChild(cw);
+        cw.title=ck==="unknown"?mmdd(iv)+" 면접·고사가 같은 날입니다. 시각을 넣으면 겹치는지 알려 드립니다(입학처 공지·수험표로 확인).":ck==="over"?"3시간 안이라 둘 다 보기 어렵습니다. 하나를 고르세요.":"시간은 다르지만 이동 시간을 확인하세요."; ec.appendChild(cw);
       } else if(w) ec.appendChild(el("span","w",w));
       ec.appendChild(el("span","edit",open?"닫기 ▲":"고치기 ▼"));
       [].forEach.call(tr.cells,function(c,i){ if(heads[i]) c.setAttribute("data-l",heads[i]); });
@@ -2323,10 +2473,10 @@ function appEditor(st,a,w){
     g.appendChild(field("구분", sel(KINDS,a.kind,function(v){a.kind=v; if(v==="정시")a.type="정시"; a.c6=(v==="수시"&&!a.jc); save(st); render();})));
     g.appendChild(field("대학 구분", sel(["4년제","전문대"],a.jc?"전문대":"4년제",function(v){
       a.jc=(v==="전문대"); a.c6=(a.kind==="수시"&&!a.jc); if(a.jc) a.group=""; save(st); render(); })));
-    g.appendChild(field("대학", txt(a.univ,a.jc?"동의과학대학교":"부산대학교",function(v){a.univ=v; save(st); render();})));
-    g.appendChild(field("모집단위", txt(a.major,"수학교육과",function(v){a.major=v; save(st);})));
-    g.appendChild(field("전형명", txt(a.jh,"학생부종합(일반)",function(v){a.jh=v; save(st);})));
-    g.appendChild(field("전형유형", sel(TYPES,a.type,function(v){a.type=v; save(st);})));
+    g.appendChild(field("대학", txt(a.univ,a.jc?"동의과학대학교":"부산대학교",function(v){a.univ=v; fillMin(st); fillExam(st); save(st); render();})));
+    g.appendChild(field("모집단위", txt(a.major,"수학교육과",function(v){a.major=v; fillMin(st); fillExam(st); save(st); render();})));
+    g.appendChild(field("전형명", txt(a.jh,"학생부종합(일반)",function(v){a.jh=v; if(a.kind==="수시"&&mapType(v)) a.type=mapType(v); fillMin(st); fillExam(st); save(st); render();})));
+    g.appendChild(field("전형유형", sel(TYPES,a.type,function(v){a.type=v; save(st); render();})));
     if(a.kind==="수시"){
       var rf=field("학교장추천", sel(["아님","학교장추천"],isRec(a)?"학교장추천":"아님",function(v){a.rec=(v==="학교장추천"); save(st); render();}));
       rf.title="전형명에 '학교장추천'이 있으면 저절로 고릅니다. 다르면 여기서 바꾸세요."; g.appendChild(rf);
@@ -2334,10 +2484,10 @@ function appEditor(st,a,w){
     if(a.kind==="정시"&&!a.jc) g.appendChild(field("군", sel([""].concat(GROUPS),a.group||"",function(v){a.group=v; save(st);})));
     if(a.kind==="정시") g.appendChild(field("원서 접수", sel(["접수 전","접수 완료"],a.filed?"접수 완료":"접수 전",function(v){ if(v==="접수 완료") a.filed=true; else delete a.filed; save(st); render(); })));
     if(a.kind==="수시"){
-      var a1=field("1단계 발표일", dateInput("date",a.ann1,function(v){a.ann1=v; save(st); render();}));
+      var a1=announcementField(st,a,"ann1","1단계 발표일");
       a1.title="서류로 먼저 거르는 단계형 전형(학종 등)만 넣습니다. 일괄합산이면 비워 두세요."; g.appendChild(a1);
     }
-    g.appendChild(field("면접일", dateInput("date",a.itv,function(v){ if(a.itvTbl){ delete a.itvTime; delete a.itvPlace; delete a.itvSrc; delete a.itvTbl; } a.itv=v; fillExam(st); save(st); render(); })));
+    g.appendChild(announcementField(st,a,"itv","면접일",function(v){ if(a.itvTbl){ delete a.itvTime; delete a.itvPlace; delete a.itvSrc; delete a.itvTbl; } a.itv=v; fillExam(st); }));
     if(a.kind==="수시"){
       var ti=document.createElement("input"); ti.type="time"; ti.value=a.itvTime||""; ti.disabled=ro();
       ti.onchange=function(){ remember("수정"); if(ti.value) a.itvTime=ti.value; else delete a.itvTime; shareExam(a); save(st); render(); };
@@ -2348,11 +2498,11 @@ function appEditor(st,a,w){
       sa.className="ghost itvfind"; sa.href=itvSearchUrl(a); sa.target="_blank"; sa.rel="noopener"; sa.textContent="입학처 공지 찾기 ↗"; sa.title="새 창에서 이 대학의 고사 시간·고사장 공지를 검색합니다";
       sf.appendChild(sl); sf.appendChild(sa); g.appendChild(sf);
     }
-    g.appendChild(field(a.kind==="수시"?"최종 발표일":"발표일", dateInput("date",a.ann,function(v){a.ann=v; save(st); render();})));
+    g.appendChild(announcementField(st,a,"ann",a.kind==="수시"?"최초 합격자 발표일":"발표일"));
     if(a.kind==="수시") g.appendChild(field("최저 충족", sel(MINSTATES,a.mmet||"미정",function(v){a.mmet=v; save(st); render();})));
     if(!hasWaitInfo(a)&&canEditWait(st)) g.appendChild(waitButton(st,a));
     g.appendChild(field("메모", txt(a.note,"",function(v){a.note=v; save(st);})));
-    if(a.kind==="수시"&&a.itv){ var pf=field("면접 준비 ("+prepDone(a)+"/"+prepList(a).length+")", prepChips(st,a)); pf.classList.add("wide"); g.appendChild(pf); }
+    if(a.kind==="수시"&&itvDate(a)){ var pf=field("면접 준비 ("+prepDone(a)+"/"+prepList(a).length+")", prepChips(st,a)); pf.classList.add("wide"); g.appendChild(pf); }
     if(a.kind==="수시"&&!a.jc){
       var cb=document.createElement("select");
       ["Y","N"].forEach(function(o){var op=document.createElement("option");op.value=o;op.textContent=o==="Y"?"포함":"제외";if((a.c6?"Y":"N")===o)op.selected=true;cb.appendChild(op);});
@@ -2579,7 +2729,9 @@ function renderUniv(all){
   names.forEach(function(u){
     var o=uni[u], open=(openUniv===u)||(!!q&&names.length===1);
     var r=ub.insertRow(); r.className="urow"+(open?" open":"");
-    var c0=r.insertCell(); c0.textContent=o.label; c0.appendChild(el("span","ucaret",open?"▲":"▼"));
+    var c0=r.insertCell(); c0.textContent=o.label;
+    if(!byM){ var st=univSchedText(o.list); if(st) c0.appendChild(el("span","usched",st)); }
+    c0.appendChild(el("span","ucaret",open?"▲":"▼"));
     [o.n,Object.keys(byM?o.unis:o.stu).length,o.pass,o.wait,o.fail].forEach(function(v,i){
       var td=r.insertCell(); td.className="num"; td.textContent=v;
       if(i===0){ var bar=el("span","ubar"); bar.style.width=Math.max(3,Math.round(v/umax*(narrow?28:70)))+"px"; td.insertBefore(bar,td.firstChild); }
@@ -2593,6 +2745,12 @@ function renderUniv(all){
   });
   if(!names.length){ var r=ub.insertRow(); var td=r.insertCell(); td.colSpan=heads.length;
     td.textContent=q?"찾는 내용이 없습니다.":"아직 입력된 지원 내역이 없습니다."; td.style.color="var(--ink-3)"; }
+}
+function univSchedText(list){
+  var s1=[], iv=[], fn=[], add=function(arr,d){ d=dateKey(d); if(d&&arr.indexOf(d)<0) arr.push(d); };
+  list.forEach(function(it){ add(s1,announcement(it.a,"ann1")); add(iv,itvDate(it.a)); add(fn,announcement(it.a,"ann")); });
+  var fmt=function(arr,lbl){ arr.sort(); return arr.length?lbl+" "+arr.slice(0,2).map(mmdd).join("·")+(arr.length>2?" 외":""):""; };
+  return [fmt(s1,"1단계"),fmt(iv,"면접"),fmt(fn,"발표")].filter(Boolean).join(" · ");
 }
 function univDetail(list,byM){
   var box=el("div");
@@ -2611,7 +2769,8 @@ function univDetail(list,byM){
     row.appendChild(el("span","pill "+statusClass(a.status),a.status||"지원완료"));
     row.appendChild(el("span","sub",[a.jc?"전문대":"", a.kind==="정시"?(a.group&&!a.jc?a.group+"군":"정시"):"수시", jhText(a)].filter(Boolean).join(" · ")));
     var meta=el("div","meta");
-    var bits=[a.ann1?mmdd(a.ann1)+" 1단계 발표":"", a.itv?mmdd(a.itv)+" 면접":"", a.ann?mmdd(a.ann)+" 발표":"", a.due?"충원 "+fmtDue(a.due)+"까지":"", a.rank?"예비 "+a.rank:""].filter(Boolean);
+    var first=announcement(a,"ann1"), iv=itvDate(a), final=announcement(a,"ann");
+    var bits=[first?mdw(first)+" 1단계 발표":"", iv?mmdd(iv)+" 면접":"", final?mdw(final)+" 발표":"", a.due?"충원 "+fmtDue(a.due)+"까지":"", a.rank?"예비 "+a.rank:""].filter(Boolean);
     if(a.kind==="수시"&&a.mreq) bits.push("최저 "+(minShort(a.mreq)||a.mreq));
     meta.textContent=bits.join(" · ");
     if(a.kind==="수시"&&a.mmet==="미충족"){ meta.appendChild(document.createTextNode(bits.length?" · ":"")); meta.appendChild(el("span","miss","최저 미충족")); }
@@ -2630,9 +2789,10 @@ function upcoming(arr,days){
   var ev=[], lim=days==null?schedDays:days;
   arr.forEach(function(s){ (s.apps||[]).forEach(function(a){
     var add=function(when,kind){ var d=daysTo(when); if(d!==null&&d>=0&&d<=lim) ev.push({s:s,a:a,kind:kind,when:when,d:d}); };
-    if(a.itv&&!PASS[a.status]&&!/불/.test(a.status||"")) add(a.itv,"itv");
-    if(ann1Wait(a)) add(a.ann1,"ann1");
-    if(a.ann&&AWAIT[a.status||"지원완료"]) add(a.ann,"ann");
+    var iv=itvDate(a);
+    if(iv&&!PASS[a.status]&&!/불/.test(a.status||"")) add(iv,"itv");
+    if(ann1Wait(a)) add(announcement(a,"ann1"),"ann1");
+    if(AWAIT[a.status||"지원완료"]) add(announcement(a,"ann"),"ann");
     if(a.status==="충원대기"){
       if(a.addAnn) add(a.addAnn,"addAnn");
       if(a.due) add(a.due,"due");
@@ -2665,7 +2825,7 @@ function saveIcs(ev, label){
     var list=anns[day];
     var who=list.map(function(e){ return e.s.name; }).filter(function(n,i,arr){ return arr.indexOf(n)===i; });
     var title="[발표] "+label+" "+list.length+"건 · "+who.slice(0,3).join(", ")+(who.length>3?" 외 "+(who.length-3)+"명":"");
-    var desc=list.map(function(e){ var a=e.a; return (e.s.cls?e.s.cls+"반 ":"")+(e.s.name||"")+" - "+[shortUniv(a.univ), shortMajor(a.major), a.jh||a.type].filter(Boolean).join(" "); }).join("\n");
+    var desc=list.map(function(e){ var a=e.a; return (e.s.cls?e.s.cls+"반 ":"")+(e.s.name||"")+" - "+[shortUniv(a.univ), shortMajor(a.major), a.jh||a.type, String(e.when).slice(11)].filter(Boolean).join(" "); }).join("\n");
     L.push.apply(L,["BEGIN:VEVENT","UID:ann-"+day+"-"+encodeURIComponent(label).replace(/%/g,"")+"@jinhak-board","DTSTAMP:"+now]
       .concat(allDay(day),["SUMMARY:"+icsText(title),"DESCRIPTION:"+icsText(desc)],alarm(title,"-PT15H"),["END:VEVENT"]));
   });
@@ -2676,11 +2836,11 @@ function saveIcs(ev, label){
       a.kind==="수시"&&a.mreq?"수능최저: "+(minShort(a.mreq)||a.mreq)+(a.mmet&&a.mmet!=="미정"&&a.mmet!=="해당없음"?" ("+a.mmet+")":""):"",
       e.kind==="addAnn"&&a.addMethod?"확인 방법: "+a.addMethod:"",e.kind==="addAnn"?waitUrl(a.addUrl):""].filter(Boolean).join("\n");
     L.push("BEGIN:VEVENT","UID:"+a.id+"-"+e.kind+"@jinhak-board","DTSTAMP:"+now);
-    if(/^(addAnn|due)$/.test(e.kind)&&/T\d/.test(e.when)){
-      var t=new Date(e.when);
+    if(/^(ann1|addAnn|due)$/.test(e.kind)&&/T\d/.test(e.when)){
+      var t=new Date(String(e.when).replace(" ","T")+"+09:00");
       L.push("DTSTART:"+icsDate(t),"DTEND:"+icsDate(new Date(t.getTime()+30*60000)));
     } else if(e.kind==="itv"&&a.itvTime){
-      var t2=new Date(String(a.itv).slice(0,10)+"T"+a.itvTime+":00");
+      var t2=new Date(String(e.when).slice(0,10)+"T"+a.itvTime+":00");
       L.push("DTSTART:"+icsDate(t2),"DTEND:"+icsDate(new Date(t2.getTime()+120*60000)));
       if(a.itvPlace) L.push("LOCATION:"+icsText(shortUniv(a.univ)+" "+a.itvPlace));
     } else L.push.apply(L, allDay(String(e.when).slice(0,10)));
@@ -2942,6 +3102,7 @@ function renderSched(host, arr, showClass){
     who.onclick=function(){ goStudent(s); };
     row.appendChild(who);
     row.appendChild(el("span","sub",[(a.jc?"전문대 ":"")+shortUniv(a.univ), shortMajor(a.major), a.kind==="정시"?(a.group&&!a.jc?a.group+"군":"정시"):jhText(a)].filter(Boolean).join(" · ")));
+    var src=/^(ann1?|itv)$/.test(e.kind)&&announcementLink(a,e.kind); if(src) row.appendChild(src);
     if(/^(addAnn|due)$/.test(e.kind)&&a.rank) row.appendChild(el("span","pill s-wait","예비 "+a.rank));
     if(e.kind==="addAnn"&&a.addMethod) row.appendChild(el("span","sub",a.addMethod));
     if(e.kind==="itv"&&prepNeeds(a)){ var pn=prepDone(a), pm=prepList(a).length; row.appendChild(el("span","pill "+(pn===pm?"s-ok":e.d<=7?"s-bad":"empty"),"준비 "+pn+"/"+pm)); }
@@ -2960,8 +3121,9 @@ var todoAll=false;
 function pending(arr){
   var out=[], now=Date.now();
   arr.forEach(function(s){ (s.apps||[]).forEach(function(a){
-    if(a.ann&&AWAIT[a.status||"지원완료"]&&daysTo(a.ann)<0) out.push({s:s,a:a,kind:"ann",when:a.ann,late:-daysTo(a.ann)});
-    else if(ann1Late(a)) out.push({s:s,a:a,kind:"ann1",when:a.ann1,late:-daysTo(a.ann1)});
+    var ann=announcement(a,"ann"), first=announcement(a,"ann1");
+    if(finalLate(a,ann)) out.push({s:s,a:a,kind:"ann",when:ann,late:-daysTo(ann)});
+    else if(ann1Late(a)) out.push({s:s,a:a,kind:"ann1",when:first,late:-daysTo(first)});
     else if(annOver(a)){ var sa=kdOf("s-ann").s; out.push({s:s,a:a,kind:"annx",when:sa,late:-daysTo(sa)}); }
     else if(a.status==="충원대기"){ var du=a.due||addEnd(a); if(du&&new Date(du).getTime()<now) out.push({s:s,a:a,kind:"due",when:du,late:Math.max(0,-daysTo(du)),noDue:!a.due}); }
   }); });
@@ -2980,16 +3142,17 @@ function renderTodo0(host, arr, showClass){
   hd.appendChild(el("h2",null,"결과 입력할 것"));
   hd.appendChild(el("span","cnt",list.length+"건"));
   host.appendChild(hd);
-  host.appendChild(el("div","shint","발표일(1단계 발표·충원 마감)이 지났는데 결과가 들어오지 않은 지원입니다. 발표일을 넣지 않은 수시 지원은 수시 합격자 발표 마감이, 충원 마감을 넣지 않은 충원 대기는 충원 합격 통보 마감이 지나면 여기 나옵니다. 오른쪽에서 결과를 고르면 목록에서 빠집니다."));
+  host.appendChild(el("div","shint","발표일이나 충원 통보 마감이 지나 결과 확인이 필요한 지원입니다. 대학별 날짜가 없으면 공통 마감 이후 표시됩니다. 확인한 결과를 고르면 목록에서 빠집니다."));
   var LIMIT=12;
   list.slice(0,todoAll?list.length:LIMIT).forEach(function(e){
     var row=el("div","sitem"), s=e.s, a=e.a;
-    row.appendChild(el("span","sk late",e.kind==="ann"?"발표 "+mmdd(a.ann):e.kind==="annx"?"발표 마감 "+mmdd(e.when):e.kind==="ann1"?"1단계 발표 "+mmdd(a.ann1):(e.noDue?"충원 통보 마감 ":"충원 마감 ")+mmdd(e.when)));
+    row.appendChild(el("span","sk late",e.kind==="ann"?"발표 "+mmdd(e.when):e.kind==="annx"?"발표 마감 "+mmdd(e.when):e.kind==="ann1"?"1단계 발표 "+mmdd(e.when):(e.noDue?"충원 통보 마감 ":"충원 마감 ")+mmdd(e.when)));
     var who=el("button","who",(showClass&&s.cls?s.cls+"반 ":"")+(s.no?s.no+" ":"")+(s.name||""));
     who.title="이 학생 보기";
     who.onclick=function(){ goStudent(s); };
     row.appendChild(who);
     row.appendChild(el("span","sub",[(a.jc?"전문대 ":"")+shortUniv(a.univ), shortMajor(a.major), a.kind==="정시"?(a.group&&!a.jc?a.group+"군":"정시"):jhText(a)].filter(Boolean).join(" · ")));
+    var src=/^(ann1?|itv)$/.test(e.kind)&&announcementLink(a,e.kind); if(src) row.appendChild(src);
     if(e.late) row.appendChild(el("span","late",e.late+"일 지남"));
     var opts=e.kind==="due"?["충원대기","충원합","불합격","등록완료","등록포기"]:e.kind==="ann1"?["지원완료","1단계합","1단계불"]:STATUSES;
     curCls=s.cls;
@@ -3035,7 +3198,7 @@ function renderBulk(host, arr, showClass, S, btnId){
   var items=[]; arr.forEach(function(st){ (st.apps||[]).forEach(function(a){ if(a.univ) items.push({s:st,a:a}); }); });
   var live=function(a){ return !!LIVE[a.status||"지원완료"]; }, opts={};
   items.forEach(function(x){
-    var a=x.a, keys=S.mode==="univ"?[univKey(a.univ)]:[String(a.ann||"").slice(0,10),String(a.ann1||"").slice(0,10)].filter(Boolean);
+    var a=x.a, keys=S.mode==="univ"?[univKey(a.univ)]:[dateKey(announcement(a,"ann")),dateKey(announcement(a,"ann1"))].filter(function(k,i,l){return k&&l.indexOf(k)===i;});
     keys.forEach(function(k){ var o=opts[k]=opts[k]||{k:k,n:0,live:0,label:S.mode==="univ"?((a.jc?"전문대 ":"")+shortUniv(a.univ)):mdw(k)+" 발표"}; o.n++; if(live(a)) o.live++; });
   });
   var L=Object.keys(opts).map(function(k){ return opts[k]; });
@@ -3058,13 +3221,13 @@ function renderBulk(host, arr, showClass, S, btnId){
   host.appendChild(hd);
   if(!L.length){ host.appendChild(el("div","sempty",S.mode==="univ"?"대학이 들어간 지원이 없습니다.":"발표일이 들어간 지원이 없습니다. 지원 고치기에서 발표일을 넣으면 여기서 고를 수 있습니다.")); return; }
   host.appendChild(el("div","shint","고르면 바로 저장됩니다. 충원대기는 옆 칸에 예비 번호를 적으세요. 대학 목록은 결과를 기다리는 지원이 많은 곳부터입니다."));
-  var rows=items.filter(function(x){ return S.mode==="univ"?univKey(x.a.univ)===S.sel:(String(x.a.ann||"").slice(0,10)===S.sel||String(x.a.ann1||"").slice(0,10)===S.sel); });
+  var rows=items.filter(function(x){ return S.mode==="univ"?univKey(x.a.univ)===S.sel:(dateKey(announcement(x.a,"ann"))===S.sel||dateKey(announcement(x.a,"ann1"))===S.sel); });
   rows.sort(function(x,y){ return ((x.s.cls||0)-(y.s.cls||0))||String(x.s.no||"").localeCompare(String(y.s.no||"")); });   // 고르는 중에 줄이 움직이지 않게 학번순
   var off=canWrite===false||(demo&&!practice);
   rows.forEach(function(x){
     var s=x.s, a=x.a, row=el("div","sitem bulkrow");
     var who=el("button","who",(showClass&&s.cls?s.cls+"반 ":"")+(s.no?s.no+" ":"")+(s.name||"")); who.title="이 학생 보기"; who.onclick=function(){ goStudent(s); }; row.appendChild(who);
-    var one=S.mode==="date"&&String(a.ann1||"").slice(0,10)===S.sel&&String(a.ann||"").slice(0,10)!==S.sel;
+    var one=S.mode==="date"&&dateKey(announcement(a,"ann1"))===S.sel&&dateKey(announcement(a,"ann"))!==S.sel;
     row.appendChild(el("span","sub",[S.mode==="date"?(a.jc?"전문대 ":"")+shortUniv(a.univ):"", shortMajor(a.major), a.kind==="정시"?(a.group?a.group+"군":"정시"):jhText(a), one?"1단계 발표":""].filter(Boolean).join(" · ")));
     var sp=el("span","bsp"), se=document.createElement("select"); se.disabled=off; se.setAttribute("aria-label",(s.name||"")+" "+shortUniv(a.univ)+" 결과");
     STATUSES.forEach(function(v){ var op=document.createElement("option"); op.value=v; op.textContent=v; if(v===(a.status||"지원완료")) op.selected=true; se.appendChild(op); });
@@ -3219,13 +3382,14 @@ function renderToday(host, arr, showClass){
   var col={0:[],1:[]}; ev.forEach(function(e){ col[e.d].push(e); });
   // 방금 결과를 넣은 오늘 발표도 그 자리에 남긴다
   arr.forEach(function(st){ (st.apps||[]).forEach(function(a){ var d=todayDone[a.id];
-    if(d&&daysTo(d.kind==="ann"?a.ann:a.ann1)===0&&!ev.some(function(e){ return e.a===a; })) col[0].push({s:st,a:a,kind:d.kind,when:d.kind==="ann"?a.ann:a.ann1,d:0}); }); });
+    var when=d&&d.kind!=="due"?announcement(a,d.kind):"";
+    if(when&&daysTo(when)===0&&!ev.some(function(e){ return e.a===a&&e.kind===d.kind; })) col[0].push({s:st,a:a,kind:d.kind,when:when,d:0}); }); });
   var KO={itv:0,ann1:1,ann:2,addAnn:3,due:4};
   col[0].sort(function(p,q){ return ((KO[p.kind]||0)-(KO[q.kind]||0))||((p.s.cls||0)-(q.s.cls||0))||String(p.s.no||"").localeCompare(String(q.s.no||""))||String(p.a.univ).localeCompare(String(q.a.univ)); });
   var kd={0:[],1:[]};
   KEYDATES.forEach(function(k){ var d=kdDays(k); if(d.a<=0&&d.b>=0) kd[0].push(k.t+(k.e&&d.b>0?" ("+mdw(k.e)+"까지)":d.b===0&&k.e?" — 마지막 날":"")); else if(d.a===1) kd[1].push(k.t+" 시작"); });
   var pend=arr.length?pending(arr).length:0;
-  var prep=[]; arr.forEach(function(st){ (st.apps||[]).forEach(function(a){ var d=daysTo(a.itv); if(prepNeeds(a)&&d!==null&&d>=2&&d<=3&&prepLeft(a).length) prep.push(a); }); });
+  var prep=[]; arr.forEach(function(st){ (st.apps||[]).forEach(function(a){ var d=daysTo(itvDate(a)); if(prepNeeds(a)&&d!==null&&d>=2&&d<=3&&prepLeft(a).length) prep.push(a); }); });
   var adds=addWaiting(arr);
   var any=col[0].length||col[1].length||kd[0].length||kd[1].length||pend||prep.length||adds.length;
   host.hidden=!any; if(!any) return;
@@ -3348,7 +3512,7 @@ function renderReg(host, arr, showClass){
 }
 /* ── 상담 기록 ── 학생마다 날짜·누구와·짧은 내용. 학교 장부에서는 학생 자료와 함께 암호화된다 */
 var NOTEK=["학생","학부모","전화","기타"];
-function ymdNow(){ var d=new Date(); return d.getFullYear()+"-"+pad2(d.getMonth()+1)+"-"+pad2(d.getDate()); }
+function ymdNow(){ return new Date(Date.now()+9*3600000).toISOString().slice(0,10); }
 function notesOf(st){ return (st.notes||[]).slice().sort(function(a,b){ return a.d<b.d?1:a.d>b.d?-1:0; }); }
 function unionNotes(a,b){ var seen={}, out=[]; (a||[]).concat(b||[]).forEach(function(n){ if(n&&!seen[n.id]){ seen[n.id]=1; out.push(n); } }); return out; }
 function noteCard(st){
@@ -3400,7 +3564,7 @@ var PREP={
   실기:[["prac","실기 연습"],["go","장소·시간·준비물 확인"]]
 };
 function prepList(a){ return PREP[a.type==="논술"?"논술":a.type==="실기"?"실기":"면접"]; }
-function prepNeeds(a){ var s0=a.status||"지원완료"; return a.kind==="수시"&&!!a.itv&&(s0==="지원완료"||s0==="1단계합"); }
+function prepNeeds(a){ var s0=a.status||"지원완료"; return a.kind==="수시"&&!!itvDate(a)&&(s0==="지원완료"||s0==="1단계합"); }
 function prepDone(a){ var p=a.prep||{}; return prepList(a).filter(function(x){ return p[x[0]]; }).length; }
 function prepLeft(a){ var p=a.prep||{}; return prepList(a).filter(function(x){ return !p[x[0]]; }).map(function(x){ return x[1]; }); }
 function prepChips(st,a){
@@ -3418,12 +3582,12 @@ function renderPrep(host, arr, showClass){
   host.innerHTML="";
   var items=[];
   arr.forEach(function(st){ (st.apps||[]).forEach(function(a){
-    var d=daysTo(a.itv); if(!prepNeeds(a)||d===null||d<0) return;
+    var iv=itvDate(a), d=daysTo(iv); if(!prepNeeds(a)||d===null||d<0) return;
     var vd=afterCsatApp(a)?examVerdict(st,a):null; if(vd&&vd.v==="skip") return;   // 최저를 못 채워 안 가도 되는 고사는 뺀다
-    items.push({s:st,a:a,d:d});
+    items.push({s:st,a:a,iv:iv,d:d});
   }); });
   host.hidden=!items.length; if(!items.length) return;
-  items.sort(function(x,y){ return String(x.a.itv).localeCompare(String(y.a.itv))||(x.s.cls-y.s.cls)||String(x.s.no||"").localeCompare(String(y.s.no||"")); });
+  items.sort(function(x,y){ return String(x.iv).localeCompare(String(y.iv))||(x.s.cls-y.s.cls)||String(x.s.no||"").localeCompare(String(y.s.no||"")); });
   var todo=items.filter(function(x){ return prepDone(x.a)<prepList(x.a).length; }).length;
   var hd=el("div","schedhead"); hd.appendChild(el("h2",null,"면접·고사 준비"));
   hd.appendChild(el("span","cnt",items.length+"건 · 준비 남음 "+todo+"건"));
@@ -3435,7 +3599,7 @@ function renderPrep(host, arr, showClass){
     row.appendChild(el("span","pill "+(n===m?"s-ok":x.d<=7?"s-bad":"s-go"),x.d===0?"오늘":"D-"+x.d));
     var who=el("button","who",(showClass&&s.cls?s.cls+"반 ":"")+(s.no?s.no+" ":"")+(s.name||"")); who.title="이 학생 보기";
     who.onclick=function(){ goStudent(s); }; row.appendChild(who);
-    row.appendChild(el("span","sub",[mdw(a.itv)+" "+(a.type==="논술"?"논술":a.type==="실기"?"실기":"면접"), (a.jc?"전문대 ":"")+shortUniv(a.univ), shortMajor(a.major), jhText(a)].filter(Boolean).join(" · ")));
+    row.appendChild(el("span","sub",[mdw(x.iv)+" "+(a.type==="논술"?"논술":a.type==="실기"?"실기":"면접"), (a.jc?"전문대 ":"")+shortUniv(a.univ), shortMajor(a.major), jhText(a)].filter(Boolean).join(" · ")));
     row.appendChild(el("span","pill "+(n===m?"s-ok":"empty"),"준비 "+n+"/"+m));
     row.appendChild(prepChips(s,a));
     host.appendChild(row);
@@ -3449,8 +3613,8 @@ var VERD={skip:["안 가도 됨","s-bad"],near:["응시 권함 · 미충족 아�
 var VORDER=["skip","near","check","edge","go"];
 function csatDay(){ var k=KEYDATES.filter(function(x){ return x.id==="csat"; })[0]; return k?k.s:"9999"; }
 function afterCsatApp(a){
-  var s0=a.status||"지원완료";
-  return a.kind==="수시"&&!!a.itv&&String(a.itv).slice(0,10)>=csatDay()&&(s0==="지원완료"||s0==="1단계합");
+  var s0=a.status||"지원완료", iv=itvDate(a);
+  return a.kind==="수시"&&!!iv&&iv>=csatDay()&&(s0==="지원완료"||s0==="1단계합");
 }
 function examVerdict(st,a){
   if(!hasCsat(st)) return null;
@@ -3497,13 +3661,13 @@ function renderAfterCsat(host, arr, showClass){
   var sum=el("div","acsum");
   VORDER.forEach(function(v){ if(cnt[v]) sum.appendChild(el("span","pill "+VERD[v][1],VERD[v][0]+" "+cnt[v])); });
   if(rows.length) host.appendChild(sum);
-  rows.sort(function(x,y){ return VORDER.indexOf(x.r.v)-VORDER.indexOf(y.r.v)||String(x.a.itv).localeCompare(String(y.a.itv))||(x.s.cls-y.s.cls)||String(x.s.no||"").localeCompare(String(y.s.no||"")); });
+  rows.sort(function(x,y){ return VORDER.indexOf(x.r.v)-VORDER.indexOf(y.r.v)||String(itvDate(x.a)).localeCompare(String(itvDate(y.a)))||(x.s.cls-y.s.cls)||String(x.s.no||"").localeCompare(String(y.s.no||"")); });
   rows.forEach(function(x){
     var s=x.s, a=x.a, row=el("div","sitem");
     row.appendChild(el("span","pill "+VERD[x.r.v][1],VERD[x.r.v][0]));
     var who=el("button","who",(showClass&&s.cls?s.cls+"반 ":"")+(s.no?s.no+" ":"")+(s.name||"")); who.title="이 학생 보기";
     who.onclick=function(){ goStudent(s); }; row.appendChild(who);
-    row.appendChild(el("span","sub",[mdw(a.itv)+" "+(a.type==="논술"?"논술":a.type==="실기"?"실기":"면접·고사"), (a.jc?"전문대 ":"")+shortUniv(a.univ), shortMajor(a.major), jhText(a)].filter(Boolean).join(" · ")));
+    row.appendChild(el("span","sub",[mdw(itvDate(a))+" "+(a.type==="논술"?"논술":a.type==="실기"?"실기":"면접·고사"), (a.jc?"전문대 ":"")+shortUniv(a.univ), shortMajor(a.major), jhText(a)].filter(Boolean).join(" · ")));
     row.appendChild(el("span","acwhy",x.r.why+(a.mreq&&x.r.why.indexOf("없음")<0?" (기준: "+(minShort(a.mreq)||a.mreq)+")":"")));
     host.appendChild(row);
   });
@@ -3529,14 +3693,14 @@ function renderCsatNudge(host, mine){
   }
   else if(daysTo(csatDay())<=0) mine.forEach(function(st){
     if(hasCsat(st)) return;
-    var k=(st.apps||[]).filter(function(a){ return afterCsatApp(a)&&a.mreq&&!parseMin(a.mreq).none&&daysTo(a.itv)>=0; }).length;
+    var k=(st.apps||[]).filter(function(a){ return afterCsatApp(a)&&a.mreq&&!parseMin(a.mreq).none&&daysTo(itvDate(a))>=0; }).length;
     if(k){ need.push(st); n+=k; }
   });
   if(!after&&need.length) msg="수능이 끝났습니다. 가채점 등급을 넣으면 최저가 있는 수능 뒤 면접·논술·실기 "+n+"건을 갈지 말지 바로 판단합니다. 등급이 없는 학생 "+need.length+"명: "+need.slice(0,5).map(function(st){ return st.name; }).join(", ")+(need.length>5?" 외":"");
   if(!after&&!need.length&&daysTo(csatDay())<=0){
     var cnt={}, n2=0;
     mine.forEach(function(st){ if(!hasCsat(st)) return; (st.apps||[]).forEach(function(a){
-      if(!afterCsatApp(a)||daysTo(a.itv)<0) return; var r=examVerdict(st,a); if(!r) return; cnt[r.v]=(cnt[r.v]||0)+1; n2++; }); });
+      if(!afterCsatApp(a)||daysTo(itvDate(a))<0) return; var r=examVerdict(st,a); if(!r) return; cnt[r.v]=(cnt[r.v]||0)+1; n2++; }); });
     if(n2){
       host.hidden=false; host.innerHTML=""; host.className="backupbar csum";
       var t=el("span",null); t.appendChild(el("b",null,(mine.some(function(st){ return st.csat&&st.csat.src==="가채점"; })?"가채점":"수능")+" 판정 · 수능 뒤 고사 "+n2+"건"));
@@ -4276,7 +4440,7 @@ function noticeItems(st, days){
       if(vd) vt=vd.v==="skip"?" → 수능최저 미충족(가채점 기준이면 확인), 응시하지 않아도 됩니다":vd.v==="near"?" → 가채점으로는 수능최저가 한 등급 차이로 모자랍니다. 가채점은 틀릴 수 있으니 응시하세요":vd.v==="edge"?" → 수능최저 아슬아슬, 응시하세요":vd.v==="check"?" → 수능최저 충족 여부 담임과 확인":a.mreq&&vd.why.indexOf("없음")<0?" → 수능최저 충족, 응시하세요":"";
       add(e.when, (a.type==="논술"?"논술":a.type==="실기"?"실기":"면접·고사")+(a.itvTime?" "+a.itvTime:"")+" — "+nm(a)+(a.itvPlace?" ["+a.itvPlace+"]":"")+vt);
     }
-    else if(e.kind==="ann") add(e.when, "합격자 발표 — "+nm(a));
+    else if(e.kind==="ann"){ var official=appliedAnnouncement(a,"ann"); add(e.when, (official&&official.by?"합격자 발표 기한":"합격자 발표")+" — "+nm(a)); }
     else if(e.kind==="ann1") add(e.when, "1단계 합격자 발표 — "+nm(a));
     else if(e.kind==="addAnn"){
       var tm=String(e.when).slice(11,16);
@@ -4650,7 +4814,7 @@ function csv(arr,name){
     var apps=s.apps&&s.apps.length?s.apps:[{}];
     apps.forEach(function(a){
       lines.push([s.cls,s.no,s.name,a.kind||"",a.kind?(a.jc?"전문대":"4년제"):"",a.univ||"",a.major||"",a.jh||"",a.type||"",a.kind==="수시"?(isRec(a)?"Y":"N"):"",a.group||"",
-        a.c6?"Y":"N",a.ann1||"",a.itv||"",a.itvTime||"",a.itvPlace||"",a.ann||"",a.due||"",a.status||"",a.mreq||"",a.mmet||"",a.rank||"",a.note||"",w,a.addAnn||"",a.addMethod||"",waitUrl(a.addUrl)].map(q).join(","));
+        a.c6?"Y":"N",dateKey(announcement(a,"ann1")),itvDate(a),a.itvTime||"",a.itvPlace||"",dateKey(announcement(a,"ann")),a.due||"",a.status||"",a.mreq||"",a.mmet||"",a.rank||"",a.note||"",w,a.addAnn||"",a.addMethod||"",waitUrl(a.addUrl)].map(q).join(","));
     });
   });
   saveFile(name,"﻿"+lines.join("\r\n"));
@@ -5119,7 +5283,7 @@ function previewApps(res, cls, source){
   res.apps.forEach(function(x,i){
     var a=x.app, r=tb.insertRow(); if(i>=LIM) r.hidden=true;
     if(!a.univ) r.className="bad";
-    [x.cls||cls, x.no||"", x.name||"", a.kind+(a.jc?"·전문대":""), a.univ||"(대학 없음)", a.major||"", a.jh||a.type||"", mmdd(a.itv), mmdd(a.ann)].forEach(function(v){ r.insertCell().textContent=v; });
+    [x.cls||cls, x.no||"", x.name||"", a.kind+(a.jc?"·전문대":""), a.univ||"(대학 없음)", a.major||"", a.jh||a.type||"", mmdd(itvDate(a)), mdw(announcement(a,"ann"))].forEach(function(v){ r.insertCell().textContent=v; });
     var sc=r.insertCell(); sc.textContent=a.status; if(!x.given.status){ sc.className="na"; sc.title="파일에 상태가 없어 지원완료로 둡니다"; }
   });
   tw.appendChild(t); d.appendChild(tw);
@@ -5341,7 +5505,7 @@ function pushApp(res, no, name, f, cls){
   var ry=parseYN(f.rec);
   var given={status:!!st, type:!!(mapType(f.type)||mapType(f.jh)), c6:yn!==null};
   res.apps.push({no:String(no||""), name:String(name||""), cls:cls||null, given:given, app:{id:uid(), kind:kind, jc:/전문/.test(str(f.found)), univ:str(f.univ),
-    major:str(f.major), jh:str(f.jh),
+    major:str(f.major), jh:str(f.jh)||(kind==="수시"?str(f.type):""),
     type:mapType(f.type)||mapType(f.jh)||(kind==="정시"?"정시":"학종"),
     group:(function(){var g=norm(f.group).replace(/군$/,""); return /^[가나다]$/.test(g)?g:"";})(),
     c6:(yn===null? kind==="수시" : yn),
@@ -5428,7 +5592,7 @@ function readByLook(rows, res){
       if(v instanceof Date){ if(!f.itv) f.itv=v; return; }
       if(!f.mreq&&/최저/.test(v)) f.mreq=v;
       else if(i>u&&!f.major&&/(학과|학부|전공|계열)$|(학과|학부)\(/.test(v)) f.major=v;
-      else if(!f.type&&v.length<=16&&mapType(v)){ f.type=v; if(!/^(학종|교과|논술|실기|정시)$/.test(v)) f.jh=v; }
+      else if(!f.type&&v.length<=16&&mapType(v)){ f.type=v; if(!/^정시$/.test(v)) f.jh=v; }
       else if(!f.kind&&/^(수시|정시)$/.test(v)) f.kind=v;
       else if(!f.group&&/^[가나다]군?$/.test(v)) f.group=v;
       else if(!f.itv&&/^(\d{4}[-.]\s*)?\d{1,2}[-.\/]\s*\d{1,2}\.?$/.test(v)) f.itv=v;
@@ -5533,11 +5697,11 @@ function shareMin(a){
    minreq 저장소에 kind:"exam" 으로 함께 둔다(규칙을 새로 붙여넣지 않아도 되게). 열쇠는 대학·모집단위·전형·날짜.
    표에서 온 시각(itvTbl)과 비어 있는 시각만 채운다. 담임이 따로 적었거나 '학생에게 받음'인 시각은 건드리지 않는다. */
 var examTable=new Map(), examEdit=null, examPast=false;
-function examKey(a){ return minKey(a)+"|"+(a.itv||""); }
+function examKey(a){ return minKey(a)+"|"+(itvDate(a)||""); }
 function fillExam(st){
   var changed=false;
   (st.apps||[]).forEach(function(a){
-    if(a.kind!=="수시"||!a.itv||a.itvSrc==="학생"||(a.itvTime&&!a.itvTbl)) return;
+    if(a.kind!=="수시"||!itvDate(a)||a.itvSrc==="학생"||(a.itvTime&&!a.itvTbl)) return;
     var e=examTable.get(examKey(a));
     if(!e||!e.itvTime) return;
     if(a.itvTbl&&a.itvTime===e.itvTime&&(a.itvPlace||"")===(e.itvPlace||"")) return;
@@ -5557,9 +5721,10 @@ function putExam(e){
 // 학생 화면에서 '입학처 공지'로 적은 시각은 표에도 올려 다른 반의 같은 지원에 쓴다
 function shareExam(a){
   delete a.itvTbl;
-  if(a.kind!=="수시"||!a.itv||!a.itvTime||a.itvSrc!=="공지") return;
+  var iv=itvDate(a);
+  if(a.kind!=="수시"||!iv||!a.itvTime||a.itvSrc!=="공지") return;
   a.itvTbl=1;
-  putExam({kind:"exam", univ:a.univ, major:a.major||"", jh:a.jh||"", type:a.type||"", itv:a.itv, itvTime:a.itvTime, itvPlace:a.itvPlace||"", by:myName()||"", at:new Date().toISOString(), year:YEAR});
+  putExam({kind:"exam", univ:a.univ, major:a.major||"", jh:a.jh||"", type:a.type||"", itv:iv, itvTime:a.itvTime, itvPlace:a.itvPlace||"", by:myName()||"", at:new Date().toISOString(), year:YEAR});
 }
 function renderExams(all){
   var t=document.getElementById("examTable"), more=document.getElementById("examMore");
@@ -5567,20 +5732,21 @@ function renderExams(all){
   t.innerHTML=""; more.innerHTML="";
   var today=ymdNow(), groups=new Map(), can=canWrite!==false&&!(demo&&!practice);
   all.forEach(function(st){ (st.apps||[]).forEach(function(a){
-    if(a.kind!=="수시"||!a.itv||PASS[a.status]||/불/.test(a.status||"")) return;
+    if(a.kind!=="수시"||!itvDate(a)||PASS[a.status]||/불/.test(a.status||"")) return;
     var k=examKey(a), g=groups.get(k);
     if(!g){ g={k:k, a:a, list:[]}; groups.set(k,g); }
     g.list.push({st:st, a:a});
   }); });
   var rows=[]; groups.forEach(function(g){
-    var e=examTable.get(g.k), pub=g.list.filter(function(x){ return x.a.itvTime&&x.a.itvSrc==="공지"; });
+    var e=examTable.get(g.k), pub=g.list.filter(function(x){ return x.a.itvTime&&x.a.itvSrc==="공지"; }), iv=itvDate(g.a);
+    g.iv=iv;
     g.time=e&&e.itvTime||(pub[0]&&pub[0].a.itvTime)||"";
     g.place=e?(e.itvPlace||""):(pub[0]&&pub[0].a.itvPlace)||"";
     g.by=e?e.by:""; g.at=e?e.at:"";
     g.own=g.list.filter(function(x){ return x.a.itvSrc==="학생"&&x.a.itvTime&&x.a.itvTime!==g.time; }).length;
-    g.past=g.a.itv<today; rows.push(g);
+    g.past=iv<today; rows.push(g);
   });
-  rows.sort(function(p,q){ return p.a.itv<q.a.itv?-1:p.a.itv>q.a.itv?1:(p.time||"99")<(q.time||"99")?-1:(p.time||"99")>(q.time||"99")?1:sameKey(p.a.univ)<sameKey(q.a.univ)?-1:1; });
+  rows.sort(function(p,q){ return p.iv<q.iv?-1:p.iv>q.iv?1:(p.time||"99")<(q.time||"99")?-1:(p.time||"99")>(q.time||"99")?1:sameKey(p.a.univ)<sameKey(q.a.univ)?-1:1; });
   var up=rows.filter(function(g){ return !g.past; }), done=up.filter(function(g){ return g.time; }).length, npast=rows.length-up.length;
   document.getElementById("examCnt").textContent=up.length?"앞으로 "+up.length+"건 · 시각 확인 "+done+"건"+(up.length>done?" · 아직 "+(up.length-done)+"건":""):"";
   var show=examPast?rows:up;
@@ -5590,9 +5756,9 @@ function renderExams(all){
     var hr=t.createTHead().insertRow(); ["날짜","대학 · 모집단위","학생","시각 · 고사장",""].forEach(function(h){ var th=document.createElement("th"); th.textContent=h; hr.appendChild(th); });
     var tb=t.createTBody();
     show.forEach(function(g){
-      var a=g.a, r=tb.insertRow(); if(g.past) r.className="past";
-      var d=new Date(a.itv+"T00:00:00");
-      r.insertCell().appendChild(el("span","exd",mmdd(a.itv)+"("+WD[d.getDay()]+")"));
+      var a=g.a, iv=g.iv, r=tb.insertRow(); if(g.past) r.className="past";
+      var d=new Date(iv+"T00:00:00");
+      r.insertCell().appendChild(el("span","exd",mmdd(iv)+"("+WD[d.getDay()]+")"));
       var c1=r.insertCell(); c1.appendChild(el("div",null,shortUniv(a.univ)+" "+(a.major||""))); if(a.jh||a.type) c1.appendChild(el("div","exs",a.jh||a.type));
       var c2=r.insertCell(), first=g.list[0];
       c2.textContent=(first.st.cls?first.st.cls+"반 ":"")+first.st.name+(g.list.length>1?" 외 "+(g.list.length-1)+"명":"");
@@ -5607,7 +5773,7 @@ function renderExams(all){
         ok.onclick=function(){
           if(!ti.value){ alert("시각을 넣어 주세요."); ti.focus(); return; }
           remember("고사 시간표"); examEdit=null;
-          putExam({kind:"exam", univ:a.univ, major:a.major||"", jh:a.jh||"", type:a.type||"", itv:a.itv, itvTime:ti.value, itvPlace:pi.value.trim(), by:myName()||"", at:new Date().toISOString(), year:YEAR});
+          putExam({kind:"exam", univ:a.univ, major:a.major||"", jh:a.jh||"", type:a.type||"", itv:iv, itvTime:ti.value, itvPlace:pi.value.trim(), by:myName()||"", at:new Date().toISOString(), year:YEAR});
           render();
         };
         no.onclick=function(){ examEdit=null; render(); };
@@ -6725,7 +6891,7 @@ function attachDb(x, onErr){
 
 /* 로컬(file://)에서만 열리는 테스트용 통로. 게시된 페이지(https)에서는 만들어지지 않는다. */
 try{ if(location.protocol==="file:"||location.hostname==="localhost"){
-  window.__dev={mapStatus:mapStatus, mapMin:mapMin, mapType:mapType,
+  window.__dev={mapStatus:mapStatus, mapMin:mapMin, mapType:mapType, announcement:announcement, itvDate:itvDate, daysTo:daysTo, renderTodo:renderTodo,
     parseDate:parseDate, parseYN:parseYN, pickStudents:pickStudents,
     parseDelimited:parseDelimited, readApps:readApps, pdfTableRows:pdfTableRows, last:function(){ return lastRead; },
     checkStudent:checkStudent, parseMin:parseMin, judgeMin:judgeMin, rowsFromPdf:rowsFromPdf,
