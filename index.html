@@ -409,7 +409,9 @@ body.landing .gate{margin-top:10px}
 .qres .qb{border:1px solid var(--line-2); background:var(--surface); border-radius:6px; padding:3px 10px; font:inherit; font-size:12px; font-weight:700; cursor:pointer}
 .qres .qb.ok{color:var(--ok)} .qres .qb.wait{color:var(--warn)} .qres .qb.bad{color:var(--bad)}
 .qres .qb:hover{background:var(--surface-2)} .qres .qb:disabled{opacity:.5; cursor:default}
-.qres input{width:76px; border:1px solid var(--line-2); background:var(--surface); color:var(--ink); border-radius:6px; padding:3px 7px; font:inherit; font-size:12px}
+.today .wait-summary{flex-basis:100%}
+.today .qres button[aria-haspopup="dialog"]{min-height:30px}
+@media(max-width:640px){.today .qres button[aria-haspopup="dialog"]{min-height:44px}}
 .backupbar.csum > span:first-child{display:flex; flex-wrap:wrap; gap:6px; align-items:center}
 .backupbar.csum b{margin-right:4px}
 .today .tadd{grid-column:1/-1; display:flex; flex-direction:column; margin-top:10px; border-top:1px solid var(--line); padding-top:8px}
@@ -2391,6 +2393,10 @@ function shortMajor(s){
 }
 function appLabel(a){
   var t=(a.jc?"전문대 ":"")+[shortUniv(a.univ)||"미입력", shortMajor(a.major), a.kind==="정시"?(a.group?a.group+"군":"정시"):a.type+(isRec(a)?"·추천":"")].filter(Boolean).join(" ");
+  if(a.status==="충원대기"){
+    var rank=String(a.rank==null?"":a.rank).trim().replace(/^예비(?:\s*번호)?\s*/,"");
+    return t+" · 충원대기"+(rank?" · 예비 "+rank.replace(/^(\d+)(?:\s*번)?$/,"$1번"):"");
+  }
   return a.status&&a.status!=="지원완료"? t+" · "+a.status : t;
 }
 /* 요강 문장에서 눈에 띄는 숫자만 뽑아 "2개합 5 · 한국사 4" 처럼 보여준다. 판정에는 쓰지 않는다. */
@@ -2548,13 +2554,14 @@ function renderRows(arr, cls, total){
     var pills=el("div","pills");
     var apps=st.apps||[];
     if(!apps.length) pills.appendChild(el("span","pill empty","지원 없음"));
-    apps.slice(0,7).forEach(function(a){
+    var shown=apps.filter(function(a,i){ return i<7||a.status==="충원대기"; });
+    shown.forEach(function(a){
       var p=el("span","pill "+((a.status||"지원완료")==="지원완료"?"":statusClass(a.status)));   // 결과가 난 지원만 색으로
       p.appendChild(el("i","tdot "+typeDot(a))); p.appendChild(document.createTextNode(appLabel(a)));
       p.title=[a.univ,a.major,a.jh||a.type,a.status].filter(Boolean).join(" · ");
       pills.appendChild(p);
     });
-    if(apps.length>7) pills.appendChild(el("span","pill","+"+(apps.length-7)));
+    if(apps.length>shown.length) pills.appendChild(el("span","pill","+"+(apps.length-shown.length)));
     head.appendChild(pills);
     if((st.notes||[]).length){ var ln=notesOf(st)[0]; var cn=el("span","cnote","상담 "+st.notes.length); cn.title="마지막 상담 "+mdw(ln.d)+" · "+(ln.t||""); head.appendChild(cn); }
     if(warns.length) head.appendChild(el("span","flagmark","경고 "+warns.length));
@@ -3545,26 +3552,42 @@ function renderBulk(host, arr, showClass, S, btnId){
     row.appendChild(sp); host.appendChild(row);
   });
 }
-/* ── 오늘 발표 결과 바로 넣기 ── 한 번 누르면 저장. 넣은 줄은 오늘 할 일에 남겨 예비 번호·되돌리기 */
-var todayDone={};   // 지원 id -> {kind, prev}
-var QUICK={due:[["충원합","충원 합격","ok"],["불합격","불합격","bad"]], ann:[["최초합","합격","ok"],["충원대기","충원","wait"],["불합격","불합격","bad"]], ann1:[["1단계합","1단계 합","ok"],["1단계불","불합격","bad"]]};
+/* ── 오늘 발표 결과 바로 넣기 ── 충원 대기는 정보 입력을 마치면 함께 저장한다. */
+var todayDone={};
+var QUICK={due:[["충원합","충원 합격","ok"],["불합격","불합격","bad"]], ann:[["최초합","합격","ok"],["충원대기","충원 대기 입력","wait"],["불합격","불합격","bad"]], ann1:[["1단계합","1단계 합","ok"],["1단계불","불합격","bad"]]};
 function quickRes(s,a,kind,showClass){
-  var box=el("span","qres"), off=canWrite===false||(demo&&!practice), d=todayDone[a.id];
+  var box=el("span","qres"), off=!canEditWait(s), d=todayDone[a.id];
+  if(d&&d.kind!==kind) d=null;
   var redraw=function(){ showClass?renderAll():render(); };
   var find=function(){ var t=st0(s); return {t:t, a:(t.apps||[]).filter(function(y){ return y.id===a.id; })[0]}; };
+  if(a.status==="충원대기") box.appendChild(waitButton(s,a));
   if(d){
     var st=a.status||"지원완료";
     box.appendChild(el("span","pill "+(PASS[st]||st==="1단계합"?"s-ok":st==="충원대기"?"s-wait":"s-bad"),"✓ "+st));
-    if(st==="충원대기"){ var rk=document.createElement("input"); rk.placeholder="예비 번호"; rk.value=a.rank||""; rk.disabled=off; rk.setAttribute("aria-label","예비 번호");
-      rk.onchange=function(){ var f=find(); if(!f.a) return; f.a.rank=rk.value.trim(); save(f.t); }; box.appendChild(rk); }
     if(st==="충원합"&&!showClass){ var rg=el("button","linkbtn","등록 정하기 →"); rg.onclick=function(){ setClsTab("res"); var p=document.getElementById("reg"); if(p) p.scrollIntoView({block:"start"}); }; box.appendChild(rg); }
     var u=el("button","linkbtn","되돌리기"); u.disabled=off;
-    u.onclick=function(){ var f=find(); if(!f.a) return; f.a.status=d.prev; delete todayDone[a.id]; save(f.t); redraw(); };
+    u.onclick=function(){
+      var f=find(); if(!f.a||!canEditWait(f.t)) return;
+      if(d.saved){
+        Object.keys(d.saved).forEach(function(k){
+          if(lnorm(f.a[k])!==d.saved[k]) return;
+          if(d.before[k]===undefined) delete f.a[k]; else f.a[k]=d.before[k];
+        });
+      } else if(f.a.status===d.status) f.a.status=d.prev;
+      delete todayDone[a.id]; save(f.t,true); redraw();
+    };
     box.appendChild(u); return box;
   }
+  if(kind==="addAnn"||kind==="ann"&&a.status==="충원대기") return box;
   QUICK[kind].forEach(function(q){
     var b=el("button","qb "+q[2],q[1]); b.disabled=off; b.title=(s.name||"")+" "+shortUniv(a.univ)+" → "+q[0];
-    b.onclick=function(){ var f=find(); if(!f.a) return; remember("결과 입력"); todayDone[a.id]={kind:kind, prev:f.a.status||"지원완료"}; f.a.status=q[0]; save(f.t); redraw(); };
+    if(q[0]==="충원대기") b.setAttribute("aria-haspopup","dialog");
+    b.onclick=function(){
+      var f=find(); if(!f.a||!canEditWait(f.t)) return;
+      if(q[0]==="충원대기"){ openWait(f.t,f.a,kind); return; }
+      remember("결과 입력"); todayDone[a.id]={kind:kind, prev:f.a.status||"지원완료", status:q[0]};
+      f.a.status=q[0]; save(f.t); redraw();
+    };
     box.appendChild(b);
   });
   return box;
@@ -3605,10 +3628,10 @@ function waitButton(s,a){
   b.onclick=function(e){ e.stopPropagation(); openWait(s,a); };
   return b;
 }
-function openWait(s,a){
+function openWait(s,a,quickKind){
   var dlg=document.getElementById("waitDlg"), off=!canEditWait(s), before=Object.assign({},a);
   dlg.innerHTML="";
-  var title=el("h2",null,off?"충원 정보":"충원 정보 수정"); title.id="waitTitle"; dlg.appendChild(title);
+  var title=el("h2",null,off?"충원 정보":quickKind?"충원 대기 입력":"충원 정보 수정"); title.id="waitTitle"; dlg.appendChild(title);
   dlg.appendChild(el("div","sub",s.name+" · "+appName(a)));
   var form=el("form"), grid=el("div","grid"), inputs={};
   var add=function(key,label,type,val,choices){
@@ -3619,10 +3642,13 @@ function openWait(s,a){
     var f=field(label,i); if(key==="addUrl"||key==="due") f.classList.add("wide");
     grid.appendChild(f); return i;
   };
-  var statuses=["충원대기","충원합","불합격"], st=a.status||"지원완료";
-  if(statuses.indexOf(st)<0) statuses.unshift(st);
-  add("status","결과 상태","",st,statuses);
+  if(!quickKind){
+    var statuses=["충원대기","충원합","불합격"], st=a.status||"지원완료";
+    if(statuses.indexOf(st)<0) statuses.unshift(st);
+    add("status","결과 상태","",st,statuses);
+  }
   var rank=add("rank","예비번호","text",a.rank); rank.placeholder="예: 7"; rank.maxLength=20;
+  if(quickKind) rank.autofocus=true;
   var next=String(a.addAnn||"");
   add("addDate","다음 충원 발표일","date",next.slice(0,10));
   add("addTime","발표 시각 (선택)","time",next.slice(11,16));
@@ -3644,7 +3670,7 @@ function openWait(s,a){
     var announce=date?date+(time?"T"+time:""):"", raw=inputs.addUrl.value.trim(), url=waitUrl(raw);
     if(time&&!date){ err.textContent="발표 시각을 넣으려면 발표일도 골라 주세요."; inputs.addDate.focus(); return; }
     if(raw&&!url){ err.textContent="입학처 공지 링크를 http:// 또는 https:// 주소로 넣어 주세요."; inputs.addUrl.focus(); return; }
-    var fields={status:inputs.status.value,rank:rank.value.trim(),addAnn:announce,addMethod:inputs.addMethod.value,addUrl:url,due:due};
+    var fields={status:quickKind?"충원대기":inputs.status.value,rank:rank.value.trim(),addAnn:announce,addMethod:inputs.addMethod.value,addUrl:url,due:due};
     var changed=Object.keys(fields).filter(function(k){return lnorm(before[k])!==fields[k];});
     if(changed.some(function(k){return lnorm(app[k])!==lnorm(before[k])&&lnorm(app[k])!==fields[k];})){
       err.textContent="다른 화면에서 충원 정보가 바뀌었습니다. 닫고 최신 내용을 확인해 주세요."; return;
@@ -3652,7 +3678,13 @@ function openWait(s,a){
     var finalAnn=changed.indexOf("addAnn")>=0?announce:app.addAnn, finalDue=changed.indexOf("due")>=0?due:app.due;
     if(finalAnn&&finalDue&&finalAnn>finalDue){ err.textContent="다음 발표가 최종 통보 마감보다 늦습니다. 두 일정을 확인해 주세요."; inputs.addDate.focus(); return; }
     if(changed.length){
-      remember("충원 정보 수정"); changed.forEach(function(k){app[k]=fields[k];}); save(current,true);
+      if(quickKind){
+        var saved={};
+        changed.forEach(function(k){saved[k]=fields[k];});
+        todayDone[app.id]={kind:quickKind,before:before,saved:saved};
+      }
+      remember(quickKind?"충원 대기 입력":"충원 정보 수정");
+      changed.forEach(function(k){app[k]=fields[k];}); save(current,true);
     }
     dlg.close(); render();
   };
@@ -3686,10 +3718,11 @@ function renderToday(host, arr, showClass){
   host.innerHTML="";
   var ev=upcoming(arr,1).filter(function(e){ if(e.kind!=="itv"||!afterCsatApp(e.a)) return true; var v=examVerdict(e.s,e.a); return !(v&&v.v==="skip"); });
   var col={0:[],1:[]}; ev.forEach(function(e){ col[e.d].push(e); });
-  // 방금 결과를 넣은 오늘 발표도 그 자리에 남긴다
+  // 오늘 발표의 결과를 방금 넣었거나 충원 대기 중이면 발표 줄에서 확인할 수 있다.
   arr.forEach(function(st){ (st.apps||[]).forEach(function(a){ var d=todayDone[a.id];
-    var when=d&&d.kind!=="due"?announcement(a,d.kind):"";
-    if(when&&daysTo(when)===0&&!ev.some(function(e){ return e.a===a&&e.kind===d.kind; })) col[0].push({s:st,a:a,kind:d.kind,when:when,d:0}); }); });
+    var kind=d&&d.kind!=="due"?d.kind:a.status==="충원대기"?"ann":"";
+    var when=kind?announcement(a,kind):"";
+    if(when&&daysTo(when)===0&&!ev.some(function(e){ return e.a===a&&e.kind===kind; })) col[0].push({s:st,a:a,kind:kind,when:when,d:0}); }); });
   var KO={itv:0,ann1:1,ann:2,addAnn:3,due:4};
   col[0].sort(function(p,q){ return ((KO[p.kind]||0)-(KO[q.kind]||0))||((p.s.cls||0)-(q.s.cls||0))||String(p.s.no||"").localeCompare(String(q.s.no||""))||String(p.a.univ).localeCompare(String(q.a.univ)); });
   var kd={0:[],1:[]};
@@ -3709,9 +3742,9 @@ function renderToday(host, arr, showClass){
       r.appendChild(el("span","sk "+e.kind,kindName(e,true)));
       var who=el("button","who",(showClass&&s.cls?s.cls+"반 ":"")+(s.name||"")); who.onclick=function(){ goStudent(s); }; r.appendChild(who);
       r.appendChild(el("span","sub",[(a.jc?"전문대 ":"")+shortUniv(a.univ), shortMajor(a.major)].filter(Boolean).join(" ")));
-      if(e.kind==="addAnn"&&a.addMethod) r.appendChild(el("span","sub",a.addMethod));
       if(e.kind==="itv"&&prepNeeds(a)&&prepLeft(a).length) r.appendChild(el("span","pill s-bad","준비 "+prepDone(a)+"/"+prepList(a).length));
-      if(p[0]===0&&QUICK[e.kind]) r.appendChild(quickRes(s,a,e.kind,showClass));
+      if(p[0]===0&&QUICK[e.kind]||e.kind==="addAnn") r.appendChild(quickRes(s,a,e.kind,showClass));
+      if(a.status==="충원대기"&&(e.kind==="ann"||e.kind==="addAnn")) r.appendChild(waitSummary(a,true));
       c.appendChild(r);
     });
     if(!kd[p[0]].length&&!col[p[0]].length) c.appendChild(el("div","tnone","일정 없음"));
@@ -3725,10 +3758,11 @@ function renderToday(host, arr, showClass){
     ahd.appendChild(el("span","tsub","대학 공지나 개별 연락으로 결과를 확인하면 아래에서 입력하세요"+(ae?" · 공통 통보 마감 "+mdw(ae.s)+(ae.time?" "+ae.time:""):"")));
     adds.forEach(function(x){
       var s=x.s, a=x.a, r=el("div","sitem");
-      r.appendChild(el("span","sk due",a.rank?"예비 "+a.rank:"충원 대기"));
+      r.appendChild(el("span","sk due","충원 대기"));
       var who=el("button","who",(showClass&&s.cls?s.cls+"반 ":"")+(s.name||"")); who.onclick=function(){ goStudent(s); }; r.appendChild(who);
-      r.appendChild(el("span","sub",[(a.jc?"전문대 ":"")+shortUniv(a.univ), shortMajor(a.major)].filter(Boolean).join(" ")+(a.due?" · 마감 "+fmtDue(a.due):"")));
+      r.appendChild(el("span","sub",[(a.jc?"전문대 ":"")+shortUniv(a.univ), shortMajor(a.major)].filter(Boolean).join(" ")));
       r.appendChild(quickRes(s,a,"due",showClass));
+      if(a.status==="충원대기") r.appendChild(waitSummary(a,true));
       ab.appendChild(r);
     });
     host.appendChild(ab);

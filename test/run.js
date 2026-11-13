@@ -1071,7 +1071,7 @@ function buildTestPage() {
     await t.c.close();
     t = await at("2026-12-27T09:00:00+09:00");
     const addRow = await t.x.$$eval("#today .tadd .sitem", (r) => r.map((e) => e.innerText.replace(/\s+/g, " ")));
-    check("충원 기간(12/27): 오늘 할 일에 충원 대기(예비 번호)와 [충원 합격][불합격], 공통 마감 2일 전부터 경고", [addRow.length, /예비 12 가나 부산대 경영학 충원 합격 불합격/.test(addRow[0] || ""), t.r.codes[0].includes("충원마감")], [1, true, true]);
+    check("충원 기간: 오늘 할 일에 예비번호·수정·결과 입력을 표시하고 공통 마감이 임박하면 경고", [addRow.length, /가나.*충원 대기 수정.*충원 합격 불합격.*예비 12/.test(addRow[0] || ""), t.r.codes[0].includes("충원마감")], [1, true, true]);
     await t.x.click("#today .tadd .qb >> text=충원 합격"); await t.x.waitForTimeout(250);
     const after = await t.x.evaluate(() => [window.__dev.students()[0].apps[1].status, document.querySelector("#today .tadd").innerText.replace(/\s+/g, " ")]);
     check("충원 합격을 누르면 저장되고 줄은 남아 '등록 정하기 →'", [after[0], /✓ 충원합.*등록 정하기/.test(after[1])], ["충원합", true]);
@@ -1144,16 +1144,39 @@ function buildTestPage() {
     const td = await x.evaluate(() => { const h = document.getElementById("today"); const cols = [...h.querySelectorAll(".tcol")].map((c) => c.innerText); return [!h.hidden, cols[0], cols[1]]; });
     check("오늘 할 일: 오늘 발표 2건, 내일 면접", [td[0], /발표[\s\S]*가나[\s\S]*발표[\s\S]*다라/.test(td[1]), /면접·고사[\s\S]*가나[\s\S]*경북대/.test(td[2])], [true, true, true]);
     const btns = await x.$$eval("#today .tcol:first-child .qres", (q) => q.map((e) => e.innerText.replace(/\s+/g, " ")));
-    await x.click("#today .tcol:first-child .sitem:has-text('다라') .qb >> text=충원"); await x.waitForTimeout(200);
-    await x.fill("#today .tcol:first-child .sitem:has-text('다라') .qres input", "12"); await x.press("#today .tcol:first-child .sitem:has-text('다라') .qres input", "Tab"); await x.waitForTimeout(150);
+    const waitRow = x.locator("#today .tcol:first-child .sitem").filter({hasText:"다라"});
+    const waitDialog = x.getByRole("dialog", {name:"충원 대기 입력"});
+    await waitRow.getByRole("button", {name:"충원 대기 입력"}).click();
+    await waitDialog.locator("[name=rank]").fill("99");
+    await waitDialog.getByRole("button", {name:"취소"}).click();
+    check("충원 대기 입력 취소: 상태·예비번호를 저장하지 않음",
+      await x.evaluate(() => window.__dev.students()[1].apps.map(a => [a.status, a.rank||""])),
+      [["지원완료",""],["최초합",""]]);
+    await waitRow.getByRole("button", {name:"충원 대기 입력"}).click();
+    await waitDialog.locator("[name=rank]").fill("12");
+    await waitDialog.locator("[name=addDate]").fill("2026-12-24");
+    await waitDialog.locator("[name=addTime]").fill("15:30");
+    await waitDialog.locator("[name=addMethod]").selectOption("입학처 홈페이지");
+    await waitDialog.locator("[name=addUrl]").fill("https://example.edu/admission");
+    await waitDialog.locator("[name=due]").fill("2026-12-29T18:00");
+    await waitDialog.getByRole("button", {name:"저장",exact:true}).click();
+    const waitText = (await waitRow.innerText()).replace(/\s+/g, " ");
+    check("오늘 할 일: 저장한 충원 정보를 즉시 표시하고 같은 줄에서 수정 가능",
+      [/예비 12.*다음 발표.*15:30.*입학처 홈페이지.*최종 통보 마감.*18:00/.test(waitText),
+        await waitRow.getByRole("link", {name:"입학처 공지"}).getAttribute("href"),
+        await waitRow.getByRole("button", {name:"충원 대기 수정"}).isVisible()],
+      [true,"https://example.edu/admission",true]);
     await x.click("#today .tcol:first-child .sitem:has-text('가나') .qb >> text=합격"); await x.waitForTimeout(200);
     const after = await x.evaluate(() => [window.__dev.students().map((s) => s.apps[0].status + (s.apps[0].rank ? ":" + s.apps[0].rank : "")), document.querySelector("#today .tcol").innerText.replace(/\s+/g, " ")]);
     await x.click("#today .tcol:first-child .sitem:has-text('가나') .linkbtn >> text=되돌리기"); await x.waitForTimeout(200);
     await x.click("#today .tcol:first-child .sitem:has-text('다라') .linkbtn >> text=되돌리기"); await x.waitForTimeout(200);
-    const undone = await x.evaluate(() => [window.__dev.students().map((s) => s.apps[0].status).join(), document.querySelectorAll("#today .tcol:first-child .qb").length]);
-    check("오늘 발표: 줄마다 합격·충원·불합격 단추, 누르면 저장되고 줄은 남아 예비 번호·되돌리기",
+    const undone = await x.evaluate(() => { const a=window.__dev.students()[1].apps[0]; return [
+      window.__dev.students().map((s) => s.apps[0].status).join(),
+      document.querySelectorAll("#today .tcol:first-child .qb").length,
+      [a.rank, a.addAnn, a.addMethod, a.addUrl, a.due].some(Boolean)]; });
+    check("오늘 발표: 결과를 입력하고 충원 대기 입력에서 저장한 내용까지 되돌림",
       [btns, after[0], /✓ 최초합[\s\S]*✓ 충원대기/.test(after[1]), undone],
-      [["합격 충원 불합격", "합격 충원 불합격"], ["최초합", "충원대기:12", "지원완료"], true, ["면접완료,지원완료,지원완료", 6]]);
+      [["합격 충원 대기 입력 불합격", "합격 충원 대기 입력 불합격"], ["최초합", "충원대기:12", "지원완료"], true, ["면접완료,지원완료,지원완료", 6, false]]);
     await x.click("#btnBulkRes"); await x.waitForTimeout(200);
     const pick = await x.$eval("#bulkPanel select.bulkpick", (s) => [s.value, s.options[s.selectedIndex].textContent]);
     const names = await x.$$eval("#bulkPanel .bulkrow .who", (b) => b.map((e) => e.textContent));
