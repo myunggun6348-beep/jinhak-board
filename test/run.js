@@ -890,6 +890,14 @@ function buildTestPage() {
     await soloGoogle.evaluate(st=>window.__dev.mergeData([{name:"personal.json",b:{students:[st]}}]),stu("30201",2,"본인학생")); await soloGoogle.waitForTimeout(1500);
     const schoolCount=()=>Object.keys(KV).filter(k=>/^schools\/[0-9a-f]{40}$/.test(k)).length;
     check("개인 학생 자료: Firebase에 암호화 저장",Object.keys(KV).some(k=>k.includes("/students/"))&&!JSON.stringify(KV).includes("본인학생"),true);
+    const ownerRoom=Object.keys(KV).find(k=>/^schools\/[0-9a-f]{40}$/.test(k)).split("/")[1];
+    await soloGoogle.evaluate(room=>{localStorage.setItem("jh.lastBackup."+room,"2026-10-01T00:00:00Z");window.__dev.render();},ownerRoom);
+    check("계정 저장: 오래된 백업 날짜에도 상단 안내 숨김",await soloGoogle.$eval("#backupBar",b=>b.hidden),true);
+    await soloGoogle.click("#tabAdmin");
+    const [backupFile]=await Promise.all([soloGoogle.waitForEvent("download"),soloGoogle.getByRole("button",{name:"백업 파일 받기",exact:true}).click()]);
+    const backupData=JSON.parse(fs.readFileSync(await backupFile.path(),"utf8"));
+    check("자료 관리 백업: 현재 학생·지원 정보 다운로드",[backupData.app,backupData.students.map(st=>[st.name,st.apps.length])],["jinhak-board",[["본인학생",1]]]);
+    await soloGoogle.click("#tabClass");
     const device=await who({email:"owner@x.com"}); await device.click("#accountLogin"); await device.waitForTimeout(1400);
     check("같은 계정 새 컴퓨터: 기존 학생 복원·공간 중복 생성 없음",[await rowNames(device),schoolCount()],[["본인학생"],1]);
     const second=await who({email:"another@x.com"}); await second.click("#accountLogin"); await second.waitForTimeout(1200);
@@ -1012,9 +1020,9 @@ function buildTestPage() {
   await adm.click(".detail .dtab >> text=상담 기록"); await adm.waitForTimeout(150); await adm.fill(".detail textarea[name=note]", "학교 장부 상담"); await adm.click(".detail .btn >> text=기록 추가"); await t2.waitForTimeout(2500);
   check("학교 장부: 상담 기록도 저장되어 담임 화면에 보임", await t2.evaluate(() => { const c = document.querySelector(".row .cnote"); return c && c.textContent; }), "상담 1");
   await adm.click(".row >> nth=0 >> .rowhead"); await adm.waitForTimeout(100);
-  const bb1 = await adm.$eval("#backupBar", (b) => [!b.hidden, b.classList.contains("due"), /학교 장부 전체 백업/.test(b.textContent)]);
-  await adm.click("#backupBar button >> text=전체 백업 받기"); await adm.waitForTimeout(300);
-  check("관리자 백업 알림: 처음엔 주황 경고, 받으면 알림 줄은 사라지고 학교 관리 탭에 날짜", [bb1, await adm.$eval("#backupBar", (b) => b.hidden), await adm.$eval("#schoolPanel", (e) => /마지막 전체 백업\(이 컴퓨터\): (?!없음)/.test(e.textContent))], [[true, true, true], true, true]);
+  const bb1 = await adm.$eval("#backupBar", (b) => b.hidden);
+  await adm.click("#tabAdmin"); await adm.click("#schoolPanel button >> text=전체 백업 받기"); await adm.waitForTimeout(300);
+  check("계정 자료 백업: 상단 알림은 접고 자료 관리에서 다운로드", [bb1, await adm.$eval("#backupBar", (b) => b.hidden), await adm.$eval("#schoolPanel", (e) => /마지막 전체 백업\(이 컴퓨터\): (?!없음)/.test(e.textContent))], [true, true, true]);
   check("담임에게는 백업 알림 없음(자료는 학교 장부에)", await t2.$eval("#backupBar", (b) => b.hidden), true);
   check("학교 장부: 반별 현황에서 백업·되살리기·합치기 단추 감춤(학교 관리 탭으로)", await t2.evaluate(() => ["btnBackup", "btnRestore", "btnMerge"].map((i) => document.getElementById(i).hidden)), [true, true, true]);
   await adm.click("#tabAdmin"); await adm.waitForTimeout(300);
