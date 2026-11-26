@@ -1265,417 +1265,462 @@ function daysTo(s){
   var day=dateKey(s), n=/^\d{4}-\d{2}-\d{2}$/.test(day)?Date.parse(day):NaN;
   return isNaN(n)?null:(n-Date.parse(ymdNow()))/86400000;
 }
-/* 2027 수시, 2026-11-10 대조. 발표 공지가 있으면 모집요강보다 우선한다.
-   규칙은 대학·캠퍼스·전형별이며, 1단계 발표(first)·면접·논술·실기일(itv)·최초 발표일(ann)을 채우고 from에 적힌 이전 날짜와 빈칸만 교정한다. */
+/* 2027 수시 최초 발표일. 발표 공지가 있으면 모집요강보다 우선한다.
+   대학·캠퍼스·전형별로 빈칸과 from의 이전 날짜만 교정한다. 고사·1단계는 아래 별도 확인표를 사용한다. */
 var ADMISSION_2027={
   "경성대":[/^/,"https://kscms.ks.ac.kr/ipsi/CMS/Contents/Contents.do?mCode=MN026",[
-    [/면접/,"12-17",{itv:"11-21"}],
-    [/실기|특기/,"12-17",{itv:"10-24"}],
+    [/면접/,"12-17"],
+    [/실기|특기/,"12-17"],
     [/./,"12-17"]]],
   "동서대":[/^/,"https://ipsi.dongseo.ac.kr/ipsi/",[
     [/^(학생부교과)?(교과|일반계고?교과|고교생활우수자|특성화교과|사회기여배려자|고른기회|농어촌출신자|특성화동일계출신자|평생학습자|성인학습자|특성화고졸재직자)$/,"11-06",{from:"11-13",released:true}],
-    [/^(학생부교과)?학생부면접$|교과.*면접/,"12-18",{itv:"11-21"}],
-    [/^학생부종합|학종|종합|면접/,"12-18",{itv:"11-28"}],
-    [/실기|포트폴리오|특기/,"12-18",{itv:"11-21"}],
+    [/^(학생부교과)?학생부면접$|교과.*면접/,"12-18"],
+    [/^학생부종합|학종|종합|면접/,"12-18"],
+    [/실기|포트폴리오|특기/,"12-18"],
     [/./,"11-06",{from:"11-13",released:true}]]],
   "동아대":[/^/,"https://ent.donga.ac.kr/admission/html/counsel/noticeView.asp?BOARD_IDX=31292",[
+    [/^(학생부종합)?(학교생활우수자|기회균형대상자|지역인재기회균형대상자|농어촌학생|특성화고교출신자동일계|평생학습자|특성화고등을졸업한재직자)$/,"12-18T14:00",{url:"https://ent.donga.ac.kr/admission/html/rolling/noticeView.asp?BOARD_IDX=31368"}],
     [/^(학생부교과)?교과진로우수자$/,"11-20T14:00",{from:"12-18"}],
-    [/^학생부종합(학교생활우수자|잠재능력우수자|종합|일반)?$|면접/,"12-18T14:00",{first:"11-20T14:00",itv:"11-28"}],
-    [/실기|특기/,"11-20T14:00",{itv:"10-24"}],
+    [/^학생부종합(학교생활우수자|잠재능력우수자|종합|일반)?$|면접/,"12-18T14:00"],
+    [/실기|특기/,"11-20T14:00"],
     [/./,"12-18T14:00"]]],
   "동의대":[/^/,"https://ipsi.deu.ac.kr/submenu.do?menuUrl=jVMGmOh68Pir%2BuTpFrHJYA%3D%3D",[
-    [/^학생부종합(학교생활우수자면접|면접)$|면접/,"12-16T14:00",{first:"11-20T14:00",itv:"11-28"}],
-    [/실기|특기/,"12-16T14:00",{itv:"11-07"}],
+    [/^학생부종합(학교생활우수자면접|면접)$|면접/,"12-16T14:00"],
+    [/실기|특기/,"12-16T14:00"],
     [/./,"12-16T14:00"]]],
   "부경대":[/^/,"https://iphak.pknu.ac.kr/pknu/board/board.htm?bbsid=notice&ctg_cd=oa&mode=view&code=iphak_help&bltn_seq=1163",[
-    [/논술/,"12-18T17:00",{itv:"11-22"}],
-    [/실기/,"12-18T17:00",{itv:"11-21"}],
+    [/논술/,"12-18T17:00"],
+    [/실기/,"12-18T17:00"],
     [/./,"12-18T17:00"]]],
   "부산대":[/^/,"https://go.pusan.ac.kr/down/mojib/RF%280%29_260611154120.pdf",[
-    [/^학생부종합(학생부종합|학종|종합|지역인재|일반|저소득층학생|사회배려자)?$|학종|종합/,"12-18T16:00",{first:"12-01T16:00",itv:"12-05"}],
-    [/^논술(논술|일반|지역인재)?$|논술/,"12-18T16:00",{itv:"11-21"}],
-    [/실기|특기/,"12-18T16:00",{itv:"11-21"}],
+    [/^학생부종합(학생부종합|학종|종합|지역인재|일반|저소득층학생|사회배려자)?$|학종|종합/,"12-18T16:00"],
+    [/^논술(논술|일반|지역인재)?$|논술/,"12-18T16:00"],
+    [/실기|특기/,"12-18T16:00"],
     [/./,"12-18T16:00"]]],
   "경북대":[/^/,"https://ipsi1.knu.ac.kr/notice/view.php?r=FxlcTx5IV0VHAHIcEBQAECVnJj4",[
-    [/^학생부종합일반$|면접|모바일과학인재|영농창업인재/,"12-18",{first:"11-20",itv:"11-28"}],
-    [/^논술(AAT|논술|일반)?$|논술|AAT/,"12-18",{itv:"11-21"}],
-    [/실기|특기/,"12-18",{itv:"11-21"}],
+    [/^학생부종합일반$|면접|모바일과학인재|영농창업인재/,"12-18"],
+    [/^논술(AAT|논술|일반)?$|논술|AAT/,"12-18"],
+    [/실기|특기/,"12-18"],
     [/./,"12-18"]]],
   "동명대":[/^/,"https://www.tu.ac.kr/iphak/sub01_02.do",[
-    [/면접/,"12-15",{itv:"10-24",major:/^간호학과$/}],
+    [/면접/,"12-15",{major:/^간호학과$/}],
     [/./,"12-15",{major:/^간호학과$/}],
-    [/면접/,"10-30",{itv:"10-24",major:/^(?!간호학과$).+$/}],
-    [/실기/,"10-30",{itv:"10-24"}],
+    [/면접/,"10-30",{major:/^(?!간호학과$).+$/}],
+    [/실기/,"10-30"],
     [/./,"10-30"]]],
   "신라대":[/^/,"https://ipsi.silla.ac.kr/ipsi/index.php?pCode=1692581907",[
-    [/면접/,"11-13T16:00",{itv:"10-24"}],
-    [/실기/,"11-13T16:00",{itv:"10-24"}],
+    [/면접/,"11-13T16:00"],
+    [/실기/,"11-13T16:00"],
     [/./,"11-13T16:00"]]],
   "건국대":[/^/,"https://enter.konkuk.ac.kr/",[
-    [/^논술(KU논술우수자|논술|일반)?$|논술/,"12-18",{itv:"11-14"}],
-    [/^학생부종합(KU자기추천|자기추천|학종|종합)?$|자기추천|면접/,"12-18",{first:"11-20",itv:"11-28"}],
-    [/실기|연기/,"12-18",{itv:"10-24"}],
+    [/^논술(KU논술우수자|논술|일반)?$|논술/,"12-18"],
+    [/^학생부종합(KU자기추천|자기추천|학종|종합)?$|자기추천|면접/,"12-18"],
+    [/실기|연기/,"12-18"],
     [/./,"12-18"]]],
   "한국해양대":[/^/,"https://www.kmou.ac.kr/ipsi/cm/cntnts/cntntsView.do?cntntsId=5400&mi=3323",[
-    [/면접|해사/,"12-18",{first:"11-20",itv:"11-28"}],
-    [/실기|특기/,"12-18",{itv:"11-20"}],
+    [/면접|해사/,"12-18"],
+    [/실기|특기/,"12-18"],
     [/./,"12-18"]]],
   "부산외국어대":[/^/,"https://enter.bufs-old.codeidea.io/bbs/board.php?bo_table=susi_viewer&wr_id=3",[
-    [/면접/,"12-04",{itv:"11-21"}],
-    [/실기/,"12-04",{itv:"11-21"}],
+    [/면접/,"12-04"],
+    [/실기/,"12-04"],
     [/./,"12-04"]]],
   "중앙대":[/^/,"https://admission.cau.ac.kr/submenu.do?board_seq=3180&menuurl=n5%2FP1yX8Zyh%2Fvtvla1KeyA%3D%3D",[
-    [/^논술(일반형|창의형|논술)?$|논술/,"12-18T14:00",{itv:"11-21"}],
-    [/CAU융합형인재|융합형인재|면접/,"12-18T14:00",{first:"11-20T14:00",itv:"11-28"}],
-    [/실기/,"11-13T14:00",{itv:"10-17"}],
+    [/^논술(일반형|창의형|논술)?$|논술/,"12-18T14:00"],
+    [/CAU융합형인재|융합형인재|면접/,"12-18T14:00"],
+    [/실기/,"11-13T14:00"],
     [/./,"12-18T14:00"]]],
   "경상국립대":[/^/,"https://www.gnu.ac.kr/intro/www/susi/index.html",[
-    [/^학생부종합(일반|지역인재|학종|종합)?$|학종|종합|면접/,"12-18T16:00",{first:"11-20T16:00",itv:"11-27"}],
-    [/실기/,"12-18T16:00",{itv:"11-25"}],
+    [/^학생부종합(일반|지역인재|학종|종합)?$|학종|종합|면접/,"12-18T16:00"],
+    [/실기/,"12-18T16:00"],
     [/./,"12-18T16:00"]]],
   "경희대":[/^/,"https://iphak.khu.ac.kr/detail.do?board_seq=17324&categoryid=1&menuurl=RnNfVbLHUGrJz9kJgEyRDQ%3D%3D&pageNo=1",[
-    [/^논술(논술우수자|논술)?$|논술/,"12-18T18:00",{itv:"11-14"}],
-    [/^학생부종합(네오르네상스|학종|종합)?$|네오르네상스|학종|종합|면접/,"12-18T18:00",{first:"11-20T18:00",itv:"11-28"}],
-    [/실기|특기/,"11-20T18:00",{itv:"10-24"}],
+    [/^논술(논술우수자|논술)?$|논술/,"12-18T18:00"],
+    [/^학생부종합(네오르네상스|학종|종합)?$|네오르네상스|학종|종합|면접/,"12-18T18:00"],
+    [/실기|특기/,"11-20T18:00"],
     [/./,"12-18T18:00"]]],
   "성균관대":[/^/,"https://admission.skku.edu/upload/guide/20260529115520H43SMR.pdf",[
-    [/^논술(위주)?(논술우수)?(언어형|수리형|논술)?$|논술/,"12-18",{by:true,itv:"11-14"}],
-    [/과학인재|면접/,"12-18",{by:true,first:"11-17",itv:"11-28"}],
-    [/실기|특기/,"12-18",{by:true,itv:"11-07"}],
+    [/^논술(위주)?(논술우수)?(언어형|수리형|논술)?$|논술/,"12-18",{by:true}],
+    [/과학인재|면접/,"12-18",{by:true}],
+    [/실기|특기/,"12-18",{by:true}],
     [/./,"12-18",{by:true}]]],
   "을지대":[/^/,"https://admission.eulji.ac.kr/",[
-    [/^학생부종합(EU면접형|면접형|면접)$|면접/,"12-18",{first:"11-18",itv:"11-21"}],
-    [/논술/,"12-18",{itv:"11-21"}],
+    [/^학생부종합(EU면접형|면접형|면접)$|면접/,"12-18"],
+    [/논술/,"12-18"],
     [/./,"12-18"]]],
   "창신대":[/^/,"https://admission.cs.ac.kr/",[
-    [/^학생부교과창신인재면접$|면접/,"11-20",{itv:"10-31"}],
-    [/실기/,"11-20",{itv:"10-31"}],
+    [/^학생부교과창신인재면접$|면접/,"11-20"],
+    [/실기/,"11-20"],
     [/./,"11-20"]]],
   "동국대":[/^/,"https://web.dongguk.ac.kr/article/generalnotice/detail/521114",[
     [/학업성적우수자$|^학생부교과(교과|일반)?$/,"12-18",{camp:/^(WISE|경주)$/i,from:"12-24",major:/^(한의예과|의예과|간호학과)$/}],
     [/학업성적우수자$|^학생부교과(교과|일반)?$/,"11-06",{camp:/^(WISE|경주)$/i,from:"12-24",major:/^(?!(한의예과|의예과|간호학과)$).+$/,released:true}],
-    [/참사람|면접/,"12-18",{camp:/^(WISE|경주)$/i,first:"11-20",itv:"11-28"}],
+    [/참사람|면접/,"12-18",{camp:/^(WISE|경주)$/i}],
     [/./,"12-18",{camp:/^(WISE|경주)$/i}],
-    [/논술/,"12-18",{itv:"11-15"}],
-    [/DoDream|두드림|면접|학생부종합|학종|종합/,"12-18",{first:"11-20",itv:"12-05"}],
-    [/실기/,"12-18",{itv:"10-17"}],
+    [/논술/,"12-18"],
+    [/DoDream|두드림|면접|학생부종합|학종|종합/,"12-18"],
+    [/실기/,"12-18"],
     [/./,"12-18"]]],
   "부산가톨릭대":[/^/,"https://ipsi.cup.ac.kr/ipsi/main.do",[
-    [/면접/,"11-25T14:00",{itv:"10-24"}],
+    [/면접/,"11-25T14:00"],
     [/./,"11-25T14:00"]]],
   "서강대":[/^/,"https://admission.sogang.ac.kr/",[
-    [/^논술(일반|논술)?$|논술/,"12-18",{itv:"11-14"}],
+    [/^논술(일반|논술)?$|논술/,"12-18"],
     [/./,"12-18"]]],
   "숭실대":[/^/,"https://iphak.ssu.ac.kr/upload/SSU%281%29_260617194322.pdf",[
-    [/^논술(논술우수자|논술)?$|논술/,"12-18",{itv:"11-14"}],
-    [/^학생부종합(SSU미래인재|미래인재|학종|종합)?$|미래인재|학종|종합|면접/,"12-18",{first:"11-24",itv:"11-28"}],
-    [/실기|예체능/,"11-13",{itv:"10-24"}],
+    [/^논술(논술우수자|논술)?$|논술/,"12-18"],
+    [/^학생부종합(SSU미래인재|미래인재|학종|종합)?$|미래인재|학종|종합|면접/,"12-18"],
+    [/실기|예체능/,"11-13"],
     [/./,"12-18"]]],
   "아주대":[/^/,"https://www.iajou.ac.kr/main/",[
-    [/^논술(논술우수자|논술)?$|논술/,"12-18",{itv:"11-21"}],
-    [/^학생부종합(ACE|첨단융합인재|학종|종합)?$|ACE|첨단융합인재|학종|종합|면접/,"12-18",{first:"11-20",itv:"11-28"}],
+    [/^논술(논술우수자|논술)?$|논술/,"12-18"],
+    [/^학생부종합(ACE|첨단융합인재|학종|종합)?$|ACE|첨단융합인재|학종|종합|면접/,"12-18"],
     [/./,"12-18"]]],
   "연세대":[/^/,"https://admission.yonsei.ac.kr/seoul/admission/html/counsel/calendar.asp?s_year=2026",[
-    [/논술/,"12-18",{camp:/^(미래|원주)$/i,itv:"11-20"}],
-    [/면접|활동우수|기회균형/,"12-18",{camp:/^(미래|원주)$/i,first:"11-13",itv:"11-21"}],
+    [/논술/,"12-18",{camp:/^(미래|원주)$/i}],
+    [/면접|활동우수|기회균형/,"12-18",{camp:/^(미래|원주)$/i}],
     [/./,"12-18",{camp:/^(미래|원주)$/i}],
-    [/^논술(논술)?$|논술/,"12-18T18:00",{itv:"10-10"}],
-    [/^학생부종합(활동우수형|국제형|학종|종합)?$|활동우수|국제형|면접|학종|종합/,"12-18T18:00",{first:"11-09",itv:"11-14"}],
+    [/^논술(논술)?$|논술/,"12-18T18:00"],
+    [/^학생부종합(활동우수형|국제형|학종|종합)?$|활동우수|국제형|면접|학종|종합/,"12-18T18:00"],
     [/./,"12-18T18:00"]]],
   "인제대":[/^/,"https://iphak.inje.ac.kr/",[
-    [/^학생부교과(의예약학|면접)$|의예|약학/,"12-18",{first:"11-13",itv:"11-21"}],
+    [/^학생부교과(의예약학|면접)$|의예|약학/,"12-18"],
     [/^학생부교과(학생부교과|교과|일반)?$/,"11-20",{major:/^의생명보건의료공학계열$/}],
-    [/면접|자기추천|학교생활우수|학생부종합|학종|종합/,"12-18",{first:"11-13",itv:"11-21"}],
-    [/실기/,"11-20",{itv:"10-24"}],
+    [/면접|자기추천|학교생활우수|학생부종합|학종|종합/,"12-18"],
+    [/실기/,"11-20"],
     [/./,"11-20"]]],
   "인하대":[/^/,"https://admission.inha.ac.kr/",[
-    [/^논술(논술우수자|논술)?$|논술/,"12-18",{itv:"11-28"}],
-    [/^학생부종합(인하미래인재|미래인재|학종|종합)?$|미래인재|학종|종합|면접/,"12-18",{first:"11-20",itv:"11-28"}],
-    [/실기/,"11-13",{itv:"10-17"}],
+    [/^논술(논술우수자|논술)?$|논술/,"12-18"],
+    [/^학생부종합(인하미래인재|미래인재|학종|종합)?$|미래인재|학종|종합|면접/,"12-18"],
+    [/실기/,"11-13"],
     [/./,"12-18"]]],
   "한국외국어대":[/^/,"https://adms.hufs.ac.kr/",[
-    [/^논술(논술|일반)?$|논술/,"12-18",{itv:"11-21"}],
-    [/^학생부종합(면접형|면접)$|면접/,"12-18",{first:"11-16",itv:"11-22"}],
+    [/^논술(논술|일반)?$|논술/,"12-18"],
+    [/^학생부종합(면접형|면접)$|면접/,"12-18"],
     [/./,"12-18"]]],
   "한양대":[/^/,"https://go.hanyang.ac.kr/web/mojib/mojib.do?m_type=SUSI&m_year=2027",[
-    [/논술/,"12-18",{camp:/^(ERICA|안산)$/i,itv:"11-21"}],
-    [/면접/,"12-18",{camp:/^(ERICA|안산)$/i,first:"11-17",itv:"11-28"}],
+    [/논술/,"12-18",{camp:/^(ERICA|안산)$/i}],
+    [/면접/,"12-18",{camp:/^(ERICA|안산)$/i}],
     [/./,"12-18",{camp:/^(ERICA|안산)$/i}],
-    [/^논술(논술|일반)?$|논술/,"12-18",{itv:"11-21"}],
-    [/^학생부종합(면접형|면접)$|면접/,"12-18",{first:"11-17",itv:"11-28"}],
+    [/^논술(논술|일반)?$|논술/,"12-18"],
+    [/^학생부종합(면접형|면접)$|면접/,"12-18"],
     [/./,"12-18"]]],
   "고신대":[/^/,"https://enter.kosin.ac.kr/",[
-    [/의예/,"12-18",{first:"11-20",itv:"11-28"}],
-    [/./,"12-18",{major:/^의예과$/,first:"11-20",itv:"11-28"}],
-    [/면접|자기추천|학교생활우수/,"11-13",{itv:"10-24"}],
-    [/실기/,"11-13",{itv:"10-24"}],
+    [/의예/,"12-18"],
+    [/./,"12-18",{major:/^의예과$/}],
+    [/면접|자기추천|학교생활우수/,"11-13"],
+    [/실기/,"11-13"],
     [/./,"12-17"]]],
   "영산대":[/^/,"https://ipsi.ysu.ac.kr/",[
-    [/면접/,"11-06",{itv:"10-24"}],
-    [/실기/,"11-06",{itv:"10-24"}],
+    [/면접/,"11-06"],
+    [/실기/,"11-06"],
     [/./,"12-16",{major:/^(간호학과|물리치료학과|치위생학과)$/}],
     [/./,"11-06"]]],
   "울산대":[/^/,"https://iphak.ulsan.ac.kr/",[
-    [/의예/,"12-18",{first:"11-20",itv:"11-28"}],
-    [/./,"12-18",{major:/^의예과$/,first:"11-20",itv:"11-28"}],
-    [/면접/,"12-18",{first:"11-20",itv:"11-28"}],
-    [/실기/,"11-20",{itv:"11-07"}],
+    [/의예/,"12-18"],
+    [/./,"12-18",{major:/^의예과$/}],
+    [/면접/,"12-18"],
+    [/실기/,"11-20"],
     [/./,"12-18"]]],
   "창원대":[/^/,"https://www.changwon.ac.kr/ipsi/",[
-    [/면접|계열적합|학생부종합|학종|종합/,"12-18",{first:"11-20",itv:"11-27"}],
-    [/실기|특기/,"11-20",{itv:"11-06"}],
+    [/면접|계열적합|학생부종합|학종|종합/,"12-18"],
+    [/실기|특기/,"11-20"],
     [/./,"12-18"]]],
   "경남대":[/^/,"https://ipsi.kyungnam.ac.kr/",[
-    [/면접|청년인재/,"11-13",{itv:"10-24"}],
-    [/실기|체육/,"11-13",{itv:"10-24"}],
+    [/면접|청년인재/,"11-13"],
+    [/실기|체육/,"11-13"],
     [/./,"12-17"]]],
   "가야대":[/^/,"https://ipsi.kaya.ac.kr/",[
-    [/면접/,"11-13",{itv:"10-23"}],
+    [/면접/,"11-13"],
     [/./,"12-16"]]],
   "부산교육대":[/^/,"https://enter.bnue.ac.kr/",[
-    [/./,"12-18",{first:"11-13",itv:"11-21"}]]],
+    [/./,"12-18"]]],
   "진주교육대":[/^/,"https://ipsi.cue.ac.kr/",[
-    [/./,"12-18",{first:"11-20",itv:"11-28"}]]],
+    [/./,"12-18"]]],
   "울산과학기술원":[/^/,"https://adm-u.unist.ac.kr/",[
-    [/면접|특기/,"12-11",{first:"11-06",itv:"11-14"}],
+    [/면접|특기/,"12-11"],
     [/./,"12-11"]]],
   "영남대":[/^/,"https://enter.yu.ac.kr/",[
-    [/의예|약학/,"12-18",{first:"11-20",itv:"11-28"}],
-    [/./,"12-18",{major:/^(의예과|약학부|약학과)$/,first:"11-20",itv:"11-28"}],
-    [/면접/,"12-18",{first:"11-13",itv:"11-21"}],
-    [/실기/,"11-13",{itv:"10-24"}],
+    [/의예|약학/,"12-18"],
+    [/./,"12-18",{major:/^(의예과|약학부|약학과)$/}],
+    [/면접/,"12-18"],
+    [/실기/,"11-13"],
     [/./,"12-18"]]],
   "계명대":[/^/,"https://www.gokmu.ac.kr/",[
-    [/면접|학교생활우수/,"12-18",{first:"11-21",itv:"11-28"}],
-    [/실기/,"11-13",{itv:"10-24"}],
+    [/면접|학교생활우수/,"12-18"],
+    [/실기/,"11-13"],
     [/./,"12-18"]]],
   "대구대":[/^/,"https://ipsi.daegu.ac.kr/",[
-    [/면접/,"12-18",{itv:"11-21"}],
-    [/실기/,"11-13",{itv:"10-24"}],
+    [/면접/,"12-18"],
+    [/실기/,"11-13"],
     [/./,"12-18"]]],
   "대구가톨릭대":[/^/,"https://ibsi.cu.ac.kr/",[
-    [/면접|창의인재|가톨릭지도자/,"12-18",{first:"11-20",itv:"11-28"}],
-    [/실기/,"11-13",{itv:"10-24"}],
+    [/면접|창의인재|가톨릭지도자/,"12-18"],
+    [/실기/,"11-13"],
     [/./,"12-18"]]],
   "대구한의대":[/^/,"https://admission.dhu.ac.kr/",[
-    [/면접/,"12-18",{first:"11-20",itv:"11-28"}],
+    [/면접/,"12-18"],
     [/./,"12-18"]]],
   "금오공과대":[/^/,"https://ipsi.kumoh.ac.kr/",[
-    [/학생부종합|학종|종합|면접/,"12-18",{first:"11-20",itv:"11-28"}],
+    [/학생부종합|학종|종합|면접/,"12-18"],
     [/./,"12-18"]]],
   "안동대":[/^/,"https://ipsi.andong.ac.kr/",[
-    [/면접|학생부종합|학종|종합/,"12-18",{first:"11-20",itv:"11-27"}],
+    [/면접|학생부종합|학종|종합/,"12-18"],
     [/./,"12-18"]]],
   "대구교육대":[/^/,"https://ipsi.dnue.ac.kr/",[
-    [/./,"12-18",{first:"11-20",itv:"11-28"}]]],
+    [/./,"12-18"]]],
   "경일대":[/^/,"https://ipsi.kiu.ac.kr/",[
-    [/면접/,"11-13",{itv:"10-24"}],
-    [/실기/,"11-13",{itv:"10-24"}],
+    [/면접/,"11-13"],
+    [/실기/,"11-13"],
     [/./,"12-18"]]],
   "포항공과대":[/^/,"https://adm-u.postech.ac.kr/",[
-    [/./,"12-11",{first:"11-13",itv:"11-21"}]]],
+    [/./,"12-11"]]],
   "대구경북과학기술원":[/^/,"https://www.dgist.ac.kr/adm/",[
-    [/면접/,"12-11",{first:"11-06",itv:"11-14"}],
+    [/면접/,"12-11"],
     [/./,"12-11"]]],
   "서울대":[/^/,"https://admission.snu.ac.kr/",[
-    [/일반/,"12-11",{first:"11-13",itv:"11-20"}],
-    [/./,"12-11",{first:"11-13",itv:"11-27"}]]],
+    [/일반/,"12-11"],
+    [/./,"12-11"]]],
   "고려대":[/^/,"https://oku.korea.ac.kr/",[
-    [/논술/,"12-18",{camp:/^세종$/i,itv:"11-21"}],
+    [/논술/,"12-18",{camp:/^세종$/i}],
     [/./,"12-18",{camp:/^세종$/i}],
-    [/논술/,"12-18T17:00",{itv:"11-14"}],
-    [/계열적합|고른기회|면접/,"12-11T17:00",{first:"11-10",itv:"11-14"}],
+    [/논술/,"12-18T17:00"],
+    [/계열적합|고른기회|면접/,"12-11T17:00"],
     [/./,"12-18T17:00"]]],
   "이화여대":[/^/,"https://admission.ewha.ac.kr/",[
-    [/논술/,"12-18",{itv:"11-21"}],
-    [/고교추천|학교장추천|교과/,"12-18",{itv:"11-14"}],
-    [/면접/,"12-18",{first:"11-20",itv:"11-28"}],
-    [/실기|예체능/,"11-13",{itv:"10-17"}],
+    [/논술/,"12-18"],
+    [/고교추천|학교장추천|교과/,"12-18"],
+    [/면접/,"12-18"],
+    [/실기|예체능/,"11-13"],
     [/./,"12-18"]]],
   "숙명여대":[/^/,"https://admission.sookmyung.ac.kr/",[
-    [/논술/,"12-18",{itv:"11-14"}],
-    [/면접|숙명인재/,"12-18",{first:"11-20",itv:"11-28"}],
-    [/실기/,"11-13",{itv:"10-24"}],
+    [/논술/,"12-18"],
+    [/면접|숙명인재/,"12-18"],
+    [/실기/,"11-13"],
     [/./,"12-18"]]],
   "홍익대":[/^/,"https://ibsi.hongik.ac.kr/",[
-    [/논술/,"12-18",{camp:/^세종$/i,itv:"11-15"}],
-    [/논술/,"12-18",{itv:"10-03"}],
-    [/실기|공연/,"11-13",{itv:"10-24"}],
-    [/미술/,"12-18",{first:"11-06",itv:"11-21"}],
+    [/논술/,"12-18",{camp:/^세종$/i}],
+    [/논술/,"12-18"],
+    [/실기|공연/,"11-13"],
+    [/미술/,"12-18"],
     [/./,"12-18"]]],
   "국민대":[/^/,"https://admission.kookmin.ac.kr/",[
-    [/논술/,"12-18",{itv:"11-21"}],
-    [/국민미래인재|면접/,"12-18",{first:"11-20",itv:"11-28"}],
-    [/실기/,"11-13",{itv:"10-17"}],
+    [/논술/,"12-18"],
+    [/국민미래인재|면접/,"12-18"],
+    [/실기/,"11-13"],
     [/./,"12-18"]]],
   "세종대":[/^/,"https://ipsi.sejong.ac.kr/",[
-    [/논술/,"12-18",{itv:"11-21"}],
-    [/면접/,"12-18",{first:"11-20",itv:"11-28"}],
-    [/실기/,"11-13",{itv:"10-17"}],
+    [/논술/,"12-18"],
+    [/면접/,"12-18"],
+    [/실기/,"11-13"],
     [/./,"12-18"]]],
   "단국대":[/^/,"https://ipsi.dankook.ac.kr/",[
-    [/논술/,"12-18",{itv:"11-14"}],
-    [/면접/,"12-18",{first:"11-20",itv:"11-28"}],
-    [/실기/,"11-13",{itv:"10-17"}],
+    [/논술/,"12-18"],
+    [/면접/,"12-18"],
+    [/실기/,"11-13"],
     [/./,"12-18"]]],
   "광운대":[/^/,"https://iphak.kw.ac.kr/",[
-    [/논술/,"12-18",{itv:"11-21"}],
-    [/면접/,"12-18",{first:"11-13",itv:"11-21"}],
+    [/논술/,"12-18"],
+    [/면접/,"12-18"],
     [/./,"12-18"]]],
   "명지대":[/^/,"https://iphak.mju.ac.kr/",[
-    [/교과면접/,"11-13",{first:"10-21",itv:"10-24"}],
-    [/면접/,"12-18",{first:"11-13",itv:"11-21"}],
-    [/실기/,"11-13",{itv:"10-17"}],
+    [/교과면접/,"11-13"],
+    [/면접/,"12-18"],
+    [/실기/,"11-13"],
     [/./,"12-18"]]],
   "상명대":[/^/,"https://admission.smu.ac.kr/",[
-    [/논술/,"12-18",{itv:"11-21"}],
-    [/면접|상명인재/,"12-18",{first:"11-06",itv:"11-14"}],
-    [/실기/,"11-13",{itv:"10-17"}],
+    [/논술/,"12-18"],
+    [/면접|상명인재/,"12-18"],
+    [/실기/,"11-13"],
     [/./,"12-18"]]],
   "가톨릭대":[/^/,"https://ipsi.catholic.ac.kr/",[
-    [/논술/,"12-18",{itv:"11-14"}],
-    [/면접|잠재능력우수자면접|가톨릭지도자/,"12-18",{first:"11-20",itv:"11-28"}],
+    [/논술/,"12-18"],
+    [/면접|잠재능력우수자면접|가톨릭지도자/,"12-18"],
     [/./,"12-18"]]],
   "서울시립대":[/^/,"https://admission.uos.ac.kr/",[
-    [/논술/,"12-18",{itv:"11-21"}],
-    [/면접/,"12-18",{first:"11-20",itv:"11-28"}],
-    [/실기/,"12-18",{itv:"11-14"}],
+    [/논술/,"12-18"],
+    [/면접/,"12-18"],
+    [/실기/,"12-18"],
     [/./,"12-18"]]],
   "서울과학기술대":[/^/,"https://admission.seoultech.ac.kr/",[
-    [/논술/,"12-18",{itv:"11-16"}],
-    [/학교생활우수|면접|학생부종합|학종|종합/,"12-18",{first:"11-13",itv:"11-21"}],
-    [/실기/,"12-18",{first:"10-30",itv:"11-07"}],
+    [/논술/,"12-18"],
+    [/학교생활우수|면접|학생부종합|학종|종합/,"12-18"],
+    [/실기/,"12-18"],
     [/./,"12-18"]]],
   "한국항공대":[/^/,"https://ibsi.kau.ac.kr/",[
-    [/논술/,"12-18",{itv:"11-21"}],
-    [/미래인재|면접|학생부종합|학종|종합/,"12-18",{first:"11-13",itv:"11-21"}],
+    [/논술/,"12-18"],
+    [/미래인재|면접|학생부종합|학종|종합/,"12-18"],
     [/./,"12-18"]]],
   "가천대":[/^/,"https://admission.gachon.ac.kr/",[
-    [/논술/,"12-18",{itv:"11-23"}],
-    [/면접|바람개비|가천의약학|학생부우수/,"12-18",{first:"11-11",itv:"11-21"}],
-    [/실기/,"11-13",{itv:"10-17"}],
+    [/논술/,"12-18"],
+    [/면접|바람개비|가천의약학|학생부우수/,"12-18"],
+    [/실기/,"11-13"],
     [/./,"12-18"]]],
   "경기대":[/^/,"https://enter.kyonggi.ac.kr/",[
-    [/논술/,"12-18",{itv:"11-14"}],
-    [/면접/,"12-18",{first:"11-13",itv:"11-21"}],
-    [/실기/,"11-13",{itv:"10-17"}],
+    [/논술/,"12-18"],
+    [/면접/,"12-18"],
+    [/실기/,"11-13"],
     [/./,"12-18"]]],
   "인천대":[/^/,"https://admission.inu.ac.kr/",[
-    [/자기추천|면접/,"12-18",{first:"11-20",itv:"11-28"}],
-    [/실기/,"12-18",{itv:"10-24"}],
+    [/자기추천|면접/,"12-18"],
+    [/실기/,"12-18"],
     [/./,"12-18"]]],
   "성신여대":[/^/,"https://ipsi.sungshin.ac.kr/",[
-    [/논술/,"12-18",{itv:"11-15"}],
-    [/자기주도인재|면접/,"12-18",{first:"11-13",itv:"11-21"}],
-    [/실기/,"11-13",{itv:"10-17"}],
+    [/논술/,"12-18"],
+    [/자기주도인재|면접/,"12-18"],
+    [/실기/,"11-13"],
     [/./,"12-18"]]],
   "서울여대":[/^/,"https://admission.swu.ac.kr/",[
-    [/논술/,"12-18",{itv:"11-14"}],
-    [/바롬인재면접|면접/,"12-18",{first:"11-13",itv:"11-21"}],
-    [/실기/,"11-13",{itv:"10-17"}],
+    [/논술/,"12-18"],
+    [/바롬인재면접|면접/,"12-18"],
+    [/실기/,"11-13"],
     [/./,"12-18"]]],
   "동덕여대":[/^/,"https://ipsi.dongduk.ac.kr/",[
-    [/논술/,"12-18",{itv:"11-21"}],
-    [/동덕창의리더|면접/,"12-18",{first:"11-13",itv:"11-21"}],
-    [/실기/,"11-13",{itv:"10-17"}],
+    [/논술/,"12-18"],
+    [/동덕창의리더|면접/,"12-18"],
+    [/실기/,"11-13"],
     [/./,"12-18"]]],
   "덕성여대":[/^/,"https://enter.duksung.ac.kr/",[
-    [/논술/,"12-18",{itv:"11-21"}],
-    [/덕성인재II|면접/,"12-18",{first:"11-13",itv:"11-21"}],
-    [/실기/,"11-13",{itv:"10-17"}],
+    [/논술/,"12-18"],
+    [/덕성인재II|면접/,"12-18"],
+    [/실기/,"11-13"],
     [/./,"12-18"]]],
   "삼육대":[/^/,"https://ipsi.syu.ac.kr/",[
-    [/논술/,"12-18",{itv:"11-16"}],
-    [/세움인재|면접/,"12-18",{first:"11-06",itv:"11-15"}],
-    [/실기/,"11-13",{itv:"10-17"}],
+    [/논술/,"12-18"],
+    [/세움인재|면접/,"12-18"],
+    [/실기/,"11-13"],
     [/./,"12-18"]]],
   "서경대":[/^/,"https://go.skuniv.ac.kr/",[
-    [/논술/,"12-18",{itv:"11-22"}],
-    [/실기/,"11-13",{itv:"10-17"}],
+    [/논술/,"12-18"],
+    [/실기/,"11-13"],
     [/./,"12-18"]]],
   "한성대":[/^/,"https://enter.hansung.ac.kr/",[
-    [/논술/,"12-18",{itv:"11-21"}],
-    [/실기/,"11-13",{itv:"10-17"}],
+    [/논술/,"12-18"],
+    [/실기/,"11-13"],
     [/./,"12-18"]]],
   "전남대":[/^/,"https://admission.jnu.ac.kr/",[
-    [/고교생활우수자I$|면접/,"12-18",{first:"11-20",itv:"11-26"}],
-    [/실기/,"12-18",{itv:"11-19"}],
+    [/고교생활우수자I$|면접/,"12-18"],
+    [/실기/,"12-18"],
     [/./,"12-18"]]],
   "전북대":[/^/,"https://enter.jbnu.ac.kr/",[
-    [/큰사람|면접|학생부종합|학종|종합/,"12-18",{first:"11-13",itv:"11-20"}],
+    [/큰사람|면접|학생부종합|학종|종합/,"12-18"],
     [/./,"12-18"]]],
   "충남대":[/^/,"https://ipsi.cnu.ac.kr/",[
-    [/PRISM|면접|학생부종합|학종|종합/,"12-18",{first:"11-20",itv:"11-26"}],
+    [/PRISM|면접|학생부종합|학종|종합/,"12-18"],
     [/./,"12-18"]]],
   "충북대":[/^/,"https://ipsi.chungbuk.ac.kr/",[
-    [/학생부종합I$|면접/,"12-18",{first:"11-20",itv:"11-28"}],
+    [/학생부종합I$|면접/,"12-18"],
     [/./,"12-18"]]],
   "강원대":[/^/,"https://www.kangwon.ac.kr/admission/",[
-    [/면접/,"12-18",{first:"11-20",itv:"11-27"}],
+    [/면접/,"12-18"],
     [/./,"12-18"]]],
   "제주대":[/^/,"https://ibsi.jejunu.ac.kr/",[
-    [/면접/,"12-18",{first:"11-20",itv:"11-27"}],
+    [/면접/,"12-18"],
     [/./,"12-18"]]],
   "공주대":[/^/,"https://ipsi.kongju.ac.kr/",[
-    [/면접|학생부종합|학종|종합/,"12-18",{first:"11-20",itv:"11-27"}],
+    [/면접|학생부종합|학종|종합/,"12-18"],
     [/./,"12-18"]]],
   "한국교통대":[/^/,"https://www.ut.ac.kr/ipsi.do",[
-    [/면접|NAVI|학생부종합|학종|종합/,"12-18",{first:"11-13",itv:"11-20"}],
+    [/면접|NAVI|학생부종합|학종|종합/,"12-18"],
     [/./,"12-18"]]],
   "한밭대":[/^/,"https://www.hanbat.ac.kr/admission/",[
-    [/면접|학종|학생부종합/,"12-18",{first:"11-20",itv:"11-27"}],
+    [/면접|학종|학생부종합/,"12-18"],
     [/./,"12-18"]]],
   "한국교원대":[/^/,"https://ent.knue.ac.kr/",[
-    [/./,"12-18",{first:"11-13",itv:"11-21"}]]],
+    [/./,"12-18"]]],
   "한국체육대":[/^/,"https://ipsi.knsu.ac.kr/",[
-    [/실기|특기/,"12-18",{itv:"10-24"}],
+    [/실기|특기/,"12-18"],
     [/./,"12-18"]]],
   "한국과학기술원":[/^/,"https://admission.kaist.ac.kr/",[
-    [/./,"12-11",{first:"11-13",itv:"11-25"}]]],
+    [/./,"12-11"]]],
   "광주과학기술원":[/^/,"https://www.gist.ac.kr/adm/",[
-    [/./,"12-11",{first:"10-23",itv:"10-31"}]]],
+    [/./,"12-11"]]],
   "경남정보대":[/^/,"https://ipsi.kit.ac.kr/",[
-    [/면접/,"10-29",{itv:"10-17"}],
+    [/면접/,"10-29"],
     [/./,"10-29"]]],
   "동의과학대":[/^/,"https://ipsi.dit.ac.kr/",[
-    [/면접/,"10-30",{itv:"10-17"}],
+    [/면접/,"10-30"],
     [/./,"10-30"]]],
   "부산과학기술대":[/^/,"https://ipsi.bist.ac.kr/",[
-    [/면접/,"10-30",{itv:"10-17"}],
+    [/면접/,"10-30"],
     [/./,"10-30"]]],
   "부산여자대":[/^/,"https://ipsi.bwc.ac.kr/",[
-    [/면접/,"10-30",{itv:"10-17"}],
+    [/면접/,"10-30"],
     [/./,"10-30"]]],
   "부산보건대":[/^/,"https://ipsi.bhu.ac.kr/",[
-    [/면접/,"10-30",{itv:"10-17"}],
+    [/면접/,"10-30"],
     [/./,"10-30"]]],
   "부산경상대":[/^/,"https://ipsi.bsks.ac.kr/",[
-    [/면접/,"10-30",{itv:"10-17"}],
+    [/면접/,"10-30"],
     [/./,"10-30"]]],
   "대동대":[/^/,"https://ipsi.daedong.ac.kr/",[
-    [/면접/,"10-30",{itv:"10-17"}],
+    [/면접/,"10-30"],
     [/./,"10-30"]]],
   "춘해보건대":[/^/,"https://ipsi.ch.ac.kr/",[
-    [/면접/,"10-30",{itv:"10-17"}],
+    [/면접/,"10-30"],
     [/./,"10-30"]]],
   "마산대":[/^/,"https://ipsi.masan.ac.kr/",[
-    [/면접/,"10-30",{itv:"10-17"}],
+    [/면접/,"10-30"],
     [/./,"10-30"]]],
   "연암공과대":[/^/,"https://ipsi.yc.ac.kr/",[
-    [/면접/,"10-30",{itv:"10-17"}],
+    [/면접/,"10-30"],
     [/./,"10-30"]]],
   "울산과학대":[/^/,"https://ipsi.uc.ac.kr/",[
-    [/면접/,"10-30",{itv:"10-17"}],
+    [/면접/,"10-30"],
     [/./,"10-30"]]],
   "김해대":[/^/,"https://ipsi.gimhae.ac.kr/",[
-    [/면접/,"10-30",{itv:"10-17"}],
+    [/면접/,"10-30"],
     [/./,"10-30"]]],
   "거제대":[/^/,"https://ipsi.koje.ac.kr/",[
-    [/면접/,"10-30",{itv:"10-17"}],
+    [/면접/,"10-30"],
     [/./,"10-30"]]]
 };
+// 고사·1단계 일정은 전형별로 확인한 항목만 적용한다. 종합전형이라는 이름으로 면접을 추정하지 않는다.
+var VERIFIED_EXAMS_2027=[
+  {univ:/^부산대\|(양산|밀양)?$/,track:/^학생부종합(학생부종합|지역인재|지역의사선발)$/,kind:"면접",ann1:"12-01T16:00",itv:"12-05",
+    url:"https://go.pusan.ac.kr/down/mojib/RF%280%29_260611154120.pdf"},
+  {univ:/^부산대\|(양산|밀양)?$/,track:/^논술(논술|지역인재)?$/,kind:"논술",itv:"11-28",
+    url:"https://go.pusan.ac.kr/down/mojib/RF%280%29_260611154120.pdf"},
+  {univ:/^부산대\|(양산|밀양)?$/,track:/^학생부교과|^학생부종합(사회배려자|저소득층학생|지역인재저소득층학생|특성화고교졸업자|특수교육대상자)$/,kind:"없음",
+    url:"https://go.pusan.ac.kr/down/mojib/RF%280%29_260611154120.pdf"},
+  {univ:/^동아대\|$/,track:/^(학생부종합)?(학교생활우수자|기회균형대상자|지역인재기회균형대상자|농어촌학생|특성화고교출신자동일계|평생학습자|특성화고등을졸업한재직자)$/,kind:"없음",
+    url:"https://ent.donga.ac.kr/admission/html/rolling/noticeView.asp?BOARD_IDX=31368"},
+  {univ:/^동아대\|$/,track:/^(학생부종합)?잠재능력우수자$/,kind:"면접",
+    url:"https://ent.donga.ac.kr/admission/html/rolling/noticeView.asp?BOARD_IDX=31367"},
+  {univ:/^동아대\|$/,track:/^(학생부종합)?(지역인재종합|지역의사제(광역권|진료권)?)$/,major:/^의예과$/,kind:"면접",
+    url:"https://ent.donga.ac.kr/admission/html/rolling/noticeView.asp?BOARD_IDX=31368"},
+  {univ:/^부경대\|$/,track:/^학생부종합학교생활우수인재$|^학생부교과(교과성적우수인재|일반|지역혁신인재)$/,kind:"없음",
+    url:"https://iphak.pknu.ac.kr/pknu/board/board.htm?bbsid=notice&ctg_cd=oa&mode=view&code=iphak_help&bltn_seq=1163"},
+  {univ:/^경북대\|$/,track:/^(학생부종합)?일반학생$/,kind:"없음",
+    url:"https://ipsi1.knu.ac.kr/notice/view.php?r=FxlcTx5IV0VHAHIcEBQAECVnJj4"},
+  {univ:/^경북대\|$/,track:/^(논술)?AAT(논술)?$|^논술(논술|일반)?$/,kind:"논술",itv:"11-28",
+    url:"https://www.knu.ac.kr/wbbs/wbbs/bbs/btin/viewBtin.action?btin.appl_no=000000&btin.bbs_cde=28&btin.doc_no=1338311&menu_idx=202"}
+];
+function examRule(a){
+  if(YEAR!==2027||a.kind!=="수시") return null;
+  var track=String(a.jh||"").normalize("NFKC").replace(/전형|[\s()[\]·ㆍ_,/.-]/g,"");
+  var university=univKey(a.univ);
+  var major=String(a.major||"").normalize("NFKC").replace(/\s+/g,"");
+  return VERIFIED_EXAMS_2027.find(function(r){return r.univ.test(university)&&r.track.test(track)&&(!r.major||r.major.test(major));})||null;
+}
+function examKind(a){
+  if(/^(면접|논술|실기|고사|없음)$/.test(a.examKind||"")) return a.examKind;
+  var rule=examRule(a);if(rule) return rule.kind;
+  var track=String(a.jh||"");
+  if(/면접\s*(없|미실시|미반영)|서류형|서류\s*100/.test(track)) return "없음";
+  if(/논술|AAT/i.test(track)) return "논술";
+  if(/실기/.test(track)) return "실기";
+  if(/면접/.test(track)) return "면접";
+  if(a.type==="논술"||a.type==="실기") return a.type;
+  return "고사";
+}
 function officialAnnouncement(a,key){
   if(YEAR!==2027||a.kind!=="수시") return null;
+  if(key==="itv"||key==="ann1"){
+    var exam=examRule(a), value=exam&&exam[key];
+    if(!value||key==="itv"&&examKind(a)==="없음") return null;
+    return {when:"2026-"+value,url:exam.url};
+  }
   var uni=univKey(a.univ).split("|"), catalog=ADMISSION_2027[uni[0]];
   if(!catalog||!catalog[0].test(uni[1])) return null;
   var track=String(a.jh||"").normalize("NFKC").replace(/전형|[\s()[\]·ㆍ_,/-]/g,"");
@@ -1683,17 +1728,22 @@ function officialAnnouncement(a,key){
   var major=String(a.major||"").normalize("NFKC").replace(/\s+/g,"");
   var rule=catalog[2].find(function(x){return x[0].test(track)&&(!x[2]||!x[2].camp||x[2].camp.test(uni[1]))&&(!x[2]||!x[2].major||x[2].major.test(major));});
   if(!rule) return null;
-  var opts=rule[2]||{}, isFinal=key==="ann", when=isFinal?rule[1]:key==="ann1"?opts.first:key==="itv"?opts.itv:"";
+  var opts=rule[2]||{}, isFinal=key==="ann", when=isFinal?rule[1]:"";
   if(!when) return null;
-  var from=isFinal?opts.from:key==="ann1"?opts.firstFrom:key==="itv"?opts.itvFrom:"";
-  return {when:"2026-"+when,url:catalog[1],released:isFinal&&opts.released,by:isFinal&&opts.by,from:from?"2026-"+from:""};
+  var from=isFinal?opts.from:"";
+  return {when:"2026-"+when,url:opts.url||catalog[1],released:isFinal&&opts.released,by:isFinal&&opts.by,from:from?"2026-"+from:""};
 }
 function appliedAnnouncement(a,key){
   var r=officialAnnouncement(a,key), saved=dateKey(a[key]);
   return r&&(!saved||saved===dateKey(r.when)||saved===r.from)?r:null;
 }
-function announcement(a,key){ var r=appliedAnnouncement(a,key); return r?r.when:(a[key]||""); }
-function itvDate(a){ return dateKey(announcement(a,"itv")); }
+function announcement(a,key){
+  if(key==="itv"&&examKind(a)==="없음") return "";
+  var exam=examRule(a);
+  if(key==="ann1"&&exam&&exam.kind==="없음"&&(!a.examKind||a.examKind==="없음")) return "";
+  var r=appliedAnnouncement(a,key); return r?r.when:(a[key]||"");
+}
+function itvDate(a){ return examKind(a)==="없음"?"":dateKey(announcement(a,"itv")); }
 function announcementLink(a,key,label){
   var r=appliedAnnouncement(a,key);
   if(!r) return null;
@@ -1703,7 +1753,7 @@ function announcementLink(a,key,label){
   return link;
 }
 function announcementField(st,a,key,label,onSet){
-  var when=announcement(a,key);
+  var when=key==="itv"?itvDate(a):announcement(a,key);
   var f=field(label,dateInput("date",dateKey(when),function(v){ if(onSet) onSet(v); else a[key]=v; save(st); render(); }));
   var r=appliedAnnouncement(a,key), link=announcementLink(a,key,r&&(r.released?"발표 공지 ↗":r.by?"발표 기한 ↗":"입학처 일정 ↗"));
   if(link){
@@ -1773,7 +1823,7 @@ function checkStudent(st){
     if(prepNeeds(a)&&prepLeft(a).length){
       var iv2=itvDate(a), pd=daysTo(iv2), pv=afterCsatApp(a)?examVerdict(st,a):null;
       if(pd!==null&&pd>=0&&pd<=2&&!(pv&&pv.v==="skip"))
-        out.push({lv:"warn",code:(a.type==="논술"?"논술":a.type==="실기"?"실기":"면접")+" 준비",msg:(a.univ||"한 곳")+" "+(a.type==="논술"?"논술":a.type==="실기"?"실기":"면접")+"이 "+(pd===0?"오늘":pd===1?"내일":"모레")+"입니다("+mdw(iv2)+"). 남은 준비: "+prepLeft(a).join(", ")+"."});
+        out.push({lv:"warn",code:examKind(a)+" 준비",msg:(a.univ||"한 곳")+" "+examKind(a)+"이 "+(pd===0?"오늘":pd===1?"내일":"모레")+"입니다("+mdw(iv2)+"). 남은 준비: "+prepLeft(a).join(", ")+"."});
     }
     if(a.status==="충원대기"&&a.due){
       var d=daysTo(a.due);
@@ -1833,7 +1883,7 @@ var KINDNAME={itv:"면접·고사", ann1:"1단계 발표", ann:"발표", addAnn:
 function kindName(e,withTime){
   var time=e.kind==="itv"?e.a.itvTime:String(e.when).match(/T(\d{2}:\d{2})/);
   var official=e.kind==="ann"&&appliedAnnouncement(e.a,"ann");
-  return (official&&official.by?"발표 기한":KINDNAME[e.kind])+(withTime&&time?" "+(Array.isArray(time)?time[1]:time):"");
+  return (e.kind==="itv"?examKind(e.a):official&&official.by?"발표 기한":KINDNAME[e.kind])+(withTime&&time?" "+(Array.isArray(time)?time[1]:time):"");
 }
 /* ── 면접·고사 시각 ── 선생님이 입학처 공지나 학생(수험표)에게 확인해 넣는다. 앱은 비교만 한다 */
 function itvMin(a){ var m=String(a.itvTime||"").match(/^(\d{1,2}):(\d{2})/); return m?(+m[1])*60+(+m[2]):null; }
@@ -1846,7 +1896,7 @@ function clashKind(list){
 }
 function itvSrcText(a){ return !a.itvTime?"":a.itvSrc==="공지"?"입학처 공지 확인":a.itvSrc==="학생"?"학생에게 받음":"확인 필요"; }
 function itvCell(a){ return mmdd(itvDate(a))+(a.itvTime?" "+a.itvTime:""); }
-function itvSearchUrl(a){ return "https://www.google.com/search?q="+encodeURIComponent(shortUniv(a.univ)+" 입학처 "+YEAR+"학년도 "+(a.type==="논술"?"논술 고사":a.type==="실기"?"실기 고사":"면접")+" 고사장 시간 "+(a.major||"")); }
+function itvSearchUrl(a){ return "https://www.google.com/search?q="+encodeURIComponent(shortUniv(a.univ)+" 입학처 "+YEAR+"학년도 "+examKind(a)+" 고사장 시간 "+(a.major||"")); }
 function hhmm(v){ var m=String(v||"").match(/(\d{1,2})\s*[:시]\s*(\d{2})?/); if(!m||+m[1]>23) return ""; return pad2(+m[1])+":"+(m[2]||"00"); }
 
 /* ── 수능최저 자동 판정 ─────────────────────
@@ -2052,7 +2102,7 @@ function byClass(c){ return sorted(list().filter(function(s){return s.cls===c;})
 var base=new Map(), actLabel="", LOGMAX=80, logOpenId=null;
 function setBase(st){ base.set(st.id, JSON.stringify(st)); }
 function resetBase(){ base=new Map(); students.forEach(function(st){ setBase(st); }); }
-var LOGF=[["status","상태"],["univ","대학"],["major","모집단위"],["jh","전형명"],["type","전형"],["kind","구분"],["group","군"],
+var LOGF=[["status","상태"],["univ","대학"],["major","모집단위"],["jh","전형명"],["type","전형"],["kind","구분"],["group","군"],["examKind","고사 구분"],
   ["ann1","1단계 발표일"],["itv","면접·고사일"],["itvTime","면접 시각"],["itvPlace","고사장"],["ann","발표일"],["due","충원 마감"],["rank","예비 순번"],["mreq","최저 기준"],["mmet","최저 충족"],
   ["addAnn","충원 발표"],["addMethod","충원 확인 방법"],["addUrl","입학처 공지 링크"],
   ["c6","6장 포함"],["rec","학교장추천"],["filed","원서 접수"],["jc","전문대"],["region","지역"],["note","메모"]];
@@ -2089,7 +2139,7 @@ function diffLines(p,s){
       var x=o[f[0]], y=a[f[0]]; if(lnorm(x)===lnorm(y)) return;
       ch.push(f[0]==="mreq"||f[0]==="note"? f[1]+" 바뀜" : f[1]+" "+lval(x)+" → "+lval(y));
     });
-    if(itvDate(a)&&a.kind==="수시"&&prepDone(o)!==prepDone(a)) ch.push("면접 준비 "+prepDone(o)+"→"+prepDone(a)+"/"+prepList(a).length);
+    if(itvDate(a)&&a.kind==="수시"&&prepDone(o)!==prepDone(a)) ch.push(examKind(a)+" 준비 "+prepDone(o)+"→"+prepDone(a)+"/"+prepList(a).length);
     if(ch.length) L.push(appName(a)+" — "+ch.join(", "));
   });
   (p.apps||[]).forEach(function(a){ if(!seen[a.id]) L.push("지원 삭제: "+appName(a)); });
@@ -2717,7 +2767,7 @@ function detail(st){
   if(apps.length){
     var tw=el("div","tablewrap"), t=document.createElement("table"); t.className="apptable";
     var hr=t.createTHead().insertRow();
-    var heads=["","대학","모집단위","전형","면접 · 발표","수능최저","상태",""];
+    var heads=["","대학","모집단위","전형","고사 · 발표","수능최저","상태",""];
     heads.forEach(function(h){
       var th=document.createElement("th"); th.textContent=h; hr.appendChild(th); });
     var tb=t.createTBody();
@@ -2735,7 +2785,8 @@ function detail(st){
       var dc=tr.insertCell(), parts=[];
       var first=announcement(a,"ann1"), final=announcement(a,"ann");
       if(first) parts.push(document.createTextNode(mdw(first)+" 1단계"));
-      if(iv){ var it=itvCell(a)+" 면접"; parts.push(cn?el("span","clash",cn+" "+it):document.createTextNode(it)); if(a.itvTime&&a.itvSrc!=="공지"&&a.itvSrc!=="학생"){ var q=el("span","itvq","확인 필요"); q.title="시각 출처를 아직 고르지 않았습니다(입학처 공지·학생 수험표로 확인)"; parts.push(q); } }
+      if(iv){ var it=itvCell(a)+" "+examKind(a); parts.push(cn?el("span","clash",cn+" "+it):document.createTextNode(it)); if(a.itvTime&&a.itvSrc!=="공지"&&a.itvSrc!=="학생"){ var q=el("span","itvq","확인 필요"); q.title="시각 출처를 아직 고르지 않았습니다(입학처 공지·학생 수험표로 확인)"; parts.push(q); } }
+      else if(examKind(a)==="없음") parts.push(document.createTextNode("고사 없음"));
       if(final) parts.push(document.createTextNode(mdw(final)+" 발표"));
       if(!parts.length) dc.textContent="—";
       parts.forEach(function(p,i){ if(i) dc.appendChild(document.createTextNode(" · ")); dc.appendChild(p); });
@@ -2803,18 +2854,25 @@ function appEditor(st,a,w){
     g.appendChild(field("모집단위", txt(a.major,"수학교육과",function(v){a.major=v; fillMin(st); fillExam(st); save(st); render();})));
     g.appendChild(field("전형명", txt(a.jh,"학생부종합(일반)",function(v){a.jh=v; if(a.kind==="수시"&&mapType(v)) a.type=mapType(v); fillMin(st); fillExam(st); save(st); render();})));
     g.appendChild(field("전형유형", sel(TYPES,a.type,function(v){a.type=v; save(st); render();})));
+    g.appendChild(field("고사 구분", sel(["자동 판단","면접","논술","실기","고사","없음"],a.examKind||"자동 판단",function(v){ if(v==="자동 판단") delete a.examKind; else a.examKind=v; save(st,true); render(); })));
+    var verifiedExam=examRule(a), examHint=el("div","f wide");
+    if(verifiedExam){
+      examHint.appendChild(el("span","sub","입학처 확인: "+(verifiedExam.kind==="없음"?"면접·고사 없음":verifiedExam.kind)));
+      var examSource=el("a","linkbtn","입학처 근거 ↗"); examSource.href=verifiedExam.url; examSource.target="_blank"; examSource.rel="noopener noreferrer"; examHint.appendChild(examSource);
+    } else examHint.appendChild(el("span","sub","고사 종류와 날짜를 확인해 입력하세요. 다르면 ‘고사 구분’에서 바꿀 수 있습니다."));
+    g.appendChild(examHint);
     if(a.kind==="수시"){
       var rf=field("학교장추천", sel(["아님","학교장추천"],isRec(a)?"학교장추천":"아님",function(v){a.rec=(v==="학교장추천"); save(st); render();}));
       rf.title="전형명에 '학교장추천'이 있으면 저절로 고릅니다. 다르면 여기서 바꾸세요."; g.appendChild(rf);
     }
     if(a.kind==="정시"&&!a.jc) g.appendChild(field("군", sel([""].concat(GROUPS),a.group||"",function(v){a.group=v; save(st);})));
     if(a.kind==="정시") g.appendChild(field("원서 접수", sel(["접수 전","접수 완료"],a.filed?"접수 완료":"접수 전",function(v){ if(v==="접수 완료") a.filed=true; else delete a.filed; save(st); render(); })));
-    if(a.kind==="수시"){
+    if(a.kind==="수시"&&!(verifiedExam&&verifiedExam.kind==="없음"&&examKind(a)==="없음")){
       var a1=announcementField(st,a,"ann1","1단계 발표일");
       a1.title="서류로 먼저 거르는 단계형 전형(학종 등)만 넣습니다. 일괄합산이면 비워 두세요."; g.appendChild(a1);
     }
-    g.appendChild(announcementField(st,a,"itv","면접일",function(v){ if(a.itvTbl){ delete a.itvTime; delete a.itvPlace; delete a.itvSrc; delete a.itvTbl; } a.itv=v; fillExam(st); }));
-    if(a.kind==="수시"){
+    if(examKind(a)!=="없음") g.appendChild(announcementField(st,a,"itv",examKind(a)+"일",function(v){ if(a.itvTbl){ delete a.itvTime; delete a.itvPlace; delete a.itvSrc; delete a.itvTbl; } a.itv=v; fillExam(st); }));
+    if(a.kind==="수시"&&examKind(a)!=="없음"){
       var ti=document.createElement("input"); ti.type="time"; ti.value=a.itvTime||""; ti.disabled=ro();
       ti.onchange=function(){ remember("수정"); if(ti.value) a.itvTime=ti.value; else delete a.itvTime; shareExam(a); save(st); render(); };
       var tf=field("면접·고사 시각", ti); tf.title="입학처 공지나 학생 수험표에서 확인한 입실(시작) 시각"; g.appendChild(tf);
@@ -2828,7 +2886,7 @@ function appEditor(st,a,w){
     if(a.kind==="수시") g.appendChild(field("최저 충족", sel(MINSTATES,a.mmet||"미정",function(v){a.mmet=v; save(st); render();})));
     if(!hasWaitInfo(a)&&canEditWait(st)) g.appendChild(waitButton(st,a));
     g.appendChild(field("메모", txt(a.note,"",function(v){a.note=v; save(st);})));
-    if(a.kind==="수시"&&itvDate(a)){ var pf=field("면접 준비 ("+prepDone(a)+"/"+prepList(a).length+")", prepChips(st,a)); pf.classList.add("wide"); g.appendChild(pf); }
+    if(a.kind==="수시"&&itvDate(a)){ var pf=field(examKind(a)+" 준비 ("+prepDone(a)+"/"+prepList(a).length+")", prepChips(st,a)); pf.classList.add("wide"); g.appendChild(pf); }
     if(a.kind==="수시"&&!a.jc){
       var cb=document.createElement("select");
       ["Y","N"].forEach(function(o){var op=document.createElement("option");op.value=o;op.textContent=o==="Y"?"포함":"제외";if((a.c6?"Y":"N")===o)op.selected=true;cb.appendChild(op);});
@@ -3073,10 +3131,10 @@ function renderUniv(all){
     td.textContent=q?"찾는 내용이 없습니다.":"아직 입력된 지원 내역이 없습니다."; td.style.color="var(--ink-3)"; }
 }
 function univSchedText(list){
-  var s1=[], iv=[], fn=[], add=function(arr,d){ d=dateKey(d); if(d&&arr.indexOf(d)<0) arr.push(d); };
-  list.forEach(function(it){ add(s1,announcement(it.a,"ann1")); add(iv,itvDate(it.a)); add(fn,announcement(it.a,"ann")); });
+  var s1=[], iv={면접:[],논술:[],실기:[],고사:[]}, fn=[], add=function(arr,d){ d=dateKey(d); if(d&&arr.indexOf(d)<0) arr.push(d); };
+  list.forEach(function(it){ add(s1,announcement(it.a,"ann1")); var d=itvDate(it.a); if(d) add(iv[examKind(it.a)],d); add(fn,announcement(it.a,"ann")); });
   var fmt=function(arr,lbl){ arr.sort(); return arr.length?lbl+" "+arr.slice(0,2).map(mmdd).join("·")+(arr.length>2?" 외":""):""; };
-  return [fmt(s1,"1단계"),fmt(iv,"면접"),fmt(fn,"발표")].filter(Boolean).join(" · ");
+  return [fmt(s1,"1단계")].concat(Object.keys(iv).map(function(k){return fmt(iv[k],k);}),[fmt(fn,"발표")]).filter(Boolean).join(" · ");
 }
 function univDetail(list,byM){
   var box=el("div");
@@ -3096,7 +3154,7 @@ function univDetail(list,byM){
     row.appendChild(el("span","sub",[a.jc?"전문대":"", a.kind==="정시"?(a.group&&!a.jc?a.group+"군":"정시"):"수시", jhText(a)].filter(Boolean).join(" · ")));
     var meta=el("div","meta");
     var first=announcement(a,"ann1"), iv=itvDate(a), final=announcement(a,"ann");
-    var bits=[first?mdw(first)+" 1단계 발표":"", iv?mmdd(iv)+" 면접":"", final?mdw(final)+" 발표":"", a.due?"충원 "+fmtDue(a.due)+"까지":"", a.rank?"예비 "+a.rank:""].filter(Boolean);
+    var bits=[first?mdw(first)+" 1단계 발표":"", iv?mmdd(iv)+" "+examKind(a):examKind(a)==="없음"?"고사 없음":"", final?mdw(final)+" 발표":"", a.due?"충원 "+fmtDue(a.due)+"까지":"", a.rank?"예비 "+a.rank:""].filter(Boolean);
     if(a.kind==="수시"&&a.mreq) bits.push("최저 "+(minShort(a.mreq)||a.mreq));
     meta.textContent=bits.join(" · ");
     if(a.kind==="수시"&&a.mmet==="미충족"){ meta.appendChild(document.createTextNode(bits.length?" · ":"")); meta.appendChild(el("span","miss","최저 미충족")); }
@@ -3156,7 +3214,7 @@ function saveIcs(ev, label){
       .concat(allDay(day),["SUMMARY:"+icsText(title),"DESCRIPTION:"+icsText(desc)],alarm(title,"-PT15H"),["END:VEVENT"]));
   });
   ev.filter(function(e){ return e.kind!=="ann"; }).forEach(function(e){
-    var s=e.s, a=e.a, kind=KINDNAME[e.kind];
+    var s=e.s, a=e.a, kind=kindName(e,false);
     var title="["+kind+"] "+(s.cls?s.cls+"반 ":"")+(s.name||"")+" · "+[(a.jc?"전문대 ":"")+shortUniv(a.univ), shortMajor(a.major)].filter(Boolean).join(" ");
     var desc=[a.univ, a.major, a.jh||a.type, "상태: "+(a.status||"지원완료")+(a.rank?" (예비 "+a.rank+")":""),
       a.kind==="수시"&&a.mreq?"수능최저: "+(minShort(a.mreq)||a.mreq)+(a.mmet&&a.mmet!=="미정"&&a.mmet!=="해당없음"?" ("+a.mmet+")":""):"",
@@ -3996,9 +4054,11 @@ function notesCsv(arr,name){
 var PREP={
   면접:[["read","학생부 다시 읽기"],["q","예상 질문 답 준비"],["mock","모의면접"],["go","장소·시간·준비물 확인"]],
   논술:[["past","기출 풀어 보기"],["mock","모의 논술·첨삭"],["go","장소·시간·준비물 확인"]],
-  실기:[["prac","실기 연습"],["go","장소·시간·준비물 확인"]]
+  실기:[["prac","실기 연습"],["go","장소·시간·준비물 확인"]],
+  고사:[["go","장소·시간·준비물 확인"]],
+  없음:[]
 };
-function prepList(a){ return PREP[a.type==="논술"?"논술":a.type==="실기"?"실기":"면접"]; }
+function prepList(a){ return PREP[examKind(a)]; }
 function prepNeeds(a){ var s0=a.status||"지원완료"; return a.kind==="수시"&&!!itvDate(a)&&(s0==="지원완료"||s0==="1단계합"); }
 function prepDone(a){ var p=a.prep||{}; return prepList(a).filter(function(x){ return p[x[0]]; }).length; }
 function prepLeft(a){ var p=a.prep||{}; return prepList(a).filter(function(x){ return !p[x[0]]; }).map(function(x){ return x[1]; }); }
@@ -4034,7 +4094,7 @@ function renderPrep(host, arr, showClass){
     row.appendChild(el("span","pill "+(n===m?"s-ok":x.d<=7?"s-bad":"s-go"),x.d===0?"오늘":"D-"+x.d));
     var who=el("button","who",(showClass&&s.cls?s.cls+"반 ":"")+(s.no?s.no+" ":"")+(s.name||"")); who.title="이 학생 보기";
     who.onclick=function(){ goStudent(s); }; row.appendChild(who);
-    row.appendChild(el("span","sub",[mdw(x.iv)+" "+(a.type==="논술"?"논술":a.type==="실기"?"실기":"면접"), (a.jc?"전문대 ":"")+shortUniv(a.univ), shortMajor(a.major), jhText(a)].filter(Boolean).join(" · ")));
+    row.appendChild(el("span","sub",[mdw(x.iv)+" "+examKind(a), (a.jc?"전문대 ":"")+shortUniv(a.univ), shortMajor(a.major), jhText(a)].filter(Boolean).join(" · ")));
     row.appendChild(el("span","pill "+(n===m?"s-ok":"empty"),"준비 "+n+"/"+m));
     row.appendChild(prepChips(s,a));
     host.appendChild(row);
@@ -4102,7 +4162,7 @@ function renderAfterCsat(host, arr, showClass){
     row.appendChild(el("span","pill "+VERD[x.r.v][1],VERD[x.r.v][0]));
     var who=el("button","who",(showClass&&s.cls?s.cls+"반 ":"")+(s.no?s.no+" ":"")+(s.name||"")); who.title="이 학생 보기";
     who.onclick=function(){ goStudent(s); }; row.appendChild(who);
-    row.appendChild(el("span","sub",[mdw(itvDate(a))+" "+(a.type==="논술"?"논술":a.type==="실기"?"실기":"면접·고사"), (a.jc?"전문대 ":"")+shortUniv(a.univ), shortMajor(a.major), jhText(a)].filter(Boolean).join(" · ")));
+    row.appendChild(el("span","sub",[mdw(itvDate(a))+" "+examKind(a), (a.jc?"전문대 ":"")+shortUniv(a.univ), shortMajor(a.major), jhText(a)].filter(Boolean).join(" · ")));
     row.appendChild(el("span","acwhy",x.r.why+(a.mreq&&x.r.why.indexOf("없음")<0?" (기준: "+(minShort(a.mreq)||a.mreq)+")":"")));
     host.appendChild(row);
   });
@@ -4873,7 +4933,7 @@ function noticeItems(st, days){
     if(e.kind==="itv"){
       var vd=afterCsatApp(a)?examVerdict(st,a):null, vt="";
       if(vd) vt=vd.v==="skip"?" → 수능최저 미충족(가채점 기준이면 확인), 응시하지 않아도 됩니다":vd.v==="near"?" → 가채점으로는 수능최저가 한 등급 차이로 모자랍니다. 가채점은 틀릴 수 있으니 응시하세요":vd.v==="edge"?" → 수능최저 아슬아슬, 응시하세요":vd.v==="check"?" → 수능최저 충족 여부 담임과 확인":a.mreq&&vd.why.indexOf("없음")<0?" → 수능최저 충족, 응시하세요":"";
-      add(e.when, (a.type==="논술"?"논술":a.type==="실기"?"실기":"면접·고사")+(a.itvTime?" "+a.itvTime:"")+" — "+nm(a)+(a.itvPlace?" ["+a.itvPlace+"]":"")+vt);
+      add(e.when, examKind(a)+(a.itvTime?" "+a.itvTime:"")+" — "+nm(a)+(a.itvPlace?" ["+a.itvPlace+"]":"")+vt);
     }
     else if(e.kind==="ann"){ var official=appliedAnnouncement(a,"ann"); add(e.when, (official&&official.by?"합격자 발표 기한":"합격자 발표")+" — "+nm(a)); }
     else if(e.kind==="ann1") add(e.when, "1단계 합격자 발표 — "+nm(a));
@@ -5241,7 +5301,7 @@ function goStudent(s){
 
 /* ── csv ───────────────────────────────────── */
 function csv(arr,name){
-  var head=["반","학번","이름","구분","대학구분","대학","모집단위","전형명","전형유형","학교장추천","군","6장포함","1단계발표일","면접일","면접시각","고사장","발표일","충원마감","상태","수능최저기준","최저충족","예비번호","메모","점검","충원발표일시","충원확인방법","입학처공지링크"];
+  var head=["반","학번","이름","구분","대학구분","대학","모집단위","전형명","전형유형","학교장추천","군","6장포함","1단계발표일","면접일","면접시각","고사장","발표일","충원마감","상태","수능최저기준","최저충족","예비번호","메모","점검","충원발표일시","충원확인방법","입학처공지링크","고사구분"];
   var lines=[head.join(",")];
   var q=function(v){ v=String(v==null?"":v); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
   arr.forEach(function(s){
@@ -5249,7 +5309,7 @@ function csv(arr,name){
     var apps=s.apps&&s.apps.length?s.apps:[{}];
     apps.forEach(function(a){
       lines.push([s.cls,s.no,s.name,a.kind||"",a.kind?(a.jc?"전문대":"4년제"):"",a.univ||"",a.major||"",a.jh||"",a.type||"",a.kind==="수시"?(isRec(a)?"Y":"N"):"",a.group||"",
-        a.c6?"Y":"N",dateKey(announcement(a,"ann1")),itvDate(a),a.itvTime||"",a.itvPlace||"",dateKey(announcement(a,"ann")),a.due||"",a.status||"",a.mreq||"",a.mmet||"",a.rank||"",a.note||"",w,a.addAnn||"",a.addMethod||"",waitUrl(a.addUrl)].map(q).join(","));
+        a.c6?"Y":"N",dateKey(announcement(a,"ann1")),itvDate(a),a.itvTime||"",a.itvPlace||"",dateKey(announcement(a,"ann")),a.due||"",a.status||"",a.mreq||"",a.mmet||"",a.rank||"",a.note||"",w,a.addAnn||"",a.addMethod||"",waitUrl(a.addUrl),a.examKind||""].map(q).join(","));
     });
   });
   saveFile(name,"﻿"+lines.join("\r\n"));
@@ -5789,6 +5849,7 @@ var COLMAP=[
   ["univ",    /^(대학|대학명|지원대학|학교|학교명)$/],
   ["major",   /^(모집단위|학과|전공|학부|모집단위명)$/],
   ["jh",      /^(전형명|전형|세부유형|세부전형)$/],
+  ["examKind",/^(고사구분|고사유형)$/],
   ["type",    /^(전형유형|유형)$/],
   ["group",   /^(군|모집군|분할모집군)$/],
   ["c6",      /^(6장포함|6장|제한포함|6장제한)$/],
@@ -5954,6 +6015,7 @@ function pushApp(res, no, name, f, cls){
     status:st||"지원완료", rank:str(f.rank), note:str(f.note), region:str(f.region)}});
   if(ry!==null) res.apps[res.apps.length-1].app.rec=ry;
   var newApp=res.apps[res.apps.length-1].app, method=str(f.addMethod), url=waitUrl(f.addUrl);
+  if(/^(면접|논술|실기|고사|없음)$/.test(str(f.examKind))) newApp.examKind=str(f.examKind);
   if(addAnn&&!isNaN(new Date(addAnn))) newApp.addAnn=addAnn;
   if(method&&WAIT_METHODS.indexOf(method)>=0) newApp.addMethod=method;
   if(url) newApp.addUrl=url;
@@ -6257,7 +6319,7 @@ function commitApps(byStudent, cls, res, source){
           (!x.jh || !a.app.jh || sameKey(x.jh)===sameKey(a.app.jh));
       })[0];
       if(same){
-        ["jh","group","ann1","itv","itvTime","itvPlace","ann","due","rank","note","region","addAnn","addMethod","addUrl"].forEach(function(k){ if(a.app[k]) same[k]=a.app[k]; });
+        ["jh","group","ann1","itv","itvTime","itvPlace","ann","due","rank","note","region","addAnn","addMethod","addUrl","examKind"].forEach(function(k){ if(a.app[k]) same[k]=a.app[k]; });
         if(a.given.status) same.status=a.app.status;
         if(a.given.type) same.type=a.app.type;
         if(a.given.c6) same.c6=a.app.c6;
@@ -7330,7 +7392,7 @@ function attachDb(x, onErr){
 
 /* 로컬(file://)에서만 열리는 테스트용 통로. 게시된 페이지(https)에서는 만들어지지 않는다. */
 try{ if(location.protocol==="file:"||location.hostname==="localhost"){
-  window.__dev={mapStatus:mapStatus, mapMin:mapMin, mapType:mapType, announcement:announcement, itvDate:itvDate, daysTo:daysTo, renderTodo:renderTodo,
+  window.__dev={examKind:examKind, univSchedText:univSchedText, kindName:kindName, mapStatus:mapStatus, mapMin:mapMin, mapType:mapType, announcement:announcement, itvDate:itvDate, daysTo:daysTo, renderTodo:renderTodo,
     parseDate:parseDate, parseYN:parseYN, pickStudents:pickStudents,
     parseDelimited:parseDelimited, readApps:readApps, pdfTableRows:pdfTableRows, last:function(){ return lastRead; },
     checkStudent:checkStudent, parseMin:parseMin, judgeMin:judgeMin, rowsFromPdf:rowsFromPdf,

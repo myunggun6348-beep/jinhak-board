@@ -145,11 +145,60 @@ function buildTestPage() {
   check("발표일 대조: 조기 발표, 전형·캠퍼스·학과 구분, 1단계, 빈칸 및 수동 입력", audit.dates,
     ["2026-11-06","2026-12-18","2026-11-06","2026-12-18","2026-12-18","2026-11-20T14:00","2026-12-18T16:00","2026-11-05","2026-12-18"]);
   check("면접·고사일 자동 채움 및 줄임 전형명·내장 대학 전체 매칭", [audit.datesItv, audit.shortTrack, audit.minBuiltinAll],
-    [["2026-11-21","2026-12-05"],["2026-12-18T16:00","2026-11-21","2026-11-28","2026-12-18T17:00","2026-12-18T17:00","2026-12-18T17:00","2026-12-18T17:00","2026-11-20","2026-11-14","2026-10-29"],true]);
+    [["2026-12-05"],["2026-12-18T16:00","2026-11-28","","2026-12-18T17:00","2026-12-18T17:00","2026-12-18T17:00","2026-12-18T17:00","2026-11-20","","2026-10-29"],true]);
   check("교정한 날짜로 결과 미입력·공지 링크·안내 문자를 표시", [audit.datesFirst,audit.pending,audit.links,audit.oldDate,audit.notice],
     [["2026-12-01T16:00"],[["early","2026-11-06",4],["wise","2026-11-06",4]],["ipsi.dongseo.ac.kr","web.dongguk.ac.kr"],false,true]);
   check("원래 입력과 충원 대기는 보존하고 오늘은 한국 날짜 기준", [audit.unchanged,audit.today],
     [["2026-11-13","충원대기","7","2026-12-24T14:00"],0]);
+
+  const exams = await p.evaluate(() => {
+    const d=window.__dev, previous=Date.now;
+    Date.now=()=>Date.parse("2026-11-26T09:00:00+09:00");
+    const a={id:"no-exam",kind:"수시",univ:"동아대학교(부산)",major:"경영학과",jh:"학생부종합(학교생활우수자전형)",type:"학종",status:"지원완료",itv:"2026-11-28",ann1:"2026-11-20"};
+    const interview={...a,id:"interview",jh:"잠재능력우수자전형",ann1:""};
+    const essay={...a,id:"essay",univ:"부산대학교",jh:"논술",type:"논술",ann1:""};
+    const unknown={...a,id:"unknown",univ:"동서대학교",jh:"학생부종합(일반)",itv:"",ann1:""};
+    const real={...interview,univ:"다른대학교",examKind:"면접"};
+    const st={id:"exam-student",cls:2,name:"검증 학생",apps:[a,real]};
+    try {
+      return {
+        noExam:[d.examKind(a),d.itvDate(a),d.announcement(a,"ann1"),d.announcement(a,"ann"),d.prepNeeds(a),d.prepList(a).length],
+        falseSchedule:d.upcoming([st],40).some(e=>e.a.id===a.id&&(e.kind==="itv"||e.kind==="ann1")),
+        falseClash:d.checkStudent(st).some(w=>w.code==="면접중복"),
+        positive:[d.examKind(interview),d.itvDate(interview),d.prepList(interview).length],
+        unknown:[d.examKind(unknown),d.itvDate(unknown),d.announcement(unknown,"ann1"),d.prepList(unknown).length],
+        labels:[d.kindName({a:essay,kind:"itv",when:d.itvDate(essay)},false),d.univSchedText([{a:essay}]),d.noticeText({name:"검증",apps:[essay]},40,2)],
+        import:d.readApps([["이름","대학","전형명","고사구분","면접일"],["검증","동아대학교","학교생활우수자","없음","11/28"]]).apps.map(x=>[x.app.examKind,d.itvDate(x.app)]),
+        original:[a.itv,a.ann1]
+      };
+    } finally {Date.now=previous;}
+  });
+  check("동아대 학교생활우수자: 잘못 저장된 면접·1단계 제외, 최초 발표만 표시", exams.noExam, ["없음","","","2026-12-18T14:00",false,0]);
+  check("면접 없는 전형: 일정·중복 경고 제외, 원본 보존", [exams.falseSchedule,exams.falseClash,exams.original], [false,false,["2026-11-28","2026-11-20"]]);
+  check("동아대 잠재능력우수자 면접은 유지, 불명확한 종합전형에 날짜·모의면접 추정 금지", [exams.positive,exams.unknown], [["면접","2026-11-28",4],["고사","","",1]]);
+  check("논술 명칭은 일정·대학 요약·안내 문자에서 일치", [exams.labels[0],/논술 11\/28/.test(exams.labels[1]),/논술 —/.test(exams.labels[2]),/면접/.test(exams.labels.join(" "))], ["논술",true,true,false]);
+  check("파일의 고사 구분 없음 읽기", exams.import, [["없음",""]]);
+
+  {
+    const c=await browser.newContext({viewport:{width:360,height:800}}), x=await c.newPage();
+    x.on("pageerror",e=>errors.push(String(e)));
+    await x.addInitScript(()=>{
+      if(sessionStorage.getItem("seeded"))return;
+      sessionStorage.setItem("seeded","1"); localStorage.setItem("jh.mode","local"); localStorage.setItem("jh.cls","2");
+      localStorage.setItem("jh.local.students",JSON.stringify([{id:"exam-ui",cls:2,no:"30201",name:"검증 학생",apps:[{id:"no-exam",kind:"수시",univ:"동아대학교",major:"경영학과",jh:"학교생활우수자전형",type:"학종",status:"지원완료",itv:"2026-11-28",ann1:"2026-11-20"}]}]));
+    });
+    await x.goto("file://"+page404); await x.click(".row .rowhead");
+    check("모바일 지원 대학: 면접 없는 동아대에 고사 없음 표시", await x.locator(".apptable .arow td:nth-child(5)").innerText().then(t=>[t.includes("고사 없음"),t.includes("11/28"),t.includes("1단계")]), [true,false,false]);
+    await x.click(".apptable .arow td:nth-child(2)");
+    const examSelect=()=>x.locator(".editcell .f").filter({hasText:/^고사 구분/}).locator("select");
+    check("동아대 고사 없음: 근거 링크와 종류 선택 제공, 날짜 입력 감춤", [await examSelect().inputValue(),await x.locator('.editcell a[href*="31368"]').count()>0,await x.locator('.editcell input[type=date]').count()], ["자동 판단",true,1]);
+    await examSelect().selectOption("면접");
+    check("고사 구분 직접 수정: 원래 날짜 복원·면접 준비 반영", [await x.locator(".apptable .arow").innerText().then(t=>/11\/28.*면접/.test(t)),await x.locator(".editcell .prepc label").count()], [true,4]);
+    await examSelect().selectOption("없음");
+    await x.reload(); await x.click(".row .rowhead"); await x.click(".apptable .arow td:nth-child(2)");
+    check("고사 구분 없음: 새로 열어도 저장·학생 탭 반영", [await examSelect().inputValue(),await x.locator(".apptable .arow").innerText().then(t=>t.includes("고사 없음")&&!t.includes("11/28"))], ["없음",true]);
+    await c.close();
+  }
   dateCases.forEach((c, i) => check('"' + c[0] + '"' + (c[1] ? " (시각 포함)" : ""), dateGot[i], c[2]));
 
   /* ── 4. 파일에서 명단 읽기 ─────────────────── */
@@ -421,7 +470,7 @@ function buildTestPage() {
   check("수능 뒤 응시 판단: 가채점으로 한 등급 모자라면 '안 가도 됨' 대신 응시 권함(성적표면 안 가도 됨)", [ac.near, ac.nearReal], ["near", "skip"]);
   check("일정 안내 문자: 가채점 한 등급 차이 미충족이면 응시하세요", /논술 — 부산대 경영학과.*한 등급 차이.*응시하세요/.test(ac.nearNotice) && !/응시하지 않아도/.test(ac.nearNotice), true);
   const pr = await p.evaluate(() => { const d = window.__dev;
-    const a = { id: "x", kind: "수시", univ: "부산대학교", major: "경영학과", type: "학종", itv: "2026-11-28", status: "1단계합", prep: { read: true, mock: true } };
+    const a = { id: "x", kind: "수시", univ: "부산대학교", major: "경영학과", type: "학종", examKind: "면접", itv: "2026-11-28", status: "1단계합", prep: { read: true, mock: true } };
     const b = JSON.parse(JSON.stringify(a)); b.prep.go = true;
     return { list: [d.prepList(a).length, d.prepList({ type: "논술" }).length, d.prepList({ type: "실기" }).length], done: d.prepDone(a),
       needs: [d.prepNeeds(a), d.prepNeeds({ ...a, status: "1단계불" }), d.prepNeeds({ ...a, itv: "" })],
@@ -439,7 +488,7 @@ function buildTestPage() {
   const nx = await p.evaluate(() => { const d = window.__dev;
     const st = { name: "가", apps: [{ kind: "수시", univ: "부산대학교", major: "경영학과", type: "학종", itv: "2026-11-28", status: "1단계합" }] };
     return { withNote: d.noticeText(st, 400, 2, "수험표 챙기세요"), onlyNote: d.noticeText({ name: "나", apps: [] }, 400, 2, "수험표 챙기세요"), empty: d.noticeText({ name: "다", apps: [] }, 400, 2, "") }; });
-  check("일정 안내 문자: 덧붙일 말은 일정 뒤에, 일정 없어도 말만 보냄", [/면접·고사 — 부산대 경영학과 \(학종\)\n\n수험표 챙기세요\n※/.test(nx.withNote), /^\[3학년 2반\] 나 학생 대입 안내.*\n수험표 챙기세요$/.test(nx.onlyNote), nx.empty], [true, true, ""]);
+  check("일정 안내 문자: 덧붙일 말은 일정 뒤에, 일정 없어도 말만 보냄", [/고사 — 부산대 경영학과 \(학종\)\n\n수험표 챙기세요\n※/.test(nx.withNote), /^\[3학년 2반\] 나 학생 대입 안내.*\n수험표 챙기세요$/.test(nx.onlyNote), nx.empty], [true, true, ""]);
   const sg = await p.evaluate(() => { const r = []; const set = (k, v) => { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); };
     const was = [localStorage.getItem("jh.myname"), localStorage.getItem("jh.sign")];
     [["2반 김철수", null], ["3학년 2반 담임 김철수", null], ["김철수 선생님", null], ["2반 김철수", "박영희"], ["", null]].forEach((x) => { set("jh.myname", x[0] || null); set("jh.sign", x[1]); r.push(window.__dev.signGet()); });
@@ -501,9 +550,9 @@ function buildTestPage() {
       { kind: "수시", univ: "경성대학교", major: "건축학과", type: "교과", due: d(5, "18:00"), rank: "7", status: "충원대기" },
       { kind: "수시", univ: "신라대학교", type: "교과", itv: d(4), status: "불합격" }] };
     const lines = window.__dev.noticeText(st, 400, 2).split("\n");
-    return { head: /^\[3학년 2반\] 가나 학생/.test(lines[0]), kinds: lines.slice(1).map((l) => (l.match(/ (면접·고사|논술|합격자 발표|충원 합격 마감|수능) —/) || [])[1]).filter(Boolean).filter((k) => k !== "수능"),
+    return { head: /^\[3학년 2반\] 가나 학생/.test(lines[0]), kinds: lines.slice(1).map((l) => (l.match(/ (고사|논술|합격자 발표|충원 합격 마감|수능) —/) || [])[1]).filter(Boolean).filter((k) => k !== "수능"),
       rank: lines.some((l) => /18:00 충원 합격 마감 — 경성대 .*예비 7번/.test(l)), none: window.__dev.noticeText({ name: "다", apps: [] }, 400, 2) }; });
-  check("일정 안내 문자: 날짜순, 결과 난 지원 빼고, 충원 시각·예비 번호", nt, { head: true, kinds: ["면접·고사", "충원 합격 마감", "논술", "합격자 발표"], rank: true, none: "" });
+  check("일정 안내 문자: 날짜순, 결과 난 지원 빼고, 충원 시각·예비 번호", nt, { head: true, kinds: ["고사", "충원 합격 마감", "논술", "합격자 발표"], rank: true, none: "" });
   const sc = await p.evaluate(() => ({ sum: window.__dev.scoreSum({ korS: "131", korP: "96", mathS: "140", mathP: "98", inq1S: "68", inq1P: "95", inq2S: "65" }),
     ok: [["korS", "200"], ["korS", "201"], ["inq1S", "101"], ["mathP", "100"], ["korP", "9a"], ["korP", ""]].map((x) => window.__dev.scoreOk(x[0], x[1])) }));
   check("정시 점수: 국·수·탐2 합과 과목 수, 범위 검사", sc, { sum: { s: 404, p: 289, ns: 4, np: 3 }, ok: [true, false, false, true, false, true] });
@@ -705,7 +754,7 @@ function buildTestPage() {
     window.__dev.mergeData([{ name: "u.json", b: { app: "jinhak-board", students: [{ id: "u1", cls: 2, no: "30299", name: "최대학", updatedAt: "2026-11-12T00:00:00Z",
       apps: [{ id: "ua1", kind: "수시", univ: "부산대학교", major: "국어국문학과", jh: "논술", type: "논술", status: "지원완료" }] }] } }]);
     document.getElementById("tabAll").click();
-    return [...document.querySelectorAll("#univTable .urow")].some((r) => /부산대/.test(r.textContent) && /면접 11\/21/.test(r.textContent) && /발표 12\/18/.test(r.textContent));
+    return [...document.querySelectorAll("#univTable .urow")].some((r) => /부산대/.test(r.textContent) && /논술 11\/28/.test(r.textContent) && /발표 12\/18/.test(r.textContent));
   });
   check("전체 현황 대학별 표: 각 대학 줄에 면접·발표 일정 요약 표시", uSched, true);
 
@@ -1144,7 +1193,7 @@ function buildTestPage() {
       { id: "s3", cls: 2, no: "30203", name: "마바", apps: [A("c1", "부경대학교", "지원완료", "2026-11-30")] }]);
     await x.goto("file://" + page404); await x.waitForTimeout(600);
     const td = await x.evaluate(() => { const h = document.getElementById("today"); const cols = [...h.querySelectorAll(".tcol")].map((c) => c.innerText); return [!h.hidden, cols[0], cols[1]]; });
-    check("오늘 할 일: 오늘 발표 2건, 내일 면접", [td[0], /발표[\s\S]*가나[\s\S]*발표[\s\S]*다라/.test(td[1]), /면접·고사[\s\S]*가나[\s\S]*경북대/.test(td[2])], [true, true, true]);
+    check("오늘 할 일: 오늘 발표 2건, 내일 고사", [td[0], /발표[\s\S]*가나[\s\S]*발표[\s\S]*다라/.test(td[1]), /고사[\s\S]*가나[\s\S]*경북대/.test(td[2])], [true, true, true]);
     const btns = await x.$$eval("#today .tcol:first-child .qres", (q) => q.map((e) => e.innerText.replace(/\s+/g, " ")));
     const waitRow = x.locator("#today .tcol:first-child .sitem").filter({hasText:"다라"});
     const waitDialog = x.getByRole("dialog", {name:"충원 대기 입력"});
