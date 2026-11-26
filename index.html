@@ -1043,6 +1043,10 @@ body.landing .wrap{max-width:1120px; padding-top:36px}
 .account-tools{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:12px 24px;padding:16px 0}
 .account-tools button{min-height:44px;display:inline-flex;align-items:center}
 @media(max-width:700px){.codeform input:not([type=checkbox]),.codeform select{font-size:16px;min-height:44px}.account-land .land-hero{gap:20px;padding:20px 0}.account-login{padding:22px;max-width:none}.account-tools{justify-content:flex-start}.account-land .land-title{font-size:30px}}
+.account-class-setup{width:100%;border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:18px;box-sizing:border-box}
+.account-class-setup p{margin:8px 0 14px}.account-class-form{display:flex;align-items:end;gap:10px;flex-wrap:wrap}
+.account-class-form select{min-width:150px;min-height:44px;font-size:16px}.account-class-form button{min-height:44px}
+.account-class-form .shint{flex-basis:100%}
 </style>
 
 <div class="topbar">
@@ -1064,7 +1068,7 @@ body.landing .wrap{max-width:1120px; padding-top:36px}
   <h2>진학 현황판 — 짧은 설명서</h2>
   <h3>담임 선생님</h3>
   <ol>
-    <li><b>들어가기</b> — Google 개인 계정으로 로그인 → 담당 반 선택 → 학생 자료 입력. 본인 자료는 계정에 저장됩니다.</li>
+    <li><b>들어가기</b> — Google 개인 계정으로 로그인 → 처음 한 번 담당 반 설정 → 학생 자료 입력. 본인 자료는 계정에 저장됩니다.</li>
     <li><b>학생·지원 넣기</b> — 지원 현황 파일(PDF·엑셀·한글)을 끌어다 놓고 <b>미리 보기</b>를 확인한 뒤 <b>넣기</b>.</li>
     <li><b>매일</b> — 맨 위 <b>오늘 할 일</b>과 경고를 보고, 발표가 나면 <b>결과 한꺼번에</b>로 결과를 고릅니다.</li>
     <li><b>시기마다</b> — <b>더보기</b>에서 수능 성적 입력과 정시 현황을 확인합니다. 합격·등록 관리는 <b>결과·등록</b> 탭에 있습니다.</li>
@@ -2365,8 +2369,8 @@ function render(){
   if(pendingRender) return;
   renderKeydates();
   renderBackupBar();
-  if(school&&!school.admin&&school.cls&&getCls()!==school.cls) setCls(school.cls);
-  document.getElementById("classbar").hidden=!!(school&&!school.admin);
+  if(school&&school.cls&&getCls()!==school.cls) setCls(school.cls);
+  document.getElementById("classbar").hidden=!!(school&&(!school.admin||school.cls));
   var cls=getCls();
   curCls=cls;
   renderClassbar(cls);
@@ -2409,8 +2413,45 @@ function render(){
   if(!document.getElementById("viewAll").hidden) renderAll();
   if(school&&school.admin&&!document.getElementById("viewAdmin").hidden) renderSchoolPanel();
 }
+function accountClassForm(buttonLabel){
+  var form=el("form","account-class-form"), select=document.createElement("select");
+  select.name="accountCls"; select.required=true;
+  [["","담당 반 선택"]].concat(CLASSES.map(function(c){return [String(c),c+"반"];})).forEach(function(option){
+    var item=document.createElement("option"); item.value=option[0]; item.textContent=option[1]; select.appendChild(item);
+  });
+  select.value=school.cls?String(school.cls):"";
+  select.onfocus=function(){pendingRender=true;}; select.onblur=function(){pendingRender=false;};
+  form.appendChild(field("담당 반",select));
+  var saveButton=el("button","btn",buttonLabel), status=el("span","shint");
+  saveButton.type="submit"; status.setAttribute("role","status");
+  form.appendChild(saveButton); form.appendChild(status);
+  form.onsubmit=function(event){
+    event.preventDefault();
+    var cls=Number(select.value); if(CLASSES.indexOf(cls)<0) return;
+    var profile=school.personal?"profile":"profile-"+fb.auth.currentUser.uid;
+    var value=school.personal?{personal:true,cls:cls}:{cls:cls};
+    saveButton.disabled=true; select.disabled=true; status.textContent="담당 반을 저장하고 있습니다…";
+    fb.S.setDoc(sRef(school.K.room,"private",profile),value).then(function(){
+      location.reload();
+    }).catch(function(){
+      saveButton.disabled=false; select.disabled=false; status.textContent="담당 반을 저장하지 못했습니다. 다시 시도해 주세요.";
+    });
+  };
+  return form;
+}
 function renderClassbar(cls){
   var bar=document.getElementById("classbar");
+  if(school&&school.admin){
+    bar.replaceChildren();
+    if(!school.cls){
+      var setup=el("div","account-class-setup");
+      setup.appendChild(el("b",null,"처음 한 번, 담당 반을 설정해 주세요"));
+      setup.appendChild(el("p","shint","선택한 반을 Google 계정에 저장하고, 다음 로그인부터 바로 불러옵니다."));
+      setup.appendChild(accountClassForm("내 반으로 시작")); bar.appendChild(setup);
+    }
+    return;
+  }
+  if(bar.querySelector(".account-class-setup")) bar.replaceChildren();
   if(bar.childElementCount) {
     Array.prototype.forEach.call(bar.querySelectorAll(".chip"),function(b){
       var c=parseInt(b.dataset.c,10);
@@ -2425,13 +2466,8 @@ function renderClassbar(cls){
     var b=el("button","chip",c+"반"+(c===getMyCls()?" ★":""));
     b.dataset.c=c; b.setAttribute("aria-pressed",String(c===cls));
     b.onclick=function(){
-      if(!getMyCls()||school&&school.personal) setMyCls(c);
-      setCls(c); openId=null;
-      if(school&&school.personal){
-        school.cls=c;
-        fb.S.setDoc(sRef(school.K.room,"private","profile"),{personal:true,cls:c}).catch(function(){setSync("off","담당 반 저장 실패 — 다시 선택해 주세요");});
-      }
-      render();
+      if(!getMyCls()) setMyCls(c);
+      setCls(c); openId=null; render();
     };
     bar.appendChild(b);
   });
@@ -6746,7 +6782,7 @@ function encDb(K){
     collection:function(name){ return {onSnapshot:function(cb,err){
       var seq=0;
       var q=S.collection(fb.fs,"schools",K.room,name);
-      if(name==="students"&&school&&!school.admin) q=S.query(q,S.where("cls","==",school.cls));
+      if(name==="students"&&school&&(!school.admin||school.personal)) q=S.query(q,S.where("cls","==",school.cls));
       var u=S.onSnapshot(q,{includeMetadataChanges:true},function(snap){
         var my=++seq, pend=snap.metadata.fromCache||snap.metadata.hasPendingWrites;
         Promise.all(snap.docs.map(function(d){ return openDoc(K,d.data()).catch(function(){ return null; }); })).then(function(arr){
@@ -7057,11 +7093,9 @@ function myQuickSchools(){ return mySchools().then(function(L){ return L.filter(
 // 학교 통째로 지우기(sid 만 있으면 된다. 학생 문서는 암호문이라 열지 않고 지운다)
 // 먼저 지울 문서를 모두 읽어 본다(연결 링크 목록은 최신 규칙에서만 읽힌다). 하나라도 막히면 아무것도 지우지 않는다
 function wipeSchool(sid){
-  var C=["students","minreq","links","members"];
+  var C=["students","minreq","links","members","private"];
   return Promise.all(C.map(function(c){ return fb.S.getDocs(fb.S.collection(fb.fs,"schools",sid,c)); })).catch(function(e){ throw {code:"rules-old", raw:e}; }).then(function(Q){
     return Promise.all(Q.map(function(q,i){ return Promise.all(q.docs.map(function(d){ return fb.S.deleteDoc(sRef(sid,C[i],d.id)); })); }));
-  }).then(function(){
-    return Promise.all(["join","code","profile"].map(function(id){ return fb.S.deleteDoc(sRef(sid,"private",id)).catch(function(){}); }));
   }).then(function(){ return fb.S.deleteDoc(sRef(sid)); });
 }
 function wipeFail(e){
@@ -7219,7 +7253,11 @@ function enterCode(code,o){
     if(admin){
       return fb.S.getDoc(sRef(K.room,"private","profile")).then(function(profile){
         info.personal=profile.exists()&&profile.data().personal===true;
-        info.personalCls=profile.exists()?+profile.data().cls||0:0;
+        if(info.personal){info.accountCls=profile.data().cls;return;}
+        return fb.S.getDoc(sRef(K.room,"private","profile-"+fb.auth.currentUser.uid)).then(function(accountProfile){
+          info.accountCls=accountProfile.exists()?accountProfile.data().cls:0;
+        });
+      }).then(function(){
         return rememberAccountSchool(code,info.name);
       }).then(function(){enterSchool(K,code,info,true,0);});
     }
@@ -7272,7 +7310,11 @@ function waitApproval(K,code,info,mref){
 function enterSchool(K,code,info,admin,cls){
   setLocalMode(""); setLanding(false);
   school={K:K, code:normCode(code), name:info.name||"", admins:info.admins||[], admin:admin, personal:!!info.personal, cls:cls||0, pwOff:!!info.pwOff};
-  if(school.personal&&info.personalCls){setMyCls(info.personalCls);setCls(info.personalCls);school.cls=info.personalCls;}
+  if(admin){
+    school.cls=CLASSES.indexOf(Number(info.accountCls))>=0?Number(info.accountCls):0;
+    if(school.cls){setMyCls(school.cls);setCls(school.cls);}
+    else{lsSet("jh.cls",null);lsSet("jh.mycls",null);}
+  }
   if(!admin&&cls){ setMyCls(cls); setCls(cls); }
   var chip=document.getElementById("whoChip"); chip.hidden=false; chip.innerHTML="";
   var acct=myMail(), wid=el("span","whoid");
@@ -7324,7 +7366,7 @@ function enterSchool(K,code,info,admin,cls){
 // 담임은 자기 반만: 다른 반 학생은 저장하지 않고 화면에서도 뺀다(규칙도 막는다)
 var skippedOther=0;
 function outOfScope(st){
-  if(!school||school.admin||(+st.cls||0)===school.cls) return false;
+  if(!school||school.admin&&!school.personal||(+st.cls||0)===school.cls) return false;
   students.delete(st.id); base.delete(st.id); skippedOther++;
   clearTimeout(outOfScope.t); outOfScope.t=setTimeout(function(){
     var m=document.getElementById("importMsg");
@@ -7346,11 +7388,15 @@ function renderSchoolPanel(){
   var grid=el("div","agrid"); host.appendChild(grid);
   var tile=function(title,sub,cls){ var t=el("div","gtile"+(cls?" "+cls:"")), h=el("div","gth"); h.appendChild(el("h3",null,title)); if(sub) h.appendChild(el("span","gsub",sub)); t.appendChild(h); grid.appendChild(t); return t; };
   if(school.personal){
+    var settings=tile("내 담당 반",school.cls?school.cls+"반":"설정 필요");
+    settings.appendChild(accountClassForm("담당 반 변경"));
     var own=tile("내 자료 백업",myMail());
     own.appendChild(el("p",null,"현재 자료를 파일로 받아 따로 보관할 수 있습니다. 실수로 학생 자료를 삭제했을 때 복원하는 용도로 사용하세요."));
     var backup=el("button","btn sec","백업 파일 받기"); backup.onclick=doBackup; own.appendChild(backup);
     return;
   }
+  var classSettings=tile("내 담당 반",school.cls?school.cls+"반":"설정 필요");
+  classSettings.appendChild(accountClassForm("담당 반 변경"));
   var mref=function(m){ return sRef(school.K.room,"members",m.uid); };
   var fail=function(e){ alert("바꾸지 못했습니다. ("+((e&&e.code)||"")+")"); };
   var put=function(m,cls,ok){ fb.S.setDoc(mref(m),{name:m.name||"",cls:+cls||0,at:m.at||"",ok:ok}).catch(fail); };

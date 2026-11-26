@@ -868,7 +868,8 @@ function buildTestPage() {
     x.makeSchool = async () => {
       await x.evaluate(()=>window.__dev.openGate("","admin")); await x.click("#banner .btn >> text=구글로 로그인"); await x.waitForTimeout(300);
       await x.fill("#banner input[name=school]", o.school || "테스트고"); await x.fill("#banner input[name=joinpw]", "1234"); await x.click("#banner .btn >> text=학교 만들기"); await x.waitForTimeout(3500);
-      lastCode = (await x.innerText("#banner .codetext")).trim(); await x.click("#banner .btn >> text=들어가기"); await x.waitForTimeout(1500); };
+      lastCode = (await x.innerText("#banner .codetext")).trim(); await x.click("#banner .btn >> text=들어가기"); await x.waitForTimeout(1500);
+      await x.selectOption("#classbar select[name=accountCls]","2"); await x.click("#classbar button >> text=내 반으로 시작"); await x.waitForTimeout(1500); };
     return x;
   };
   const rowNames = (x) => x.evaluate(() => [...document.querySelectorAll(".row .nm")].map((e) => e.textContent));
@@ -886,7 +887,10 @@ function buildTestPage() {
     await soloGoogle.click("#accountLogin"); await soloGoogle.waitForTimeout(1200);
     check("Google 첫 로그인: 학교 생성·가입 신청 없이 본인 자료 화면",[await gateTitle(soloGoogle),await soloGoogle.$eval("#whoChip .wrole",e=>e.textContent)],["","내 계정"]);
     check("개인 자료 관리: 학교 초대·승인 메뉴 없이 자료 관리 표시",[await soloGoogle.$eval("#tabAdmin",e=>e.firstChild.textContent),await soloGoogle.locator("#schoolPanel input[name=quick]").count()],["자료 관리",0]);
-    await soloGoogle.click('#classbar .chip[data-c="2"]');
+    check("첫 담당 반: 브라우저의 이전 2반 선택을 계정 설정으로 사용하지 않음",await soloGoogle.$eval("#classbar select[name=accountCls]",e=>e.value),"");
+    await soloGoogle.selectOption("#classbar select[name=accountCls]","2");
+    await soloGoogle.click("#classbar button >> text=내 반으로 시작"); await soloGoogle.waitForTimeout(1400);
+    check("설정 후 담당 반: 본인 2반만 표시",[await soloGoogle.locator("#classbar .chip").count(),await soloGoogle.locator("#workspaceTitle").textContent()],[0,"3학년 2반 진학 현황"]);
     await soloGoogle.evaluate(st=>window.__dev.mergeData([{name:"personal.json",b:{students:[st]}}]),stu("30201",2,"본인학생")); await soloGoogle.waitForTimeout(1500);
     const schoolCount=()=>Object.keys(KV).filter(k=>/^schools\/[0-9a-f]{40}$/.test(k)).length;
     check("개인 학생 자료: Firebase에 암호화 저장",Object.keys(KV).some(k=>k.includes("/students/"))&&!JSON.stringify(KV).includes("본인학생"),true);
@@ -898,21 +902,32 @@ function buildTestPage() {
     const backupData=JSON.parse(fs.readFileSync(await backupFile.path(),"utf8"));
     check("자료 관리 백업: 현재 학생·지원 정보 다운로드",[backupData.app,backupData.students.map(st=>[st.name,st.apps.length])],["jinhak-board",[["본인학생",1]]]);
     await soloGoogle.click("#tabClass");
+    await soloGoogle.evaluate(st=>window.__dev.mergeData([{name:"wrong-class.json",b:{students:[st]}}]),stu("30501",5,"다른반학생")); await soloGoogle.waitForTimeout(500);
+    check("개인 계정 입력: 담당 반과 다른 반 자료는 넣지 않음",await soloGoogle.evaluate(()=>window.__dev.students().map(st=>st.cls)),[2]);
+    const oldOther=await soloGoogle.evaluate(async args=>{const keys=await window.__dev.codeKeys(args.code);return Object.assign(await window.__dev.sealDoc(keys,{id:args.student.id,d:args.student}),{cls:5});},{code:KV["users/g_owner"].code,student:stu("legacy-five",5,"이전다른반")});
+    KV["schools/"+ownerRoom+"/students/old-other"]=oldOther;
     const device=await who({email:"owner@x.com"}); await device.click("#accountLogin"); await device.waitForTimeout(1400);
     check("같은 계정 새 컴퓨터: 기존 학생 복원·공간 중복 생성 없음",[await rowNames(device),schoolCount()],[["본인학생"],1]);
     const second=await who({email:"another@x.com"}); await second.click("#accountLogin"); await second.waitForTimeout(1200);
     check("다른 Google 계정: 본인 학생만 조회",[await rowNames(second),schoolCount()],[[],2]);
+    await second.selectOption("#classbar select[name=accountCls]","2"); await second.click("#classbar button >> text=내 반으로 시작"); await second.waitForTimeout(1200);
     await second.evaluate(st=>window.__dev.mergeData([{name:"other.json",b:{students:[st]}}]),stu("30201",2,"다른학생")); await second.waitForTimeout(1000);
     await device.evaluate(()=>localStorage.setItem("jh.cls","5"));
     await device.reload(); await device.waitForTimeout(1200);
-    check("계정의 담당 반: 다른 기기에서도 선택 복원",await device.$eval("#classbar .chip[aria-pressed=true]",e=>e.dataset.c),"2");
+    check("계정의 담당 반: 다른 기기에서도 선택 복원",await device.locator("#workspaceTitle").textContent(),"3학년 2반 진학 현황");
     check("같은 학번도 계정별 분리·새로고침 후 유지",await rowNames(device),["본인학생"]);
+    check("개인 계정 조회: 이전에 저장된 다른 반 자료도 제외",await device.evaluate(()=>window.__dev.students().map(st=>st.cls)),[2]);
+    await device.click("#tabAdmin"); await device.selectOption("#schoolPanel select[name=accountCls]","3"); await device.click("#schoolPanel button >> text=담당 반 변경"); await device.waitForTimeout(1300);
+    check("자료 관리에서 반 변경: 저장된 3반만 표시",[await device.locator("#workspaceTitle").textContent(),await rowNames(device)],["3학년 3반 진학 현황",[]]);
+    await device.click("#tabAdmin"); await device.selectOption("#schoolPanel select[name=accountCls]","2"); await device.click("#schoolPanel button >> text=담당 반 변경"); await device.waitForTimeout(1300);
+    check("반 설정을 되돌려도 기존 학생 자료 유지",await rowNames(device),["본인학생"]);
     await soloGoogle.click("#whoChip button >> text=로그아웃"); await soloGoogle.waitForTimeout(800);
     check("로그아웃 후 학생 자료 감춤",[await gateTitle(soloGoogle),await soloGoogle.evaluate(()=>getComputedStyle(document.getElementById("viewClass")).display)],["우리 반 진학현황판","none"]);
     // 첫 생성이 학교 문서까지만 완료된 상태에서 다시 로그인해도 같은 공간을 복구한다.
     const ownerKey=Object.keys(KV).find(k=>k.startsWith("users/")&&k.includes("g_owner")); const ownerSid=Object.keys(KV).find(k=>k.endsWith("/private/profile"));
     delete KV[ownerKey]; delete KV[ownerSid]; delete KV[ownerSid.replace("profile","code")];
     await soloGoogle.click("#accountLogin"); await soloGoogle.waitForTimeout(1500);
+    await soloGoogle.selectOption("#classbar select[name=accountCls]","2"); await soloGoogle.click("#classbar button >> text=내 반으로 시작"); await soloGoogle.waitForTimeout(1200);
     check("중단된 초기 연결 복원: 기존 자료 보존·개인 공간 유지",[await rowNames(soloGoogle),await soloGoogle.$eval("#whoChip .wrole",e=>e.textContent),schoolCount()],[["본인학생"],"내 계정",2]);
     for(const page of [soloGoogle,device,second])await page.context().close();
     check("JavaScript 오류 없음",errors,[]);srv.close();await browser.close();console.log(pass+" passed, "+fail+" failed");process.exit(fail?1:0);
