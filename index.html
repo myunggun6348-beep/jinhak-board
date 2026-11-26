@@ -491,6 +491,37 @@ body.hide-today #today,body.hide-today #allToday,body.hide-alerts #alerts,body.h
 .minnote{margin-top:8px; font-size:12px; color:var(--ink-3)}
 .minnote.off{color:var(--warn); font-weight:700}
 .apphead .warnnote{font-size:11.5px; color:var(--bad); font-weight:700; margin-left:auto}
+.compact-editor{padding:16px}
+.compact-editor .apphead{margin-bottom:14px; flex-wrap:wrap}
+.compact-editor .apphead .editor-close{margin-left:auto}
+.compact-editor .apphead .warnnote{margin-left:0}
+.compact-editor .grid{grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px}
+.compact-editor .f label{font-size:14px; letter-spacing:0; color:var(--ink-2)}
+.compact-editor .f input,.compact-editor .f select,.compact-editor .f textarea{font-size:16px; min-height:42px; padding:9px 10px}
+.compact-editor .core-grid{margin-bottom:12px}
+.editor-footnote{font-size:12px; color:var(--ink-3); margin-bottom:14px}
+.editor-wait{display:flex; align-items:center; flex-wrap:wrap; gap:8px 14px; margin-bottom:14px}
+.editor-wait .wait-summary{flex:1; min-width:180px}
+.app-panel{border-top:1px solid var(--line); padding:12px 0}
+.app-panel:last-child{padding-bottom:0}
+.app-panel>summary{display:flex; align-items:center; gap:12px; cursor:pointer; list-style:none; min-height:36px}
+.app-panel>summary::-webkit-details-marker{display:none}
+.app-panel>summary::after{content:"+"; flex:none; color:var(--accent); font-size:20px; margin-left:4px}
+.app-panel[open]>summary::after{content:"−"}
+.app-panel-title{font-size:15px; font-weight:700; flex:none}
+.app-panel-value{margin-left:auto; color:var(--ink-2); font-size:14px; text-align:right; overflow-wrap:anywhere; min-width:0}
+.app-panel[open]>summary{margin-bottom:12px}
+.app-panel:not([open])>.grid{display:none}
+.app-panel .exam-hint{display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:14px}
+.app-panel .exam-hint .linkbtn{margin-left:auto}
+.editor-danger{display:flex; justify-content:flex-end; margin-top:14px}
+.editor-danger .del{font-size:14px; color:var(--bad); padding:8px 12px}
+@media(max-width:700px){
+  .compact-editor{padding:12px}
+  .compact-editor .grid{grid-template-columns:1fr}
+  .app-panel>summary{align-items:flex-start; gap:8px}
+  .app-panel-value{font-size:13px; line-height:1.5}
+}
 .del{border:0; background:transparent; color:var(--ink-3); font-size:12px; padding:3px 6px; border-radius:5px}
 .del:hover{color:var(--bad); background:var(--bad-soft)}
 .addrow{display:flex; gap:7px; flex-wrap:wrap}
@@ -2824,91 +2855,114 @@ function detail(st){
   addRow(d,st);
   return d;
 }
+var appEditorPanels={};
 function appEditor(st,a,w){
-    var box=el("div","app"+(w?" warn":""));
+    var box=el("div","app compact-editor"+(w?" warn":""));
     var hd=el("div","apphead");
-    hd.appendChild(el("span","kind",a.kind+" 지원 고치기"));
+    hd.appendChild(el("span","kind","지원 정보 수정"));
     if(w) hd.appendChild(el("span","warnnote",w));
-    var del=el("button","del","삭제");
-    del.disabled=ro();
-    del.onclick=function(){
-      remember("지원 삭제");
-      st.apps=st.apps.filter(function(x){return x.id!==a.id;}); save(st); render();
-    };
-    // 고치는 칸에서도 바로 지원을 더할 수 있게(목록 맨 아래까지 내려가지 않도록)
-    [["수시","+ 수시 지원 추가"],["정시","+ 정시 지원 추가"],["수시","+ 전문대 지원 추가",true]].forEach(function(k,i){
-      var b=el("button","btn sec",k[1]); b.style.padding="4px 10px"; b.style.fontSize="12px";
-      if(!i&&!w) b.style.marginLeft="auto";
-      b.disabled=ro();
-      b.onclick=function(){ addApp(st,k[0],k[2]); };
-      hd.appendChild(b);
-    });
-    hd.appendChild(del);
+    var close=el("button","ghost editor-close","접기"); close.type="button";
+    close.onclick=function(){editAppId=null; render();}; hd.appendChild(close);
     box.appendChild(hd);
-
-    var g=el("div","grid");
-    g.appendChild(field("구분", sel(KINDS,a.kind,function(v){a.kind=v; if(v==="정시")a.type="정시"; a.c6=(v==="수시"&&!a.jc); save(st); render();})));
-    g.appendChild(field("대학 구분", sel(["4년제","전문대"],a.jc?"전문대":"4년제",function(v){
-      a.jc=(v==="전문대"); a.c6=(a.kind==="수시"&&!a.jc); if(a.jc) a.group=""; save(st); render(); })));
-    g.appendChild(field("대학", txt(a.univ,a.jc?"동의과학대학교":"부산대학교",function(v){a.univ=v; fillMin(st); fillExam(st); save(st); render();})));
-    g.appendChild(field("모집단위", txt(a.major,"수학교육과",function(v){a.major=v; fillMin(st); fillExam(st); save(st); render();})));
-    g.appendChild(field("전형명", txt(a.jh,"학생부종합(일반)",function(v){a.jh=v; if(a.kind==="수시"&&mapType(v)) a.type=mapType(v); fillMin(st); fillExam(st); save(st); render();})));
-    g.appendChild(field("전형유형", sel(TYPES,a.type,function(v){a.type=v; save(st); render();})));
-    g.appendChild(field("고사 구분", sel(["자동 판단","면접","논술","실기","고사","없음"],a.examKind||"자동 판단",function(v){ if(v==="자동 판단") delete a.examKind; else a.examKind=v; save(st,true); render(); })));
-    var verifiedExam=examRule(a), examHint=el("div","f wide");
-    if(verifiedExam){
-      examHint.appendChild(el("span","sub","입학처 확인: "+(verifiedExam.kind==="없음"?"면접·고사 없음":verifiedExam.kind)));
-      var examSource=el("a","linkbtn","입학처 근거 ↗"); examSource.href=verifiedExam.url; examSource.target="_blank"; examSource.rel="noopener noreferrer"; examHint.appendChild(examSource);
-    } else examHint.appendChild(el("span","sub","고사 종류와 날짜를 확인해 입력하세요. 다르면 ‘고사 구분’에서 바꿀 수 있습니다."));
-    g.appendChild(examHint);
-    if(a.kind==="수시"){
-      var rf=field("학교장추천", sel(["아님","학교장추천"],isRec(a)?"학교장추천":"아님",function(v){a.rec=(v==="학교장추천"); save(st); render();}));
-      rf.title="전형명에 '학교장추천'이 있으면 저절로 고릅니다. 다르면 여기서 바꾸세요."; g.appendChild(rf);
+    var stateKey=JSON.stringify([st.id,a.id]);
+    var panelState=appEditorPanels[stateKey]||(appEditorPanels[stateKey]={});
+    var summaryUpdates=[], refreshPanels=false;
+    box.addEventListener("change",function(){summaryUpdates.forEach(function(update){update();});});
+    function panel(id,title,value){
+      var section=el("details","app-panel"); section.dataset.panel=id; section.open=!!panelState[id];
+      var summary=el("summary"); summary.appendChild(el("span","app-panel-title",title));
+      var label=el("span","app-panel-value",value()); summary.appendChild(label); section.appendChild(summary);
+      summaryUpdates.push(function(){label.textContent=value();});
+      summary.onclick=function(e){
+        panelState[id]=!section.open;
+        if(refreshPanels){
+          e.preventDefault(); pendingRender=false; render();
+          var fresh=document.querySelector('.compact-editor [data-panel="'+id+'"]>summary');
+          if(fresh) fresh.focus({preventScroll:true});
+        }
+      };
+      section.ontoggle=function(){if(section.isConnected) panelState[id]=section.open;};
+      var grid=el("div","grid"); section.appendChild(grid); box.appendChild(section); return grid;
     }
-    if(a.kind==="정시"&&!a.jc) g.appendChild(field("군", sel([""].concat(GROUPS),a.group||"",function(v){a.group=v; save(st);})));
+    var g=el("div","grid core-grid");
+    g.appendChild(field("대학", txt(a.univ,a.jc?"동의과학대학교":"부산대학교",function(v){a.univ=v; refreshPanels=true; fillMin(st); fillExam(st); save(st); render();})));
+    g.appendChild(field("학과·모집단위", txt(a.major,"수학교육과",function(v){a.major=v; refreshPanels=true; fillMin(st); fillExam(st); save(st); render();})));
+    g.appendChild(field("전형명", txt(a.jh,"학생부종합(일반)",function(v){a.jh=v; refreshPanels=true; if(a.kind==="수시"&&mapType(v)) a.type=mapType(v); fillMin(st); fillExam(st); save(st); render();})));
+    if(a.kind==="정시"&&!a.jc) g.appendChild(field("군", sel([""].concat(GROUPS),a.group||"",function(v){a.group=v; save(st); render();})));
     if(a.kind==="정시") g.appendChild(field("원서 접수", sel(["접수 전","접수 완료"],a.filed?"접수 완료":"접수 전",function(v){ if(v==="접수 완료") a.filed=true; else delete a.filed; save(st); render(); })));
-    if(a.kind==="수시"&&!(verifiedExam&&verifiedExam.kind==="없음"&&examKind(a)==="없음")){
+    box.appendChild(g);
+    box.appendChild(el("div","editor-footnote","기본 정보는 입력 후 다른 칸으로 이동하면 자동 저장됩니다. 결과와 예비번호는 위 지원 줄에서 바로 수정하세요."));
+    var wait=el("div","editor-wait");
+    if(hasWaitInfo(a)) wait.appendChild(waitSummary(a,true));
+    if(canEditWait(st)||hasWaitInfo(a)) wait.appendChild(waitButton(st,a));
+    if(wait.childNodes.length) box.appendChild(wait);
+
+    var verifiedExam=examRule(a), ek=examKind(a), iv=itvDate(a);
+    var dates=panel("schedule","발표·고사 일정",function(){
+      var final=announcement(a,"ann"), iv=itvDate(a), first=announcement(a,"ann1"), ek=examKind(a);
+      return [final?"발표 "+mdw(final):"발표일 미입력",ek==="없음"?"고사 없음":iv?ek+" "+itvCell(a):"",first?"1단계 "+mmdd(first):""].filter(Boolean).join(" · ");
+    });
+    dates.appendChild(announcementField(st,a,"ann",a.kind==="수시"?"최초 합격자 발표일":"발표일"));
+    dates.appendChild(field("고사 구분", sel(["자동 판단","면접","논술","실기","고사","없음"],a.examKind||"자동 판단",function(v){ if(v==="자동 판단") delete a.examKind; else a.examKind=v; save(st,true); render(); })));
+    if(a.kind==="수시"&&!(verifiedExam&&verifiedExam.kind==="없음"&&ek==="없음")){
       var a1=announcementField(st,a,"ann1","1단계 발표일");
-      a1.title="서류로 먼저 거르는 단계형 전형(학종 등)만 넣습니다. 일괄합산이면 비워 두세요."; g.appendChild(a1);
+      a1.title="서류로 먼저 거르는 단계형 전형만 넣습니다. 일괄합산이면 비워 두세요."; dates.appendChild(a1);
     }
-    if(examKind(a)!=="없음") g.appendChild(announcementField(st,a,"itv",examKind(a)+"일",function(v){ if(a.itvTbl){ delete a.itvTime; delete a.itvPlace; delete a.itvSrc; delete a.itvTbl; } a.itv=v; fillExam(st); }));
-    if(a.kind==="수시"&&examKind(a)!=="없음"){
+    if(ek!=="없음") dates.appendChild(announcementField(st,a,"itv",ek+"일",function(v){ if(a.itvTbl){ delete a.itvTime; delete a.itvPlace; delete a.itvSrc; delete a.itvTbl; } a.itv=v; fillExam(st); }));
+    if(a.kind==="수시"&&ek!=="없음"){
       var ti=document.createElement("input"); ti.type="time"; ti.value=a.itvTime||""; ti.disabled=ro();
       ti.onchange=function(){ remember("수정"); if(ti.value) a.itvTime=ti.value; else delete a.itvTime; shareExam(a); save(st); render(); };
-      var tf=field("면접·고사 시각", ti); tf.title="입학처 공지나 학생 수험표에서 확인한 입실(시작) 시각"; g.appendChild(tf);
-      g.appendChild(field("고사장", txt(a.itvPlace,"예: 인문관 301호",function(v){ if(v) a.itvPlace=v; else delete a.itvPlace; shareExam(a); save(st);})));
-      g.appendChild(field("시각 출처", sel(["확인 전","입학처 공지","학생에게 받음"],a.itvSrc==="공지"?"입학처 공지":a.itvSrc==="학생"?"학생에게 받음":"확인 전",function(v){ if(v==="입학처 공지") a.itvSrc="공지"; else if(v==="학생에게 받음") a.itvSrc="학생"; else delete a.itvSrc; a.itvAt=new Date().toISOString(); shareExam(a); save(st); render(); })));
+      var tf=field(ek+" 시각", ti); tf.title="입학처 공지나 학생 수험표에서 확인한 입실(시작) 시각"; dates.appendChild(tf);
+      dates.appendChild(field("고사장", txt(a.itvPlace,"예: 인문관 301호",function(v){ if(v) a.itvPlace=v; else delete a.itvPlace; shareExam(a); save(st);})));
+      dates.appendChild(field("시각 출처", sel(["확인 전","입학처 공지","학생에게 받음"],a.itvSrc==="공지"?"입학처 공지":a.itvSrc==="학생"?"학생에게 받음":"확인 전",function(v){ if(v==="입학처 공지") a.itvSrc="공지"; else if(v==="학생에게 받음") a.itvSrc="학생"; else delete a.itvSrc; a.itvAt=new Date().toISOString(); shareExam(a); save(st); render(); })));
       var sf=el("div","f"), sl=el("label",null,"공지 찾기"), sa=document.createElement("a");
-      sa.className="ghost itvfind"; sa.href=itvSearchUrl(a); sa.target="_blank"; sa.rel="noopener"; sa.textContent="입학처 공지 찾기 ↗"; sa.title="새 창에서 이 대학의 고사 시간·고사장 공지를 검색합니다";
-      sf.appendChild(sl); sf.appendChild(sa); g.appendChild(sf);
+      sa.className="ghost itvfind"; sa.href=itvSearchUrl(a); sa.target="_blank"; sa.rel="noopener"; sa.textContent="입학처 공지 찾기";
+      sf.appendChild(sl); sf.appendChild(sa); dates.appendChild(sf);
     }
-    g.appendChild(announcementField(st,a,"ann",a.kind==="수시"?"최초 합격자 발표일":"발표일"));
-    if(a.kind==="수시") g.appendChild(field("최저 충족", sel(MINSTATES,a.mmet||"미정",function(v){a.mmet=v; save(st); render();})));
-    if(!hasWaitInfo(a)&&canEditWait(st)) g.appendChild(waitButton(st,a));
-    g.appendChild(field("메모", txt(a.note,"",function(v){a.note=v; save(st);})));
-    if(a.kind==="수시"&&itvDate(a)){ var pf=field(examKind(a)+" 준비 ("+prepDone(a)+"/"+prepList(a).length+")", prepChips(st,a)); pf.classList.add("wide"); g.appendChild(pf); }
-    if(a.kind==="수시"&&!a.jc){
-      var cb=document.createElement("select");
-      ["Y","N"].forEach(function(o){var op=document.createElement("option");op.value=o;op.textContent=o==="Y"?"포함":"제외";if((a.c6?"Y":"N")===o)op.selected=true;cb.appendChild(op);});
-      cb.onchange=function(){ remember("수정"); a.c6=(cb.value==="Y"); save(st); render(); };
-      cb.disabled=ro();
-      g.appendChild(field("6장 제한", cb));
-    }
+    var examHint=el("div","f wide exam-hint");
+    if(verifiedExam){
+      examHint.appendChild(el("span","sub","입학처 확인: "+(verifiedExam.kind==="없음"?"면접·고사 없음":verifiedExam.kind)));
+      var examSource=el("a","linkbtn","입학처 근거"); examSource.href=verifiedExam.url; examSource.target="_blank"; examSource.rel="noopener noreferrer"; examHint.appendChild(examSource);
+    } else examHint.appendChild(el("span","sub","고사 종류와 날짜를 확인해 주세요. 다르면 고사 구분에서 바꿀 수 있습니다."));
+    dates.appendChild(examHint);
+    if(a.kind==="수시"&&iv){ var pf=field(ek+" 준비 ("+prepDone(a)+"/"+prepList(a).length+")", prepChips(st,a)); pf.classList.add("wide"); dates.appendChild(pf); }
+
     if(a.kind==="수시"){
-      /* 요강 문장이 길어 한 줄 칸에서는 잘린다. 전체가 보이도록 넓은 칸으로 둔다. */
+      var minimum=panel("minimum","수능최저",function(){
+        var text=String(a.mreq||"").replace(/\s+/g," ");
+        return text?text.slice(0,64)+(text.length>64?"…":"")+(a.mmet&&a.mmet!=="해당없음"?" · "+a.mmet:""):"기준 미입력";
+      });
       var mf=field("수능최저 기준", area(a.mreq,"예: 국수영탐 중 2개합 5, 한국사 4",function(v){a.mreq=v; a.msrc=v?"담임 입력":""; shareMin(a); applyMin(st); save(st); render();}));
-      if(a.msrc) mf.appendChild(el("div","minnote","출처: "+a.msrc));
-      mf.style.gridColumn="1 / -1";
-      g.appendChild(mf);
+      mf.classList.add("wide"); if(a.msrc) mf.appendChild(el("div","minnote","출처: "+a.msrc)); minimum.appendChild(mf);
+      minimum.appendChild(field("최저 충족", sel(MINSTATES,a.mmet||"미정",function(v){a.mmet=v; save(st); render();})));
+      if(a.mreq&&hasCsat(st)){
+        var r=judgeMin(a.mreq, st.csat);
+        var t=r.res?"자동 판정: "+r.res+" — "+r.why:"자동 판정 안 함 — "+r.why+". ‘최저 충족’을 직접 골라 주세요.";
+        if(r.res&&r.res!==(a.mmet||"미정")) t+=" (지금은 ‘"+(a.mmet||"미정")+"’으로 직접 골라 두었습니다)";
+        var verdict=el("div","minnote f wide"+(r.res&&r.res===a.mmet?"":" off"),t); minimum.appendChild(verdict);
+      }
     }
-    box.appendChild(g);
-    /* 판정 안내는 수능 등급을 넣은 뒤에만 띄운다. 수능 전에는 판정할 수 없으니 안내도 소음일 뿐이다. */
-    if(a.kind==="수시"&&a.mreq&&hasCsat(st)){
-      var r=judgeMin(a.mreq, st.csat);
-      var t=r.res?"자동 판정: "+r.res+" — "+r.why:"자동 판정 안 함 — "+r.why+". ‘최저 충족’을 직접 골라 주세요.";
-      if(r.res&&r.res!==(a.mmet||"미정")) t+=" (지금은 ‘"+(a.mmet||"미정")+"’으로 직접 골라 두었습니다)";
-      box.appendChild(el("div","minnote"+(r.res&&r.res===a.mmet?"":" off"),t));
+
+    var settings=panel("settings","추가 설정·메모",function(){return [a.kind,a.jc?"전문대":"4년제",a.type,a.note?"메모 있음":""].filter(Boolean).join(" · ");});
+    settings.appendChild(field("구분", sel(KINDS,a.kind,function(v){a.kind=v; if(v==="정시")a.type="정시"; a.c6=(v==="수시"&&!a.jc); save(st); render();})));
+    settings.appendChild(field("대학 구분", sel(["4년제","전문대"],a.jc?"전문대":"4년제",function(v){
+      a.jc=(v==="전문대"); a.c6=(a.kind==="수시"&&!a.jc); if(a.jc) a.group=""; save(st); render(); })));
+    settings.appendChild(field("전형유형", sel(TYPES,a.type,function(v){a.type=v; save(st); render();})));
+    if(a.kind==="수시"){
+      var rf=field("학교장추천", sel(["아님","학교장추천"],isRec(a)?"학교장추천":"아님",function(v){a.rec=(v==="학교장추천"); save(st); render();}));
+      rf.title="전형명에 '학교장추천'이 있으면 저절로 고릅니다. 다르면 여기서 바꾸세요."; settings.appendChild(rf);
     }
+    if(a.kind==="수시"&&!a.jc){
+      var cb=sel(["포함","제외"],a.c6?"포함":"제외",function(v){a.c6=(v==="포함"); save(st); render();});
+      settings.appendChild(field("6장 제한",cb));
+    }
+    var memo=field("메모",area(a.note,"상담 때 참고할 내용을 적으세요",function(v){a.note=v; save(st); render();})); memo.classList.add("wide"); settings.appendChild(memo);
+    var danger=el("div","editor-danger f wide"), del=el("button","del","이 지원 삭제"); del.type="button"; del.disabled=ro();
+    del.onclick=function(){
+      if(!window.confirm((a.univ||"이 대학")+" "+(a.major||"")+" 지원을 삭제할까요?")) return;
+      remember("지원 삭제"); st.apps=st.apps.filter(function(x){return x.id!==a.id;}); save(st); render();
+    };
+    danger.appendChild(del); settings.appendChild(danger);
     return box;
 }
 function addRow(d,st){

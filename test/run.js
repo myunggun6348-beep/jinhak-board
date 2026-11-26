@@ -190,13 +190,30 @@ function buildTestPage() {
     await x.goto("file://"+page404); await x.click(".row .rowhead");
     check("모바일 지원 대학: 면접 없는 동아대에 고사 없음 표시", await x.locator(".apptable .arow td:nth-child(5)").innerText().then(t=>[t.includes("고사 없음"),t.includes("11/28"),t.includes("1단계")]), [true,false,false]);
     await x.click(".apptable .arow td:nth-child(2)");
+    check("간단한 지원 입력: 기본 세 칸만 보이고 세부 정보는 요약으로 접힘", await x.evaluate(()=>{
+      const box=document.querySelector(".compact-editor");
+      return [[...box.querySelectorAll("input,select,textarea")].filter(e=>!!e.getClientRects().length).length,
+        [...box.querySelectorAll(".core-grid label")].map(e=>e.textContent),box.querySelectorAll(".app-panel[open]").length,
+        /12\/18.*고사 없음/.test(box.querySelector('[data-panel="schedule"] summary').textContent),box.querySelectorAll(".apphead button").length];
+    }), [3,["대학","학과·모집단위","전형명"],0,true,1]);
+    await x.getByLabel("학과·모집단위",{exact:true}).fill("반도체학과");
+    await x.getByLabel("학과·모집단위",{exact:true}).press("Tab");
+    check("기본 정보 자동 저장: 다른 세부 항목은 펼치지 않음", [await x.evaluate(()=>window.__dev.students()[0].apps[0].major),await x.locator(".app-panel[open]").count()], ["반도체학과",0]);
+    await x.locator('.app-panel[data-panel=schedule]>summary').click();
     const examSelect=()=>x.locator(".editcell .f").filter({hasText:/^고사 구분/}).locator("select");
     check("동아대 고사 없음: 근거 링크와 종류 선택 제공, 날짜 입력 감춤", [await examSelect().inputValue(),await x.locator('.editcell a[href*="31368"]').count()>0,await x.locator('.editcell input[type=date]').count()], ["자동 판단",true,1]);
     await examSelect().selectOption("면접");
+    check("세부 일정 입력 중 다시 그려져도 열린 항목 유지", await x.locator('.app-panel[data-panel=schedule]').getAttribute("open"), "");
     check("고사 구분 직접 수정: 원래 날짜 복원·면접 준비 반영", [await x.locator(".apptable .arow").innerText().then(t=>/11\/28.*면접/.test(t)),await x.locator(".editcell .prepc label").count()], [true,4]);
     await examSelect().selectOption("없음");
     await x.reload(); await x.click(".row .rowhead"); await x.click(".apptable .arow td:nth-child(2)");
+    await x.locator('.app-panel[data-panel=schedule]>summary').click();
     check("고사 구분 없음: 새로 열어도 저장·학생 탭 반영", [await examSelect().inputValue(),await x.locator(".apptable .arow").innerText().then(t=>t.includes("고사 없음")&&!t.includes("11/28"))], ["없음",true]);
+    await x.locator('.app-panel[data-panel=settings]>summary').click();
+    await x.getByLabel("메모",{exact:true}).fill("상담 후 재확인"); await x.getByLabel("메모",{exact:true}).press("Tab");
+    check("추가 설정의 메모 저장과 요약 반영", [await x.evaluate(()=>window.__dev.students()[0].apps[0].note),await x.locator('.app-panel[data-panel=settings]>summary').innerText().then(t=>t.includes("메모 있음"))], ["상담 후 재확인",true]);
+    await x.locator('.app-panel[data-panel=schedule]>summary').click(); await x.locator('.app-panel[data-panel=settings]>summary').click();
+    check("모바일 간단 입력은 가로 스크롤 없이 핵심과 요약 표시", await x.evaluate(()=>[innerWidth,document.documentElement.scrollWidth,[...document.querySelectorAll('.compact-editor input,.compact-editor select,.compact-editor textarea')].filter(e=>e.getClientRects().length).length]), [360,360,3]);
     await c.close();
   }
   dateCases.forEach((c, i) => check('"' + c[0] + '"' + (c[1] ? " (시각 포함)" : ""), dateGot[i], c[2]));
