@@ -2864,24 +2864,45 @@ function detail(st){
 }
 var appEditorPanels={};
 function suggestionText(value){return String(value||"").normalize("NFKC").replace(/[\s()·ㆍ.,_-]/g,"").toLowerCase();}
+function eachSuggestionSource(visit){
+  list().forEach(function(st){
+    if(school&&!school.admin&&+st.cls!==+school.cls) return;
+    (st.apps||[]).forEach(function(a){visit(a,true,st.id);});
+  });
+  if(minTable) minTable.forEach(function(a){visit(a,false,"");});
+}
+function suggestedTrackType(university,track,kind,original){
+  if(!String(track||"").trim()) return null;
+  if(kind==="정시") return "정시";
+  var explicit=mapType(track); if(explicit&&explicit!=="정시") return explicit;
+  if(!String(university||"").trim()) return null;
+  var types=new Set(), universityKey=univKey(university), key=suggestionText(track);
+  function add(a){
+    if((a.kind||"수시")!==(kind||"수시")||univKey(a.univ)!==universityKey||suggestionText(a.jh)!==key) return;
+    if(TYPES.indexOf(a.type)>=0&&a.type!=="정시") types.add(a.type);
+  }
+  eachSuggestionSource(function(a,fromStudent,studentId){
+    if(original&&studentId===original.studentId&&a.id===original.appId) return;
+    add(a);
+  });
+  if(original) add(original);
+  return types.size===1?Array.from(types)[0]:null;
+}
 function applicationSuggestions(kind,university,query,original){
   var choices=new Map(), universityKey=univKey(university);
   function add(a,fromStudent){
-    var value=String((kind==="univ"?a.univ:a.major)||"").trim();
-    if(!value||kind==="major"&&(!university||univKey(a.univ)!==universityKey)) return;
+    var value=String((kind==="univ"?a.univ:kind==="track"?a.jh:a.major)||"").trim();
+    if(!value||kind!=="univ"&&(!university||univKey(a.univ)!==universityKey)) return;
+    if(kind==="track"&&original&&(a.kind||"수시")!==original.kind) return;
     var key=kind==="univ"?univKey(value):suggestionText(value), old=choices.get(key);
     if(!old) choices.set(key,{value:value,used:fromStudent?1:0,key:key});
     else if(fromStudent) old.used++;
   }
-  list().forEach(function(st){
-    if(school&&!school.admin&&+st.cls!==+school.cls) return;
-    (st.apps||[]).forEach(function(a){
-      if(kind==="major"&&original&&st.id===original.studentId&&a.id===original.appId) return;
-      add(a,true);
-    });
+  eachSuggestionSource(function(a,fromStudent,studentId){
+    if(kind!=="univ"&&original&&studentId===original.studentId&&a.id===original.appId) return;
+    add(a,fromStudent);
   });
-  if(kind==="major"&&original) add(original,false);
-  if(minTable) minTable.forEach(function(a){add(a,false);});
+  if(kind!=="univ"&&original) add(original,false);
   if(kind==="univ") Object.keys(ADMISSION_2027).forEach(function(name){add({univ:name},false);});
   var q=suggestionText(query);
   return Array.from(choices.values()).map(function(item){
@@ -2976,16 +2997,23 @@ function appEditor(st,a,w){
     var g=el("div","grid core-grid");
     var universityInput=txt(a.univ,a.jc?"동의과학대학교":"부산대학교",function(v){a.univ=v; refreshPanels=true; fillMin(st); fillExam(st); save(st,true); render();});
     var majorInput=txt(a.major,"수학교육과",function(v){a.major=v; refreshPanels=true; fillMin(st); fillExam(st); save(st,true); render();});
-    var originalChoice={studentId:st.id,appId:a.id,univ:a.univ,major:a.major};
-    var trackInput=txt(a.jh,"학생부종합(일반)",function(v){a.jh=v; refreshPanels=true; if(a.kind==="수시"&&mapType(v)) a.type=mapType(v); fillMin(st); fillExam(st); save(st); render();});
-    var universityField=field("대학",universityInput), majorField=field("학과·모집단위",majorInput);
+    var originalChoice={studentId:st.id,appId:a.id,univ:a.univ,major:a.major,jh:a.jh,type:a.type,kind:a.kind};
+    var trackInput=txt(a.jh,"학생부종합(일반)",function(v){
+      a.jh=v; refreshPanels=true; var type=suggestedTrackType(a.univ,v,a.kind,originalChoice); if(type) a.type=type;
+      fillMin(st); fillExam(st); save(st,true); render();
+    });
+    var universityField=field("대학",universityInput), majorField=field("학과·모집단위",majorInput), trackField=field("전형명",trackInput);
     universityField.appendChild(suggestInput(universityInput,function(q){return applicationSuggestions("univ","",q);},function(){return "목록에 없는 대학도 직접 입력할 수 있습니다.";},function(){majorInput.focus();majorInput.select();}));
     majorField.appendChild(suggestInput(majorInput,function(q){return applicationSuggestions("major",universityInput.value.trim(),q,originalChoice);},function(){return universityInput.value.trim()?"등록된 학과 후보가 없습니다. 직접 입력할 수 있습니다.":"대학을 먼저 입력하면 해당 대학의 학과를 추천합니다.";},function(){trackInput.focus();}));
-    g.appendChild(universityField); g.appendChild(majorField); g.appendChild(field("전형명",trackInput));
+    trackField.appendChild(suggestInput(trackInput,function(q){return applicationSuggestions("track",universityInput.value.trim(),q,originalChoice);},function(){return universityInput.value.trim()?"등록된 전형 후보가 없습니다. 직접 입력할 수 있습니다.":"대학을 먼저 입력하면 해당 대학의 전형을 추천합니다.";},function(){
+      pendingRender=false; render();
+      var next=document.querySelector('.compact-editor [data-panel="schedule"]>summary'); if(next) next.focus({preventScroll:true});
+    }));
+    g.appendChild(universityField); g.appendChild(majorField); g.appendChild(trackField);
     if(a.kind==="정시"&&!a.jc) g.appendChild(field("군", sel([""].concat(GROUPS),a.group||"",function(v){a.group=v; save(st); render();})));
     if(a.kind==="정시") g.appendChild(field("원서 접수", sel(["접수 전","접수 완료"],a.filed?"접수 완료":"접수 전",function(v){ if(v==="접수 완료") a.filed=true; else delete a.filed; save(st); render(); })));
     box.appendChild(g);
-    box.appendChild(el("div","editor-footnote","대학·학과는 검색하거나 직접 입력할 수 있습니다. 등록된 지원·기준표의 학과를 추천하며, 다른 칸으로 이동하면 저장됩니다. 결과·예비번호는 위 지원 줄에서 수정하세요."));
+    box.appendChild(el("div","editor-footnote","대학·학과·전형은 검색하거나 직접 입력할 수 있습니다. 학과·전형은 선택한 대학의 등록된 지원·기준표에서 추천합니다. 선택하거나 다른 칸으로 이동하면 저장됩니다."));
     var wait=el("div","editor-wait");
     if(hasWaitInfo(a)) wait.appendChild(waitSummary(a,true));
     if(canEditWait(st)||hasWaitInfo(a)) wait.appendChild(waitButton(st,a));
@@ -7540,7 +7568,7 @@ function attachDb(x, onErr){
 
 /* 로컬(file://)에서만 열리는 테스트용 통로. 게시된 페이지(https)에서는 만들어지지 않는다. */
 try{ if(location.protocol==="file:"||location.hostname==="localhost"){
-  window.__dev={applicationSuggestions:applicationSuggestions, examKind:examKind, univSchedText:univSchedText, kindName:kindName, mapStatus:mapStatus, mapMin:mapMin, mapType:mapType, announcement:announcement, itvDate:itvDate, daysTo:daysTo, renderTodo:renderTodo,
+  window.__dev={suggestedTrackType:suggestedTrackType, applicationSuggestions:applicationSuggestions, examKind:examKind, univSchedText:univSchedText, kindName:kindName, mapStatus:mapStatus, mapMin:mapMin, mapType:mapType, announcement:announcement, itvDate:itvDate, daysTo:daysTo, renderTodo:renderTodo,
     parseDate:parseDate, parseYN:parseYN, pickStudents:pickStudents,
     parseDelimited:parseDelimited, readApps:readApps, pdfTableRows:pdfTableRows, last:function(){ return lastRead; },
     checkStudent:checkStudent, parseMin:parseMin, judgeMin:judgeMin, rowsFromPdf:rowsFromPdf,

@@ -223,8 +223,8 @@ function buildTestPage() {
     x.on("pageerror",e=>errors.push(String(e)));
     await x.addInitScript(()=>{
       if(sessionStorage.getItem("seeded"))return; sessionStorage.setItem("seeded","1"); localStorage.setItem("jh.mode","local");localStorage.setItem("jh.cls","2");
-      const app=(id,univ,major)=>({id,univ,major,kind:"수시",jh:"",type:"학종",status:"지원완료",c6:true});
-      localStorage.setItem("jh.local.students",JSON.stringify([{id:"suggestions",cls:2,name:"자동완성 검증",apps:[app("entry","",""),app("donga","동아대학교(부산)","반도체학과"),app("pnu","부산대학교","물리학과"),app("wise","동국대학교(WISE)","한의예과"),app("seoul","동국대학교(서울)","국어국문학과")]}]));
+      const app=(id,univ,major,jh="",type="학종",kind="수시")=>({id,univ,major,kind,jh,type,status:"지원완료",c6:kind==="수시"});
+      localStorage.setItem("jh.local.students",JSON.stringify([{id:"suggestions",cls:2,name:"자동완성 검증",apps:[app("entry","","","","교과"),app("donga","동아대학교(부산)","반도체학과","학교생활우수자"),app("pnu","부산대학교","물리학과","학생부교과(학교장추천)","교과"),app("wise","동국대학교(WISE)","한의예과","WISE인재"),app("seoul","동국대학교(서울)","국어국문학과","서울인재"),app("regular","동아대학교","반도체학과","수능위주","정시","정시")]}]));
     });
     await x.goto("file://"+page404); await x.locator("#rows .rowhead").click(); await x.locator(".apptable .arow td:nth-child(2)").first().click();
     const univ=x.getByLabel("대학",{exact:true}), major=x.getByLabel("학과·모집단위",{exact:true});
@@ -235,6 +235,26 @@ function buildTestPage() {
     check("모바일 대학 선택: 정확한 대학 저장 후 학과로 이동", [(await data()).univ,await major.evaluate(e=>document.activeElement===e)], ["동아대학교(부산)",true]);
     await major.fill("반도"); await x.getByRole("option",{name:"반도체학과",exact:true}).tap();
     check("모바일 학과 선택: 저장 후 전형으로 이동", [(await data()).major,await x.getByLabel("전형명",{exact:true}).evaluate(e=>document.activeElement===e)], ["반도체학과",true]);
+    const track=x.getByLabel("전형명",{exact:true});
+    await track.fill("학교생활");
+    check("전형명 일부 글자로 같은 대학의 후보 표시, 검색 중 유형은 유지", [await x.getByRole("option",{name:"학교생활우수자",exact:true}).count(),(await data()).type,(await data()).jh], [1,"교과",""]);
+    await x.getByRole("option",{name:"학교생활우수자",exact:true}).tap();
+    check("모바일 전형 선택: 전형명·유형 저장 및 면접 없음 즉시 반영", [(await data()).jh,(await data()).type,/고사 없음/.test(await x.locator('[data-panel=schedule]>summary').innerText()),await x.locator('[data-panel=schedule]>summary').evaluate(e=>document.activeElement===e)], ["학교생활우수자","학종",true,true]);
+    await x.reload(); await x.locator("#rows .rowhead").click(); await x.locator(".apptable .arow td:nth-child(2)").first().click();
+    check("전형명 자동완성은 새로 열어도 전형·유형 유지", [await track.inputValue(),(await data()).type], ["학교생활우수자","학종"]);
+    const tracks=await x.evaluate(()=>{
+      const d=window.__dev;
+      return [d.applicationSuggestions("track","동아대학교","수능",{kind:"수시"}),d.applicationSuggestions("track","동아대학교","수능",{kind:"정시"}),d.applicationSuggestions("track","동국대학교(WISE)","서울",{kind:"수시"}),d.applicationSuggestions("track","동아대학교","학교장",{kind:"수시"})];
+    });
+    check("전형 후보는 수시·정시 및 대학·캠퍼스를 구분", tracks, [[],["수능위주"],[],[]]);
+    await track.fill("새로운교과전형"); await track.press("Tab");
+    check("목록에 없는 전형 직접 입력과 명시된 교과 유형 반영", [(await data()).jh,(await data()).type], ["새로운교과전형","교과"]);
+    const inferred=await x.evaluate(()=>{
+      const d=window.__dev;
+      d.mergeData([{name:"conflicts.json",b:{app:"jinhak-board",students:[{id:"track-conflicts",cls:2,name:"전형 검증",apps:[{id:"one",kind:"수시",univ:"경성대학교",jh:"맞춤인재",type:"교과"},{id:"two",kind:"수시",univ:"경성대학교",jh:"맞춤인재",type:"학종"}]}]}}]);
+      return [d.suggestedTrackType("경성대학교","맞춤인재","수시"),d.suggestedTrackType("동아대학교","미확인전형","수시"),d.suggestedTrackType("동아대학교","수능위주","정시"),d.suggestedTrackType("동아대학교","","수시")];
+    });
+    check("유형이 충돌하거나 불명확한 전형은 임의 분류하지 않음", inferred, [null,null,"정시",null]);
     const scope=await x.evaluate(()=>{
       const d=window.__dev;
       return [d.applicationSuggestions("major","동국대학교(WISE)","한의"),d.applicationSuggestions("major","동국대학교(서울)","한의"),d.applicationSuggestions("major","동아대학교","물리"),d.applicationSuggestions("univ","","동아").length];
@@ -247,11 +267,13 @@ function buildTestPage() {
     check("키보드 대학 선택: 부산외대 별칭으로 해당 대학 선택", await x.evaluate(()=>window.__dev.univKey(window.__dev.students()[0].apps[0].univ)), "부산외국어대|");
     await major.fill("반도");
     check("대학 변경 후 이전 대학의 학과를 새 대학 후보로 오인하지 않음", await x.locator('.suggest-list:visible [role=option]').count(), 0);
+    await track.fill("학교생활");
+    check("대학 변경 후 이전 대학의 전형을 새 대학 후보로 오인하지 않음", await x.locator('.suggest-list:visible [role=option]').count(), 0);
     await major.fill("새로운융합학과");
     check("등록되지 않은 학과는 자유 입력 안내", [await x.locator('.suggest-list:visible [role=option]').count(),/직접 입력/.test(await x.locator('.suggest-list:visible').innerText())], [0,true]);
     await major.press("Tab");
     await univ.fill("새로운테스트대학교"); await univ.press("Tab"); await major.press("Tab");
-    await x.reload(); await x.locator("#rows .rowhead").click(); await x.locator(".apptable .arow td:nth-child(2)").first().click();
+    await x.reload(); await x.locator("#rows .rowhead").first().click(); await x.locator(".apptable .arow td:nth-child(2)").first().click();
     check("목록에 없는 대학·학과도 직접 저장하고 다시 열기", [await univ.inputValue(),await major.inputValue()], ["새로운테스트대학교","새로운융합학과"]);
     await univ.fill("동아"); await univ.dispatchEvent("compositionstart"); await univ.dispatchEvent("keydown",{key:"Enter",isComposing:true,keyCode:229}); await univ.dispatchEvent("compositionend");
     check("한글 조합 중 Enter는 후보 선택·저장하지 않음", [await univ.inputValue(),(await data()).univ], ["동아","새로운테스트대학교"]);
