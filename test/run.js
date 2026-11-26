@@ -55,7 +55,7 @@ function buildTestPage() {
   await p.goto("file://" + page404);
   await p.waitForTimeout(600);
 
-  if(!process.argv.includes("--account-ui")){
+  if(!process.argv.includes("--account-ui")&&!process.argv.includes("--instant-ui")){
   /* ── 1. 상태 낱말 ──────────────────────────────
      순서가 틀리면 '불합격'이 '합격'을 품어 합격으로 뒤집힌다. */
   console.log("\n[상태 낱말 읽기]");
@@ -874,12 +874,40 @@ function buildTestPage() {
   const rowNames = (x) => x.evaluate(() => [...document.querySelectorAll(".row .nm")].map((e) => e.textContent));
   const gateTitle = (x) => x.evaluate(() => { const b = document.getElementById("banner"), h = b.querySelector("h2"); return b.hidden || !h ? "" : h.textContent; });
   const join = async (x, code, name, cls, pw) => {
-    await x.click("#banner button >> text=처음 이용하시나요");
+    await x.click("#banner button >> text=학교 공동 관리에 참여하기");
     await x.click("#banner .gbtn"); await x.waitForTimeout(300);
     await x.fill("#banner input[name=code]", code); await x.fill("#banner input[name=name]", name); await x.selectOption("#banner select[name=cls]", String(cls)); await x.fill("#banner input[name=pw]", pw || "1234");
     await x.click("#banner button >> text=학교 참여 신청"); await x.waitForTimeout(1500);
   };
   const stu = (id, cls, name) => ({ id, cls, no: id, name, updatedAt: "2026-10-01T00:00:00Z", apps: [{ id: "a" + id, kind: "수시", univ: "부산대학교", major: "국어국문학과", type: "학종", status: "지원완료", c6: true, itv: "2026-11-21" }] });
+  if(process.argv.includes("--instant-ui")){
+    const soloGoogle=await who({email:"owner@x.com"});
+    await soloGoogle.click("#accountLogin"); await soloGoogle.waitForTimeout(1200);
+    check("Google 첫 로그인: 학교 생성·가입 신청 없이 본인 자료 화면",[await gateTitle(soloGoogle),await soloGoogle.$eval("#whoChip .wrole",e=>e.textContent)],["","내 계정"]);
+    check("개인 자료 관리: 학교 초대·승인 메뉴 없이 자료 관리 표시",[await soloGoogle.$eval("#tabAdmin",e=>e.firstChild.textContent),await soloGoogle.locator("#schoolPanel input[name=quick]").count()],["자료 관리",0]);
+    await soloGoogle.click('#classbar .chip[data-c="2"]');
+    await soloGoogle.evaluate(st=>window.__dev.mergeData([{name:"personal.json",b:{students:[st]}}]),stu("30201",2,"본인학생")); await soloGoogle.waitForTimeout(1500);
+    const schoolCount=()=>Object.keys(KV).filter(k=>/^schools\/[0-9a-f]{40}$/.test(k)).length;
+    check("개인 학생 자료: Firebase에 암호화 저장",Object.keys(KV).some(k=>k.includes("/students/"))&&!JSON.stringify(KV).includes("본인학생"),true);
+    const device=await who({email:"owner@x.com"}); await device.click("#accountLogin"); await device.waitForTimeout(1400);
+    check("같은 계정 새 컴퓨터: 기존 학생 복원·공간 중복 생성 없음",[await rowNames(device),schoolCount()],[["본인학생"],1]);
+    const second=await who({email:"another@x.com"}); await second.click("#accountLogin"); await second.waitForTimeout(1200);
+    check("다른 Google 계정: 본인 학생만 조회",[await rowNames(second),schoolCount()],[[],2]);
+    await second.evaluate(st=>window.__dev.mergeData([{name:"other.json",b:{students:[st]}}]),stu("30201",2,"다른학생")); await second.waitForTimeout(1000);
+    await device.evaluate(()=>localStorage.setItem("jh.cls","5"));
+    await device.reload(); await device.waitForTimeout(1200);
+    check("계정의 담당 반: 다른 기기에서도 선택 복원",await device.$eval("#classbar .chip[aria-pressed=true]",e=>e.dataset.c),"2");
+    check("같은 학번도 계정별 분리·새로고침 후 유지",await rowNames(device),["본인학생"]);
+    await soloGoogle.click("#whoChip button >> text=로그아웃"); await soloGoogle.waitForTimeout(800);
+    check("로그아웃 후 학생 자료 감춤",[await gateTitle(soloGoogle),await soloGoogle.evaluate(()=>getComputedStyle(document.getElementById("viewClass")).display)],["학교 진학현황판","none"]);
+    // 첫 생성이 학교 문서까지만 완료된 상태에서 다시 로그인해도 같은 공간을 복구한다.
+    const ownerKey=Object.keys(KV).find(k=>k.startsWith("users/")&&k.includes("g_owner")); const ownerSid=Object.keys(KV).find(k=>k.endsWith("/private/profile"));
+    delete KV[ownerKey]; delete KV[ownerSid]; delete KV[ownerSid.replace("profile","code")];
+    await soloGoogle.click("#accountLogin"); await soloGoogle.waitForTimeout(1500);
+    check("중단된 초기 연결 복원: 기존 자료 보존·개인 공간 유지",[await rowNames(soloGoogle),await soloGoogle.$eval("#whoChip .wrole",e=>e.textContent),schoolCount()],[["본인학생"],"내 계정",2]);
+    for(const page of [soloGoogle,device,second])await page.context().close();
+    check("JavaScript 오류 없음",errors,[]);srv.close();await browser.close();console.log(pass+" passed, "+fail+" failed");process.exit(fail?1:0);
+  }
   const adm = await who({ email: "admin@x.com", local: [stu("30201", 2, "김예시"), stu("30501", 5, "박예시")] });
   check("처음: 계정 로그인 시작 화면", await gateTitle(adm), "학교 진학현황판");
   const vis = (x) => x.evaluate(() => getComputedStyle(document.getElementById("viewClass")).display !== "none");
@@ -949,8 +977,8 @@ function buildTestPage() {
   check("담임 구글 연결: 그 컴퓨터는 다음부터 바로", await gateTitle(t10), "");
   await t10.context().close();
   const t11 = await who({ email: "stranger@x.com" });
-  await t11.click("#accountLogin"); await t11.waitForTimeout(1200);
-  check("처음 구글로 누르면 그 계정으로 가입 칸", [/연결된 학교가 아직 없습니다/.test(await t11.innerText("#banner")), /stranger@x\.com 계정으로 가입됩니다/.test(await t11.innerText("#banner"))], [true, true]);
+  await t11.click("#banner button >> text=학교 공동 관리에 참여하기"); await t11.click("#banner .gbtn"); await t11.waitForTimeout(1200);
+  check("처음 구글로 누르면 그 계정으로 가입 칸", [/학교 참여 신청/.test(await t11.innerText("#banner")), /stranger@x\.com/.test(await t11.innerText("#banner"))], [true, true]);
   await t11.fill("#banner input[name=code]", firstCode); await t11.waitForTimeout(1200);
   await t11.fill("#banner input[name=name]", "구담임"); await t11.selectOption("#banner select[name=cls]", "3"); await t11.fill("#banner input[name=pw]", "1234"); await t11.click("#banner button >> text=학교 참여 신청"); await t11.waitForTimeout(1500);
   const pendingAccount=await who({email:"stranger@x.com"}); await pendingAccount.click("#accountLogin"); await pendingAccount.waitForTimeout(1200);
@@ -1052,10 +1080,10 @@ function buildTestPage() {
   const pwHidden = await t6.$eval("#banner input[name=pw]", (e) => e.hidden);
   await t6.fill("#banner input[name=name]", "최담임"); await t6.selectOption("#banner select[name=cls]", "5"); await t6.click("#banner button >> text=학교 참여 신청"); await t6.waitForTimeout(1500);
   check("가입 암호 없이 승인만으로: 초대 링크에 암호 칸이 없고 이름·반만으로 승인 대기", [pwOffSaved, pwHidden, await gateTitle(t6)], [true, true, "관리자 승인을 기다리는 중입니다"]);
-  const t9 = await who({}); await t9.click("#banner button >> text=처음 이용하시나요"); await t9.fill("#banner input[name=code]", "https://jinhak-board.vercel.app/#join=" + firstCode);
+  const t9 = await who({}); await t9.click("#banner button >> text=학교 공동 관리에 참여하기"); await t9.fill("#banner input[name=code]", "https://jinhak-board.vercel.app/#join=" + firstCode);
   check("코드 칸에 초대 링크를 통째로 붙여넣어도 코드만", await t9.$eval("#banner input[name=code]", (e) => e.value), firstCode);
   await t9.context().close();
-  const t8 = await who({}); await t8.click("#banner button >> text=처음 이용하시나요"); await t8.click("#banner .gbtn"); await t8.waitForTimeout(400); const pwFirst = await t8.$eval("#banner input[name=pw]", (e) => e.hidden);
+  const t8 = await who({}); await t8.click("#banner button >> text=학교 공동 관리에 참여하기"); await t8.click("#banner .gbtn"); await t8.waitForTimeout(400); const pwFirst = await t8.$eval("#banner input[name=pw]", (e) => e.hidden);
   check("코드를 넣기 전에는 가입 암호 칸을 숨김", pwFirst, true);
   await t8.fill("#banner input[name=code]", firstCode.toLowerCase()); await t8.waitForTimeout(1200);
   check("코드를 쳐도 가입 암호를 끈 학교면 암호 칸이 사라짐", await t8.$eval("#banner input[name=pw]", (e) => e.hidden), true);
