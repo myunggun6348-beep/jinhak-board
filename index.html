@@ -516,6 +516,13 @@ body.hide-today #today,body.hide-today #allToday,body.hide-alerts #alerts,body.h
 .app-panel .exam-hint .linkbtn{margin-left:auto}
 .editor-danger{display:flex; justify-content:flex-end; margin-top:14px}
 .editor-danger .del{font-size:14px; color:var(--bad); padding:8px 12px}
+.suggest-field{position:relative; min-width:0}
+.suggest-list{position:absolute; z-index:30; top:calc(100% + 4px); left:0; right:0; max-height:min(280px,35dvh); overflow:auto;
+  border:1px solid var(--line-2); border-radius:8px; background:var(--surface); box-shadow:0 6px 20px #0002; padding:4px}
+.suggest-option{display:block; width:100%; min-height:44px; padding:10px; border:0; border-radius:5px; background:transparent;
+  text-align:left; color:var(--ink); font:inherit; font-size:15px; white-space:normal; overflow-wrap:anywhere; cursor:pointer}
+.suggest-option:hover,.suggest-option[aria-selected=true]{background:var(--accent-soft); color:var(--accent)}
+.suggest-empty{display:block; padding:10px; color:var(--ink-2); font-size:14px; line-height:1.5; white-space:normal}
 @media(max-width:700px){
   .compact-editor{padding:12px}
   .compact-editor .grid{grid-template-columns:1fr}
@@ -2856,6 +2863,88 @@ function detail(st){
   return d;
 }
 var appEditorPanels={};
+function suggestionText(value){return String(value||"").normalize("NFKC").replace(/[\s()·ㆍ.,_-]/g,"").toLowerCase();}
+function applicationSuggestions(kind,university,query,original){
+  var choices=new Map(), universityKey=univKey(university);
+  function add(a,fromStudent){
+    var value=String((kind==="univ"?a.univ:a.major)||"").trim();
+    if(!value||kind==="major"&&(!university||univKey(a.univ)!==universityKey)) return;
+    var key=kind==="univ"?univKey(value):suggestionText(value), old=choices.get(key);
+    if(!old) choices.set(key,{value:value,used:fromStudent?1:0,key:key});
+    else if(fromStudent) old.used++;
+  }
+  list().forEach(function(st){
+    if(school&&!school.admin&&+st.cls!==+school.cls) return;
+    (st.apps||[]).forEach(function(a){
+      if(kind==="major"&&original&&st.id===original.studentId&&a.id===original.appId) return;
+      add(a,true);
+    });
+  });
+  if(kind==="major"&&original) add(original,false);
+  if(minTable) minTable.forEach(function(a){add(a,false);});
+  if(kind==="univ") Object.keys(ADMISSION_2027).forEach(function(name){add({univ:name},false);});
+  var q=suggestionText(query);
+  return Array.from(choices.values()).map(function(item){
+    var terms=[item.value];
+    if(kind==="univ"){
+      terms.push(shortUniv(item.value),item.key.split("|")[0]);
+      Object.keys(UNIV_ALIAS).forEach(function(alias){if(univKey(alias)===item.key) terms.push(alias);});
+    }
+    var normalized=terms.map(suggestionText);
+    item.score=normalized.some(function(t){return t===q;})?0:normalized.some(function(t){return t.indexOf(q)===0;})?1:2;
+    item.hit=!q||normalized.some(function(t){return t.indexOf(q)>=0;});
+    return item;
+  }).filter(function(item){return item.hit;}).sort(function(x,y){
+    return x.score-y.score||y.used-x.used||x.value.localeCompare(y.value,"ko");
+  }).slice(0,6).map(function(item){return item.value;});
+}
+function suggestInput(input,provider,emptyText,onPick){
+  var wrap=el("div","suggest-field"), menu=el("div","suggest-list"), menuId="suggest-"+uid();
+  menu.id=menuId; menu.hidden=true; menu.setAttribute("role","listbox");
+  input.setAttribute("role","combobox"); input.setAttribute("aria-autocomplete","list"); input.setAttribute("aria-expanded","false");
+  input.setAttribute("aria-controls",menuId); input.setAttribute("autocomplete","off");
+  wrap.appendChild(input); wrap.appendChild(menu);
+  var values=[], active=-1, composing=false, committed=input.value;
+  function close(){menu.hidden=true; input.setAttribute("aria-expanded","false"); input.removeAttribute("aria-activedescendant"); active=-1;}
+  function highlight(){
+    Array.from(menu.querySelectorAll('[role="option"]')).forEach(function(option,i){option.setAttribute("aria-selected",String(i===active));});
+    if(active>=0){input.setAttribute("aria-activedescendant",menuId+"-"+active); menu.children[active].scrollIntoView({block:"nearest"});}
+    else input.removeAttribute("aria-activedescendant");
+  }
+  function choose(value){
+    input.value=value; close();
+    if(value!==committed) input.dispatchEvent(new Event("change",{bubbles:true}));
+    if(onPick) onPick();
+  }
+  function show(){
+    if(input.disabled||composing) return;
+    values=provider(input.value); active=-1; menu.innerHTML="";
+    values.forEach(function(value,i){
+      var option=el("button","suggest-option",value); option.type="button"; option.tabIndex=-1; option.id=menuId+"-"+i;
+      option.setAttribute("role","option"); option.setAttribute("aria-selected","false");
+      option.onpointerdown=function(e){e.preventDefault();};
+      option.onclick=function(){choose(value);}; menu.appendChild(option);
+    });
+    if(!values.length){var message=el("span","suggest-empty",emptyText()); message.setAttribute("role","status"); menu.appendChild(message);}
+    input.removeAttribute("aria-activedescendant"); menu.hidden=false; input.setAttribute("aria-expanded","true");
+  }
+  input.addEventListener("focus",show);
+  input.addEventListener("input",function(e){if(!e.isComposing) show();});
+  input.addEventListener("change",function(){committed=input.value;});
+  input.addEventListener("blur",close);
+  input.addEventListener("compositionstart",function(){composing=true;close();});
+  input.addEventListener("compositionend",function(){composing=false;show();});
+  input.addEventListener("keydown",function(e){
+    if(e.isComposing||composing||e.keyCode===229) return;
+    if(e.key==="ArrowDown"||e.key==="ArrowUp"){
+      e.preventDefault(); if(menu.hidden) show();
+      if(values.length){active=e.key==="ArrowDown"?(active+1)%values.length:(active<0?values.length-1:(active+values.length-1)%values.length); highlight();}
+    } else if(e.key==="Enter"&&!menu.hidden&&active>=0){e.preventDefault();choose(values[active]);}
+    else if(e.key==="Escape"){e.preventDefault();close();}
+    else if(e.key==="Tab") close();
+  });
+  return wrap;
+}
 function appEditor(st,a,w){
     var box=el("div","app compact-editor"+(w?" warn":""));
     var hd=el("div","apphead");
@@ -2885,13 +2974,18 @@ function appEditor(st,a,w){
       var grid=el("div","grid"); section.appendChild(grid); box.appendChild(section); return grid;
     }
     var g=el("div","grid core-grid");
-    g.appendChild(field("대학", txt(a.univ,a.jc?"동의과학대학교":"부산대학교",function(v){a.univ=v; refreshPanels=true; fillMin(st); fillExam(st); save(st); render();})));
-    g.appendChild(field("학과·모집단위", txt(a.major,"수학교육과",function(v){a.major=v; refreshPanels=true; fillMin(st); fillExam(st); save(st); render();})));
-    g.appendChild(field("전형명", txt(a.jh,"학생부종합(일반)",function(v){a.jh=v; refreshPanels=true; if(a.kind==="수시"&&mapType(v)) a.type=mapType(v); fillMin(st); fillExam(st); save(st); render();})));
+    var universityInput=txt(a.univ,a.jc?"동의과학대학교":"부산대학교",function(v){a.univ=v; refreshPanels=true; fillMin(st); fillExam(st); save(st,true); render();});
+    var majorInput=txt(a.major,"수학교육과",function(v){a.major=v; refreshPanels=true; fillMin(st); fillExam(st); save(st,true); render();});
+    var originalChoice={studentId:st.id,appId:a.id,univ:a.univ,major:a.major};
+    var trackInput=txt(a.jh,"학생부종합(일반)",function(v){a.jh=v; refreshPanels=true; if(a.kind==="수시"&&mapType(v)) a.type=mapType(v); fillMin(st); fillExam(st); save(st); render();});
+    var universityField=field("대학",universityInput), majorField=field("학과·모집단위",majorInput);
+    universityField.appendChild(suggestInput(universityInput,function(q){return applicationSuggestions("univ","",q);},function(){return "목록에 없는 대학도 직접 입력할 수 있습니다.";},function(){majorInput.focus();majorInput.select();}));
+    majorField.appendChild(suggestInput(majorInput,function(q){return applicationSuggestions("major",universityInput.value.trim(),q,originalChoice);},function(){return universityInput.value.trim()?"등록된 학과 후보가 없습니다. 직접 입력할 수 있습니다.":"대학을 먼저 입력하면 해당 대학의 학과를 추천합니다.";},function(){trackInput.focus();}));
+    g.appendChild(universityField); g.appendChild(majorField); g.appendChild(field("전형명",trackInput));
     if(a.kind==="정시"&&!a.jc) g.appendChild(field("군", sel([""].concat(GROUPS),a.group||"",function(v){a.group=v; save(st); render();})));
     if(a.kind==="정시") g.appendChild(field("원서 접수", sel(["접수 전","접수 완료"],a.filed?"접수 완료":"접수 전",function(v){ if(v==="접수 완료") a.filed=true; else delete a.filed; save(st); render(); })));
     box.appendChild(g);
-    box.appendChild(el("div","editor-footnote","기본 정보는 입력 후 다른 칸으로 이동하면 자동 저장됩니다. 결과와 예비번호는 위 지원 줄에서 바로 수정하세요."));
+    box.appendChild(el("div","editor-footnote","대학·학과는 검색하거나 직접 입력할 수 있습니다. 등록된 지원·기준표의 학과를 추천하며, 다른 칸으로 이동하면 저장됩니다. 결과·예비번호는 위 지원 줄에서 수정하세요."));
     var wait=el("div","editor-wait");
     if(hasWaitInfo(a)) wait.appendChild(waitSummary(a,true));
     if(canEditWait(st)||hasWaitInfo(a)) wait.appendChild(waitButton(st,a));
@@ -7446,7 +7540,7 @@ function attachDb(x, onErr){
 
 /* 로컬(file://)에서만 열리는 테스트용 통로. 게시된 페이지(https)에서는 만들어지지 않는다. */
 try{ if(location.protocol==="file:"||location.hostname==="localhost"){
-  window.__dev={examKind:examKind, univSchedText:univSchedText, kindName:kindName, mapStatus:mapStatus, mapMin:mapMin, mapType:mapType, announcement:announcement, itvDate:itvDate, daysTo:daysTo, renderTodo:renderTodo,
+  window.__dev={applicationSuggestions:applicationSuggestions, examKind:examKind, univSchedText:univSchedText, kindName:kindName, mapStatus:mapStatus, mapMin:mapMin, mapType:mapType, announcement:announcement, itvDate:itvDate, daysTo:daysTo, renderTodo:renderTodo,
     parseDate:parseDate, parseYN:parseYN, pickStudents:pickStudents,
     parseDelimited:parseDelimited, readApps:readApps, pdfTableRows:pdfTableRows, last:function(){ return lastRead; },
     checkStudent:checkStudent, parseMin:parseMin, judgeMin:judgeMin, rowsFromPdf:rowsFromPdf,

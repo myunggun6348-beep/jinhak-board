@@ -218,6 +218,52 @@ function buildTestPage() {
   }
   dateCases.forEach((c, i) => check('"' + c[0] + '"' + (c[1] ? " (시각 포함)" : ""), dateGot[i], c[2]));
 
+  {
+    const c=await browser.newContext({viewport:{width:360,height:900},hasTouch:true}), x=await c.newPage();
+    x.on("pageerror",e=>errors.push(String(e)));
+    await x.addInitScript(()=>{
+      if(sessionStorage.getItem("seeded"))return; sessionStorage.setItem("seeded","1"); localStorage.setItem("jh.mode","local");localStorage.setItem("jh.cls","2");
+      const app=(id,univ,major)=>({id,univ,major,kind:"수시",jh:"",type:"학종",status:"지원완료",c6:true});
+      localStorage.setItem("jh.local.students",JSON.stringify([{id:"suggestions",cls:2,name:"자동완성 검증",apps:[app("entry","",""),app("donga","동아대학교(부산)","반도체학과"),app("pnu","부산대학교","물리학과"),app("wise","동국대학교(WISE)","한의예과"),app("seoul","동국대학교(서울)","국어국문학과")]}]));
+    });
+    await x.goto("file://"+page404); await x.locator("#rows .rowhead").click(); await x.locator(".apptable .arow td:nth-child(2)").first().click();
+    const univ=x.getByLabel("대학",{exact:true}), major=x.getByLabel("학과·모집단위",{exact:true});
+    const data=()=>x.evaluate(()=>window.__dev.students()[0].apps.find(a=>a.id==="entry"));
+    await univ.fill("동아");
+    check("자동완성: 대학 일부 글자로 후보 표시, 검색 중에는 저장하지 않음", [await x.getByRole("option",{name:"동아대학교(부산)",exact:true}).count(),(await data()).univ,await univ.getAttribute("aria-expanded")], [1,"","true"]);
+    await x.getByRole("option",{name:"동아대학교(부산)",exact:true}).tap();
+    check("모바일 대학 선택: 정확한 대학 저장 후 학과로 이동", [(await data()).univ,await major.evaluate(e=>document.activeElement===e)], ["동아대학교(부산)",true]);
+    await major.fill("반도"); await x.getByRole("option",{name:"반도체학과",exact:true}).tap();
+    check("모바일 학과 선택: 저장 후 전형으로 이동", [(await data()).major,await x.getByLabel("전형명",{exact:true}).evaluate(e=>document.activeElement===e)], ["반도체학과",true]);
+    const scope=await x.evaluate(()=>{
+      const d=window.__dev;
+      return [d.applicationSuggestions("major","동국대학교(WISE)","한의"),d.applicationSuggestions("major","동국대학교(서울)","한의"),d.applicationSuggestions("major","동아대학교","물리"),d.applicationSuggestions("univ","","동아").length];
+    });
+    check("학과 추천: 대학·캠퍼스 구분 및 대학 이름 중복 제거", scope, [["한의예과"],[],[],1]);
+    await univ.fill("부산외대"); await univ.press("ArrowDown");
+    const active=await univ.getAttribute("aria-activedescendant");
+    check("키보드 자동완성: 줄임말 검색과 현재 후보 안내", [!!active,await x.locator('[role=option][aria-selected=true]').count()], [true,1]);
+    await univ.press("Enter");
+    check("키보드 대학 선택: 부산외대 별칭으로 해당 대학 선택", await x.evaluate(()=>window.__dev.univKey(window.__dev.students()[0].apps[0].univ)), "부산외국어대|");
+    await major.fill("반도");
+    check("대학 변경 후 이전 대학의 학과를 새 대학 후보로 오인하지 않음", await x.locator('.suggest-list:visible [role=option]').count(), 0);
+    await major.fill("새로운융합학과");
+    check("등록되지 않은 학과는 자유 입력 안내", [await x.locator('.suggest-list:visible [role=option]').count(),/직접 입력/.test(await x.locator('.suggest-list:visible').innerText())], [0,true]);
+    await major.press("Tab");
+    await univ.fill("새로운테스트대학교"); await univ.press("Tab"); await major.press("Tab");
+    await x.reload(); await x.locator("#rows .rowhead").click(); await x.locator(".apptable .arow td:nth-child(2)").first().click();
+    check("목록에 없는 대학·학과도 직접 저장하고 다시 열기", [await univ.inputValue(),await major.inputValue()], ["새로운테스트대학교","새로운융합학과"]);
+    await univ.fill("동아"); await univ.dispatchEvent("compositionstart"); await univ.dispatchEvent("keydown",{key:"Enter",isComposing:true,keyCode:229}); await univ.dispatchEvent("compositionend");
+    check("한글 조합 중 Enter는 후보 선택·저장하지 않음", [await univ.inputValue(),(await data()).univ], ["동아","새로운테스트대학교"]);
+    await univ.press("Escape");
+    check("Escape로 후보만 닫기 및 모바일 가로 폭 유지", [await univ.getAttribute("aria-expanded"),await x.evaluate(()=>[innerWidth,document.documentElement.scrollWidth])], ["false",[360,360]]);
+    await c.close();
+  }
+  if(process.argv.includes("--input-ui")){
+    check("입력 화면 자바스크립트 오류 없음",errors,[]); await browser.close();
+    console.log((fail?"✗ "+fail+"개 실패 / ":"✓ 모두 통과 — ")+pass+"개 통과"); process.exitCode=fail?1:0; return;
+  }
+
   /* ── 4. 파일에서 명단 읽기 ─────────────────── */
   console.log("\n[파일에서 명단 읽기]");
   /* 파일을 넣으면 미리 보기가 뜨고 [넣기]를 눌러야 들어간다. 읽은 결과는 __dev.last() 로, 안내는 #importMsg 로 본다. */
