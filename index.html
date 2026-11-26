@@ -938,6 +938,17 @@ body.landing .wrap{max-width:1120px; padding-top:36px}
 .wait-summary{display:flex; flex-wrap:wrap; align-items:center; gap:5px 9px; font-size:12px}
 .wait-status{display:grid; justify-items:start; gap:5px; margin-top:6px}
 .wait-status .ghost{min-height:28px; padding:3px 8px}
+.rank-editor{display:inline-flex; flex-wrap:wrap; align-items:center; gap:5px; margin:5px 0 0; max-width:100%}
+.rank-editor label{display:inline-flex; align-items:center; gap:5px; white-space:nowrap}
+.rank-editor input{width:88px; min-width:0; min-height:36px; padding:6px 8px; font:inherit; font-size:16px; color:var(--ink); background:var(--surface); border:1px solid var(--line-2); border-radius:6px}
+.rank-editor button{min-height:36px}
+.rank-editor output{flex-basis:100%; font-size:12px; color:var(--ok)}
+.rank-editor output.error{color:var(--bad)}
+.rank-status{margin-left:auto}
+.rank-status .rank-editor{margin:0}
+.rank-entry .sub{flex:1; min-width:140px}
+.rank-entry .pill{font-size:12px}
+@media(max-width:640px){.rank-editor input,.rank-editor button{min-height:44px}.rank-status{flex-basis:100%;margin-left:0}}
 .wait-ann{color:var(--ink); font-weight:700}
 .wait-ann.passed{color:var(--warn)}
 .wait-deadline{color:var(--ink-2)}
@@ -1067,6 +1078,7 @@ body.landing .wrap{max-width:1120px; padding-top:36px}
       <span class="sp">
         <button class="ghost" id="btnUndo" hidden disabled>↶ 되돌리기</button>
         <button class="ghost" id="btnBulkRes" title="대학이나 발표일을 고르면 그 지원 학생들의 결과를 한 화면에서 넣습니다">결과 한꺼번에</button>
+        <button class="ghost" id="btnRanks" type="button" aria-expanded="false" aria-controls="bulkPanel">예비번호 입력</button>
         <button class="btn" id="btnAddStudents" type="button">＋ 학생·지원 추가</button>
         <details class="tmenu"><summary class="ghost">더보기 ▾</summary><div class="tmenu-list">
         <span class="menu-label">입시 도구</span>
@@ -2734,6 +2746,7 @@ function detail(st){
       var s=sel(STATUSES,a.status,function(v){a.status=v; save(st); render();});
       s.onclick=function(e){ e.stopPropagation(); };
       var sc=tr.insertCell(); sc.appendChild(s);
+      if(rankEligible(a)) sc.appendChild(rankEditor(st,a));
       if(hasWaitInfo(a)){
         var ws=el("div","wait-status");
         if(a.status==="충원대기") ws.appendChild(waitSummary(a,false));
@@ -3506,8 +3519,10 @@ function renderView(){
 var bulkC={open:false, mode:"univ", sel:""}, bulkA={open:false, mode:"univ", sel:""};
 function renderBulk(host, arr, showClass, S, btnId){
   host.hidden=!S.open; document.getElementById(btnId).setAttribute("aria-pressed",String(S.open));
+  if(!showClass) document.getElementById("btnRanks").setAttribute("aria-expanded",String(S.open&&S.mode==="rank"));
   if(!S.open) return;
   host.innerHTML="";
+  if(S.mode==="rank"){ renderRankEntry(host,arr,showClass,S); return; }
   var items=[]; arr.forEach(function(st){ (st.apps||[]).forEach(function(a){ if(a.univ) items.push({s:st,a:a}); }); });
   var live=function(a){ return !!LIVE[a.status||"지원완료"]; }, opts={};
   items.forEach(function(x){
@@ -3524,7 +3539,7 @@ function renderBulk(host, arr, showClass, S, btnId){
   }
   var hd=el("div","schedhead"); hd.appendChild(el("h2",null,"결과 한꺼번에 넣기"));
   var seg=el("span","seg");
-  [["univ","대학별"],["date","발표일별"]].forEach(function(p){ var b=el("button",null,p[1]); b.setAttribute("aria-pressed",String(S.mode===p[0])); b.onclick=function(){ S.mode=p[0]; S.sel=""; showClass?renderAll():render(); }; seg.appendChild(b); });
+  [["univ","대학별"],["date","발표일별"],["rank","예비번호"]].forEach(function(p){ var b=el("button",null,p[1]); b.setAttribute("aria-pressed",String(S.mode===p[0])); b.onclick=function(){ S.mode=p[0]; S.sel=""; showClass?renderAll():render(); }; seg.appendChild(b); });
   hd.appendChild(seg);
   var pk=document.createElement("select"); pk.className="bulkpick"; pk.setAttribute("aria-label",S.mode==="univ"?"대학 고르기":"발표일 고르기");
   L.forEach(function(o){ var op=document.createElement("option"); op.value=o.k; op.textContent=o.label+" — "+(o.live?"결과 기다림 "+o.live+" / ":"")+o.n+"건"; if(o.k===S.sel) op.selected=true; pk.appendChild(op); });
@@ -3533,7 +3548,7 @@ function renderBulk(host, arr, showClass, S, btnId){
   var x=el("button","ghost","닫기"); x.style.marginLeft="auto"; x.onclick=function(){ S.open=false; showClass?renderAll():render(); }; hd.appendChild(x);
   host.appendChild(hd);
   if(!L.length){ host.appendChild(el("div","sempty",S.mode==="univ"?"대학이 들어간 지원이 없습니다.":"발표일이 들어간 지원이 없습니다. 지원 고치기에서 발표일을 넣으면 여기서 고를 수 있습니다.")); return; }
-  host.appendChild(el("div","shint","고르면 바로 저장됩니다. 충원대기는 옆 칸에 예비 번호를 적으세요. 대학 목록은 결과를 기다리는 지원이 많은 곳부터입니다."));
+  host.appendChild(el("div","shint","결과를 고르면 바로 저장됩니다. 예비번호는 번호를 넣고 Enter 또는 저장을 누르세요."));
   var rows=items.filter(function(x){ return S.mode==="univ"?univKey(x.a.univ)===S.sel:(dateKey(announcement(x.a,"ann"))===S.sel||dateKey(announcement(x.a,"ann1"))===S.sel); });
   rows.sort(function(x,y){ return ((x.s.cls||0)-(y.s.cls||0))||String(x.s.no||"").localeCompare(String(y.s.no||"")); });   // 고르는 중에 줄이 움직이지 않게 학번순
   var off=canWrite===false||(demo&&!practice);
@@ -3547,9 +3562,88 @@ function renderBulk(host, arr, showClass, S, btnId){
     var find=function(){ var t=st0(s); return {t:t, a:(t.apps||[]).filter(function(y){ return y.id===a.id; })[0]}; };
     se.onchange=function(){ var f=find(); if(!f.a) return; remember("결과 입력"); f.a.status=se.value; save(f.t); showClass?renderAll():render(); };
     sp.appendChild(se);
-    if((a.status||"")==="충원대기"){ var rk=document.createElement("input"); rk.placeholder="예비 번호"; rk.value=a.rank||""; rk.disabled=off; rk.setAttribute("aria-label","예비 번호");
-      rk.onchange=function(){ var f=find(); if(!f.a) return; f.a.rank=rk.value.trim(); save(f.t); }; sp.appendChild(rk); }
     row.appendChild(sp); host.appendChild(row);
+    if(a.status==="충원대기") row.appendChild(rankEditor(s,a));
+  });
+}
+function rankEligible(a){ return a.status==="충원대기"||!!AWAIT[a.status||"지원완료"]; }
+function parseRank(value){
+  var text=String(value==null?"":value).normalize("NFKC").trim();
+  text=text.replace(/^예비(?:\s*번호)?\s*/,"").replace(/\s*번$/,"").trim();
+  if(!text) return "";
+  if(!/^\d+$/.test(text)||/^0+$/.test(text)) return null;
+  return text.replace(/^0+/,"");
+}
+var rankFeedback={key:"",text:""};
+function rankEditor(s,a){
+  var form=el("form","rank-editor"), key=JSON.stringify([s.id,a.id]);
+  form.dataset.rankKey=key;
+  var before=lnorm(a.rank), label=el("label",null,"예비번호"), input=document.createElement("input");
+  input.type="text"; input.inputMode="numeric"; input.enterKeyHint="next"; input.maxLength=20;
+  input.placeholder="번호"; input.value=parseRank(a.rank)===null?lnorm(a.rank):parseRank(a.rank);
+  input.setAttribute("aria-label",(s.name||"")+" "+(a.univ||"")+" "+(a.major||"")+" "+(a.jh||a.type||"")+" 예비번호");
+  input.disabled=!canEditWait(s);
+  label.appendChild(input); form.appendChild(label);
+  var button=el("button","ghost","저장"); button.type="submit"; button.disabled=input.disabled; form.appendChild(button);
+  var feedback=el("output"); feedback.setAttribute("aria-live","polite");
+  if(rankFeedback.key===key) feedback.textContent=rankFeedback.text;
+  form.appendChild(feedback);
+  form.onclick=function(e){e.stopPropagation();};
+  function commit(advance){
+    var current=students.get(s.id), app=current&&(current.apps||[]).find(function(x){return x.id===a.id;});
+    function error(message){ feedback.className="error"; feedback.textContent=message; input.setAttribute("aria-invalid","true"); }
+    if(!app||!canEditWait(current)||!rankEligible(app)){error("지원 상태나 수정 권한이 바뀌었습니다. 다시 확인해 주세요.");return;}
+    var rank=parseRank(input.value);
+    if(rank===null){error("1 이상의 예비번호를 넣어 주세요.");return;}
+    if(lnorm(app.rank)!==before&&parseRank(app.rank)!==rank){error("예비번호가 다른 화면에서 바뀌었습니다. 다시 열어 확인해 주세요.");return;}
+    var scope=form.closest("#bulkPanel,#allBulk,#rows,#waitlist,#allWaitlist"), scopeId=scope&&scope.id;
+    var editors=scope?Array.from(scope.querySelectorAll(".rank-editor")):[], nextKey=key;
+    var index=editors.indexOf(form);
+    if(advance&&index>=0){
+      var next=editors.slice(index+1).find(function(f){return !f.querySelector("input").disabled;});
+      if(next) nextKey=next.dataset.rankKey;
+    }
+    if(lnorm(app.rank)!==rank||(rank&&app.status!=="충원대기")){
+      remember("예비번호 입력"); app.rank=rank;
+      if(rank) app.status="충원대기";
+      save(current,true);
+    }
+    rankFeedback={key:key,text:rank?"예비 "+rank+"번 저장됨":"예비번호 지움"};
+    render();
+    var updated=scopeId&&document.getElementById(scopeId);
+    var target=updated&&Array.from(updated.querySelectorAll(".rank-editor")).find(function(f){return f.dataset.rankKey===nextKey;});
+    if(target){var field=target.querySelector("input");field.focus();field.select();}
+  }
+  form.onsubmit=function(e){e.preventDefault();commit(false);};
+  input.onkeydown=function(e){if(e.key==="Enter"){e.preventDefault();e.stopPropagation();commit(true);}};
+  input.oninput=function(){input.removeAttribute("aria-invalid");feedback.className="";feedback.textContent="";};
+  return form;
+}
+function renderRankEntry(host,arr,showClass,S){
+  var heading=el("div","schedhead");heading.appendChild(el("h2",null,"예비번호 입력"));
+  var close=el("button","ghost","닫기");close.style.marginLeft="auto";
+  close.onclick=function(){S.open=false;render();};heading.appendChild(close);host.appendChild(heading);
+  host.appendChild(el("p","shint","번호를 넣고 Enter 또는 저장을 누르세요. 충원 대기로 저장되며 Enter를 누르면 다음 칸으로 이동합니다."));
+  var items=[];
+  sorted(arr.slice()).forEach(function(s){(s.apps||[]).forEach(function(a){if(rankEligible(a)) items.push({s:s,a:a});});});
+  if(!items.length){host.appendChild(el("div","sempty","예비번호를 입력할 지원이 없습니다."));return;}
+  var names={};
+  items.forEach(function(x){names[univKey(x.a.univ)]=x.a.univ||"대학 미입력";});
+  if(S.sel&&!names[S.sel]) S.sel="";
+  var pick=document.createElement("select");pick.className="bulkpick";pick.setAttribute("aria-label","대학 고르기");
+  var all=el("option",null,"모든 대학");all.value="";pick.appendChild(all);
+  Object.keys(names).sort(function(a,b){return names[a].localeCompare(names[b],"ko");}).forEach(function(k){
+    var option=el("option",null,names[k]);option.value=k;pick.appendChild(option);
+  });
+  pick.value=S.sel;pick.onchange=function(){S.sel=pick.value;render();};host.appendChild(pick);
+  items.filter(function(x){return !S.sel||univKey(x.a.univ)===S.sel;}).forEach(function(x){
+    var s=x.s,a=x.a,row=el("div","sitem rank-entry");
+    var who=el("button","who",(showClass?s.cls+"반 ":"")+(s.no?s.no+" ":"")+(s.name||""));
+    who.onclick=function(){goStudent(s);};row.appendChild(who);
+    row.appendChild(el("span","sub",[a.univ,a.major,a.jh||a.type].filter(Boolean).join(" · ")));
+    row.appendChild(el("span","pill "+statusClass(a.status),a.status||"지원완료"));
+    var controls=el("div","rank-status");controls.appendChild(rankEditor(s,a));row.appendChild(controls);
+    host.appendChild(row);
   });
 }
 /* ── 오늘 발표 결과 바로 넣기 ── 충원 대기는 정보 입력을 마치면 함께 저장한다. */
@@ -3704,6 +3798,7 @@ function renderWaitlist(host,arr,showClass){
     who.onclick=function(){ goStudent(s); }; row.appendChild(who);
     row.appendChild(el("span","sub",appName(a)));
     row.appendChild(waitButton(s,a)); row.appendChild(waitSummary(a,true)); host.appendChild(row);
+    row.appendChild(rankEditor(s,a));
   });
 }
 // 충원 기간(합격자 등록 시작 ~ 충원 통보 마감)인 충원 대기 지원. 방금 넣은 것도 그 자리에 남긴다
@@ -5281,7 +5376,11 @@ function bindStatic(){
   // 더보기 메뉴: 고르면 닫고, 바깥을 누르면 닫는다
   document.querySelectorAll(".tmenu,.class-tools").forEach(function(m){ m.addEventListener("click",function(e){ if(e.target.closest(".tmenu-list button")) m.open=false; }); });
   document.addEventListener("click",function(e){ document.querySelectorAll(".tmenu[open],.class-tools[open]").forEach(function(m){ if(!m.contains(e.target)) m.open=false; }); });
-  document.getElementById("btnBulkRes").onclick=function(){ bulkC.open=!bulkC.open; render(); if(bulkC.open) document.getElementById("bulkPanel").scrollIntoView({block:"start"}); };
+  document.getElementById("btnBulkRes").onclick=function(){ bulkC.open=!bulkC.open||bulkC.mode==="rank"; if(bulkC.mode==="rank"){bulkC.mode="univ";bulkC.sel="";} render(); if(bulkC.open) document.getElementById("bulkPanel").scrollIntoView({block:"start"}); };
+  document.getElementById("btnRanks").onclick=function(){
+    bulkC.open=!bulkC.open||bulkC.mode!=="rank";bulkC.mode="rank";bulkC.sel="";render();
+    if(bulkC.open){var host=document.getElementById("bulkPanel");host.scrollIntoView({block:"start"});var first=host.querySelector(".rank-editor input:not(:disabled)");if(first) first.focus({preventScroll:true});}
+  };
   [].forEach.call(document.querySelectorAll("#clsTabs button"),function(b){
     b.onclick=function(){ openClassTab(b.dataset.t); };
     b.onkeydown=function(e){

@@ -726,6 +726,8 @@ function buildTestPage() {
     await c.addInitScript((a) => { if (!sessionStorage.getItem("seeded")) { sessionStorage.setItem("seeded", "1"); localStorage.setItem("jh.cls", "2");
       if (a.local) localStorage.setItem("jh.local.students", JSON.stringify(a.local)); } if (a.email) window.__fbEmail = a.email; }, o);
     const x = await c.newPage(); x.on("pageerror", (e) => errors.push(String(e))); x.on("dialog", (d) => d.accept());
+    // 고사 일정이 지나도 같은 학교 장부 시나리오를 검증한다.
+    await x.clock.install({time:new Date("2026-11-10T09:00:00+09:00")});
     await x.goto("http://localhost:" + port + "/?fb=1" + (o.hash || "")); await x.waitForTimeout(600);
     x.makeSchool = async () => {
       await x.click("#banner .choice >> text=관리자입니다"); await x.click("#banner .btn >> text=구글로 로그인"); await x.waitForTimeout(300);
@@ -1183,12 +1185,81 @@ function buildTestPage() {
     check("결과 한꺼번에: 기다리는 대학 먼저, 캠퍼스 표기 달라도 같은 대학으로", [/부산대 — 결과 기다림 2 \/ 2건/.test(pick[1]), names], [true, ["30201 가나", "30202 다라"]]);
     await x.selectOption("#bulkPanel .bulkrow >> nth=0 >> select", "최초합"); await x.waitForTimeout(150);
     await x.selectOption("#bulkPanel .bulkrow >> nth=1 >> select", "충원대기"); await x.waitForTimeout(150);
-    await x.fill("#bulkPanel .bulkrow >> nth=1 >> input", "7"); await x.press("#bulkPanel .bulkrow >> nth=1 >> input", "Tab"); await x.waitForTimeout(150);
+    await x.fill("#bulkPanel .bulkrow >> nth=1 >> input", "7"); await x.press("#bulkPanel .bulkrow >> nth=1 >> input", "Enter"); await x.waitForTimeout(150);
     const saved = await x.evaluate(() => window.__dev.students().map((s) => s.apps[0].status + (s.apps[0].rank ? ":" + s.apps[0].rank : "")));
     check("결과 한꺼번에: 고르면 바로 저장, 충원대기는 예비 번호", saved, ["최초합", "충원대기:7", "지원완료"]);
     await x.click("#bulkPanel .seg button >> text=발표일별"); await x.waitForTimeout(150);
     const dpick = await x.$eval("#bulkPanel select.bulkpick", (s) => s.options[s.selectedIndex].textContent);
     check("결과 한꺼번에(발표일별): 오늘과 가까운 발표일을 먼저", /^11\/30\(월\) 발표|^11\/24\(화\) 발표/.test(dpick), true);
+    await c.close();
+  }
+  console.log("\n[예비번호 빠른 입력과 지원 대학 반영]");
+  {
+    const c = await browser.newContext({viewport:{width:1200,height:900}});
+    const x = await c.newPage();
+    x.on("pageerror",e=>errors.push(String(e)));
+    await x.addInitScript(() => {
+      if(sessionStorage.getItem("rankFixture")) return;
+      sessionStorage.setItem("rankFixture","1");
+      localStorage.setItem("jh.mode","local");localStorage.setItem("jh.cls","2");localStorage.setItem("jh.mycls","2");
+      const apps=[
+        {id:"rank-a",kind:"수시",univ:"동서대학교",major:"경영학부",jh:"일반계교과",status:"지원완료"},
+        {id:"rank-b",kind:"수시",univ:"동서대학교",major:"경영학부",jh:"고교생활우수자",status:"충원대기",rank:"8"},
+        {id:"rank-c",kind:"수시",univ:"부산대학교",major:"경제학과",status:"최초합",rank:"2"}
+      ];
+      localStorage.setItem("jh.local.students",JSON.stringify([
+        {id:"rank-student",cls:2,no:"30201",name:"번호입력",apps},
+        {id:"other",cls:2,no:"30202",name:"다음학생",apps:[{id:"rank-d",kind:"수시",univ:"부산대학교",major:"경제학과",status:"지원완료"}]}
+      ]));
+    });
+    await x.goto("file://"+page404);
+    await x.locator("#btnRanks").click();
+    const editors=x.locator("#bulkPanel .rank-editor");
+    check("예비번호 입력: 모든 대학을 학생순으로 표시하고 입력 가능한 지원만 노출",
+      [await editors.count(),await editors.first().locator("input").evaluate(i=>i===document.activeElement)],
+      [3,true]);
+    await editors.first().locator("input").fill("１２");
+    await editors.first().locator("input").press("Enter");
+    const displayed=await x.locator("#rows .rowhead").first().innerText();
+    check("Enter 저장: 해당 전형만 충원 대기·예비번호가 되고 다음 전형으로 포커스 이동",
+      [await x.evaluate(()=>window.__dev.students()[0].apps.map(a=>[a.status,a.rank||""])),
+        /일반계교과/.test(await x.locator("#bulkPanel .rank-entry").first().innerText()),
+        /충원대기 · 예비 12번/.test(displayed),
+        await editors.nth(1).locator("input").evaluate(i=>i===document.activeElement)],
+      [[["충원대기","12"],["충원대기","8"],["최초합","2"]],true,true,true]);
+    await editors.nth(1).locator("input").fill("-3");
+    await editors.nth(1).getByRole("button",{name:"저장",exact:true}).click();
+    check("잘못된 예비번호는 저장하지 않고 오류 표시",
+      [await editors.nth(1).locator("input").getAttribute("aria-invalid"),
+        await x.evaluate(()=>window.__dev.students()[0].apps[1].rank)],
+      ["true","8"]);
+    await editors.nth(1).locator("input").fill("예비 15번");
+    await editors.nth(1).getByRole("button",{name:"저장",exact:true}).click();
+    await x.locator("#bulkPanel").getByRole("button",{name:"닫기",exact:true}).click();
+    await x.locator("#rows .rowhead").first().click();
+    const detail=x.locator("#rows .apptable .rank-editor");
+    check("학생별 지원 대학 탭: 같은 대학의 전형별 예비번호를 각각 표시",
+      [await detail.locator("input").evaluateAll(inputs=>inputs.map(i=>i.value)),
+        /예비 15번/.test(await x.locator("#rows .rowhead").first().innerText())],
+      [["12","15"],true]);
+    await detail.first().locator("input").fill("21");
+    await detail.first().getByRole("button",{name:"저장",exact:true}).click();
+    check("지원 대학 탭에서 수정하면 접힌 목록과 충원 목록도 함께 갱신",
+      [/예비 21번/.test(await x.locator("#rows .rowhead").first().innerText()),
+        /예비 21/.test(await x.locator("#waitlist").innerText())],[true,true]);
+    await x.reload();
+    await x.locator("#rows .rowhead").first().waitFor();
+    check("저장 직후 새로고침해도 학생별·전형별 번호가 유지",
+      await x.evaluate(()=>window.__dev.students()[0].apps.map(a=>[a.status,a.rank])),
+      [["충원대기","21"],["충원대기","15"],["최초합","2"]]);
+    await x.setViewportSize({width:360,height:780});
+    await x.locator("#btnRanks").click();
+    await editors.first().locator("input").fill("");
+    await editors.first().getByRole("button",{name:"저장",exact:true}).click();
+    check("모바일: 번호만 지우면 충원 대기를 유지하고 다른 전형 번호도 유지",
+      [await x.evaluate(()=>window.__dev.students()[0].apps.slice(0,2).map(a=>[a.status,a.rank])),
+        await x.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)],
+      [[["충원대기",""],["충원대기","15"]],true]);
     await c.close();
   }
   check("자바스크립트 오류 없음", errors, []);
